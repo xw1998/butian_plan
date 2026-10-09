@@ -12,6 +12,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="butian")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init")
+    serve = sub.add_parser("serve"); serve.add_argument("--host", default="127.0.0.1"); serve.add_argument("--port", type=int, default=8765)
+    sub.add_parser("mcp")
     member = sub.add_parser("member").add_subparsers(dest="member_command", required=True)
     add = member.add_parser("add"); add.add_argument("member_id"); add.add_argument("name"); add.add_argument("--role", default="member"); add.add_argument("--model")
     task = sub.add_parser("task").add_subparsers(dest="task_command", required=True)
@@ -21,6 +23,12 @@ def main(argv: list[str] | None = None) -> int:
     path = home() / "team.db"
     if args.command == "init":
         Store(path).close(); print(f"initialized {path}"); return 0
+    if args.command == "serve":
+        from .runtime.http_api import serve as run_server
+        run_server(home(), args.host, args.port); return 0
+    if args.command == "mcp":
+        from .mcp_server import run
+        run(home()); return 0
     store = Store(path)
     try:
         if args.command == "member" and args.member_command == "add":

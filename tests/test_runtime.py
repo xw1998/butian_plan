@@ -1,0 +1,29 @@
+from butian.runtime.service import ButianService
+
+
+def test_member_memory_and_model_negotiation(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "研究员", model_id="special")
+    memory = service.memory("m1")
+    memory.put("mem1", "lesson", "先验证证据", confidence=0.9, status="warm")
+    assert memory.search("证据")[0]["memory_id"] == "mem1"
+    memory.close()
+    session = service.create_session("team", "m1", "special", {"can_select_model": False})
+    result = service.select_model(session["session_id"], "special", {"can_select_model": False})
+    assert result["selection_status"] == "unsupported"
+    service.close()
+
+
+def test_question_and_handoff_require_structure(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "派活者")
+    session = service.create_session("team", "m1")
+    task = service.store.create_task(session["session_id"], "确认需求", "m1")
+    service.store.transition_task(task, 1, "ready", "ready-1")
+    service.store.transition_task(task, 2, "claimed", "claim-1")
+    service.store.transition_task(task, 3, "running", "run-1")
+    question_id = service.ask_user(task, 4, "m1", "请选择范围")
+    assert service.store.db.execute("select status from tasks where task_id=?", (task,)).fetchone()[0] == "waiting_user"
+    assert service.answer_user(question_id, "全部") == task
+    service.submit_handoff({"task_id": task, "task_revision": 6, "member_id": "m1", "status": "done", "summary": "已确认", "evidence_ids": [], "next_action": "review", "confidence": 0.8})
+    service.close()
