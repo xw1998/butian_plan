@@ -63,8 +63,32 @@ class Store:
             self.db.execute("UPDATE operations SET state='committed' WHERE operation_id=?", (operation_id,))
             self.db.execute("UPDATE events SET commit_state='committed' WHERE operation_id=?", (operation_id,))
 
-    def list_tasks(self) -> list[dict[str, Any]]:
+    def list_tasks(self, status: str | None = None) -> list[dict[str, Any]]:
+        if status:
+            return [dict(row) for row in self.db.execute("SELECT * FROM tasks WHERE status=? ORDER BY rowid", (status,))]
         return [dict(row) for row in self.db.execute("SELECT * FROM tasks ORDER BY rowid")]
+
+    def recover(self) -> list[dict[str, Any]]:
+        pending = [dict(row) for row in self.db.execute("SELECT * FROM operations WHERE state IN ('prepared','pending_recovery')")]
+        for operation in pending:
+            with self.db:
+                self.db.execute("UPDATE operations SET state='incomplete', error=? WHERE operation_id=?", ("requires replay or manual review", operation["operation_id"]))
+                self.db.execute("UPDATE events SET commit_state='incomplete' WHERE operation_id=? AND commit_state!='committed'", (operation["operation_id"],))
+        return pending
+
+    def verify_evidence(self, evidence_id: str) -> dict[str, Any]:
+        row = self.db.execute("SELECT * FROM evidence WHERE evidence_id=?", (evidence_id,)).fetchone()
+        if not row:
+            raise ValueError("evidence_not_found")
+        try:
+            data = Path(row["path"]).read_bytes()
+            current_hash = hashlib.sha256(data).hexdigest()
+            current_size = len(data)
+        except OSError:
+            current_hash, current_size = None, None
+        status = "valid" if current_hash == row["sha256"] and current_size == row["size"] else "stale"
+        self.db.execute("UPDATE evidence SET status=? WHERE evidence_id=?", (status, evidence_id))
+        return {"evidence_id": evidence_id, "status": status, "sha256": current_hash, "size": current_size}
 
     def record_evidence(self, path: str | Path) -> str:
         p = Path(path)
