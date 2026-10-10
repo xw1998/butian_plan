@@ -1,5 +1,6 @@
 from __future__ import annotations
 import hashlib
+import hmac
 import json
 import sqlite3
 import time
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS evidence (evidence_id TEXT PRIMARY KEY, path TEXT NOT
 CREATE TABLE IF NOT EXISTS memory_verifications (verification_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, operation_key TEXT NOT NULL UNIQUE, outcome TEXT NOT NULL, evidence_ids TEXT NOT NULL, environment TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_events_aggregate ON events(aggregate_id, seq);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE TABLE IF NOT EXISTS members_auth (member_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, created_at REAL NOT NULL);
 """
 
 class Store:
@@ -38,6 +40,47 @@ class Store:
 
     def add_member(self, member_id: str, name: str, role: str = "member", responsibilities: list[str] | None = None, provider_id: str | None = None, model_id: str | None = None) -> None:
         self.db.execute("INSERT INTO members VALUES (?, ?, ?, ?, ?, ?)", (member_id, name, role, json.dumps(responsibilities or [], ensure_ascii=False), provider_id, model_id))
+
+    def set_member_token(self, member_id: str, token: str) -> None:
+        if not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
+            raise ValueError("member_not_found")
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        self.db.execute("INSERT INTO members_auth VALUES (?, ?, ?) ON CONFLICT(member_id) DO UPDATE SET token_hash=excluded.token_hash", (member_id, token_hash, time.time()))
+
+    def authenticate_member(self, member_id: str, token: str | None = None) -> bool:
+        if not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
+            return False
+        row = self.db.execute("SELECT token_hash FROM members_auth WHERE member_id=?", (member_id,)).fetchone()
+        return row is None or (token is not None and hmac.compare_digest(row["token_hash"], hashlib.sha256(token.encode("utf-8")).hexdigest()))
+
+    def claim_task(self, task_id: str, member_id: str, lease_seconds: int = 300, token: str | None = None) -> dict[str, Any]:
+        if not self.authenticate_member(member_id, token):
+            raise ValueError("member_authentication_failed")
+        lease_id = f"lease_{uuid.uuid4().hex}"; now = time.time()
+        with self.db:
+            row = self.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if not row: raise ValueError("task_not_found")
+            if row["lease_until"] and row["lease_until"] > now and row["lease_id"]: raise ValueError("task_lease_held")
+            transition = __import__("butian.core.state_machine", fromlist=["transition"]).transition
+            transition(__import__("butian.core.models", fromlist=["TaskStatus"]).TaskStatus(row["status"]), __import__("butian.core.models", fromlist=["TaskStatus"]).TaskStatus.CLAIMED)
+            updated = self.db.execute("UPDATE tasks SET status='claimed', assignee_id=?, lease_id=?, lease_until=?, revision=revision+1 WHERE task_id=? AND revision=?", (member_id, lease_id, now + lease_seconds, task_id, row["revision"])).rowcount
+            if updated != 1:
+                raise ValueError("revision_conflict")
+        return {"task_id": task_id, "lease_id": lease_id, "revision": row["revision"] + 1, "lease_until": now + lease_seconds}
+
+    def heartbeat(self, task_id: str, lease_id: str, lease_seconds: int = 300) -> None:
+        updated = self.db.execute("UPDATE tasks SET lease_until=? WHERE task_id=? AND lease_id=? AND lease_until>?", (time.time() + lease_seconds, task_id, lease_id, time.time())).rowcount
+        if updated != 1: raise ValueError("lease_invalid")
+
+    def release_lease(self, task_id: str, lease_id: str) -> None:
+        with self.db:
+            row = self.db.execute("SELECT status FROM tasks WHERE task_id=? AND lease_id=?", (task_id, lease_id)).fetchone()
+            if not row:
+                raise ValueError("lease_invalid")
+            if row["status"] == "claimed":
+                self.db.execute("UPDATE tasks SET status='ready', assignee_id=NULL, lease_id=NULL, lease_until=NULL, revision=revision+1 WHERE task_id=? AND lease_id=?", (task_id, lease_id))
+            else:
+                self.db.execute("UPDATE tasks SET lease_id=NULL, lease_until=NULL WHERE task_id=? AND lease_id=?", (task_id, lease_id))
 
     def create_session(self, mode: str, dispatcher_member_id: str | None, requested_model: str | None, capabilities: dict[str, Any]) -> str:
         session_id = f"sess_{uuid.uuid4().hex}"
@@ -126,8 +169,11 @@ class Store:
         self.db.execute("INSERT INTO memory_verifications VALUES (?,?,?,?,?,?,?)", (verification_id, memory_id, operation_key, outcome, json.dumps(evidence_ids), json.dumps(environment or {}, ensure_ascii=False), time.time()))
         return verification_id
 
-    def record_evidence(self, path: str | Path) -> str:
-        p = Path(path)
+    def record_evidence(self, path: str | Path, root: str | Path | None = None) -> str:
+        p = Path(path).resolve()
+        if root is not None:
+            base = Path(root).resolve()
+            if base not in p.parents and p != base: raise ValueError("evidence_path_outside_root")
         data = p.read_bytes()
         evidence_id = f"ev_{uuid.uuid4().hex}"
         self.db.execute("INSERT INTO evidence VALUES (?,?,?,?,?,?)", (evidence_id, str(p), hashlib.sha256(data).hexdigest(), len(data), "valid", time.time()))

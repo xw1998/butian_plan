@@ -29,3 +29,33 @@ def test_evidence_hash(tmp_path):
     row = store.db.execute("select sha256, size, status from evidence").fetchone()
     assert row["size"] == 8 and row["status"] == "valid"
     store.close()
+
+
+def test_claim_requires_member_and_release_requeues(tmp_path):
+    store = Store(tmp_path / "team.db")
+    store.add_member("worker", "执行者")
+    session = store.create_session("team", "worker", None, {})
+    task = store.create_task(session, "leased")
+    store.transition_task(task, 1, "ready", "lease-ready")
+    lease = store.claim_task(task, "worker")
+    assert store.list_tasks()[0]["status"] == "claimed"
+    store.release_lease(task, lease["lease_id"])
+    row = store.list_tasks()[0]
+    assert row["status"] == "ready" and row["lease_id"] is None
+    with pytest.raises(ValueError, match="member_authentication_failed"):
+        store.claim_task(task, "missing")
+    store.close()
+
+
+def test_claim_token_is_checked(tmp_path):
+    store = Store(tmp_path / "team.db")
+    store.add_member("worker", "执行者")
+    store.set_member_token("worker", "secret")
+    session = store.create_session("team", "worker", None, {})
+    task = store.create_task(session, "protected")
+    store.transition_task(task, 1, "ready", "token-ready")
+    with pytest.raises(ValueError, match="member_authentication_failed"):
+        store.claim_task(task, "worker", token="wrong")
+    lease = store.claim_task(task, "worker", token="secret")
+    assert lease["lease_id"].startswith("lease_")
+    store.close()
