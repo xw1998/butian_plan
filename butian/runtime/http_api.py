@@ -46,7 +46,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             latest_maintenance = None
             if latest:
                 latest_maintenance = {"event_type": latest["event_type"], "payload": json.loads(latest["payload"]), "created_at": latest["created_at"]}
-            self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "not_implemented", "rewarm_policy": "evidence_required"}}); return
+            self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "url_capture_with_audit_ledger", "rewarm_policy": "evidence_required"}}); return
         if self.path == "/api/tasks":
             self._send(200, {"tasks": self.service.store.list_tasks()}); return
         if self.path == "/api/questions":
@@ -65,6 +65,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(200, {"hypotheses": [dict(row) for row in self.service.store.db.execute("SELECT * FROM practice_hypotheses ORDER BY updated_at DESC")]}); return
         if self.path == "/api/knowledge/claims":
             self._send(200, {"claims": [dict(row) for row in self.service.store.db.execute("SELECT * FROM source_claims ORDER BY created_at DESC")]}); return
+        if self.path == "/api/knowledge/runs":
+            self._send(200, {"runs": self.service.learning.list_learning_runs()}); return
         if self.path == "/api/events":
             self._send(200, {"events": [dict(row) for row in self.service.store.db.execute("SELECT * FROM events ORDER BY created_at DESC LIMIT 50")]}); return
         if urlparse(self.path).path == "/api/evolution":
@@ -119,6 +121,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(201, {"hypothesis_id": hypothesis_id, "assessment": {"reliability": assessment.reliability, "rationale": assessment.rationale}}); return
             if path == "/api/knowledge/sources":
                 source_id = self.service.learning.add_source(body["source_type"], body["locator"], body["title"], body["content_hash"], metadata=body.get("metadata")); self._send(201, {"source_id": source_id}); return
+            if path == "/api/knowledge/capture":
+                result = self.service.learning.capture_url(body["url"], title=body.get("title"), source_type=body.get("source_type", "web"), timeout=float(body.get("timeout", 10)), max_bytes=int(body.get("max_bytes", 1_000_000)))
+                result.pop("content", None)
+                self._send(201, result); return
             if path == "/api/knowledge/sources/verify":
                 result = self.service.learning.verify_source_content(body["source_id"], body["content"]); self._send(200, result); return
             if path == "/api/knowledge/claims":
