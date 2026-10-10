@@ -199,3 +199,21 @@ def test_dream_hypothesis_argument_and_verification_drive(tmp_path):
     assert outcome["status"] == "supported"
     assert memory.get("new")["content"] == "验证后的经验"
     memory.close()
+
+
+def test_memory_dream_distillation_and_abstraction_are_auditable_and_idempotent(tmp_path):
+    from butian.runtime.dream import DreamRunner
+    memory = MemoryStore(tmp_path / "memory.db")
+    dream = DreamRunner(memory)
+    memory.put("m1", "lesson", "电源布局测试一", source_event_ids=["e1"])
+    memory.put("m2", "lesson", "电源布局测试二", source_event_ids=["e2"])
+    distill = dream.distill_memories(["m1", "m2"], summary="电源布局测试摘要", merged_items=["重复项"], conflicts=["条件不同"], discarded_items=[], information_loss=.1)
+    again = dream.distill_memories(["m2", "m1"], summary="电源布局测试摘要", information_loss=.1)
+    assert distill["distillation_id"] == again["distillation_id"]
+    assert distill["status"] == "candidate" and distill["reversible"] == 1
+    abstract = dream.abstract_memories(["m1", "m2"], pattern="布局必须结合负载条件验证", supports=["m1", "m2"], counterexamples=["e3"], applicability=["同一电源拓扑"], failure_conditions=["负载变化"], abstraction_level=1)
+    assert abstract["status"] == "candidate"
+    assert '负载变化' in abstract["failure_conditions"]
+    with pytest.raises(ValueError, match="distillation_must_be_reversible"):
+        dream.distill_memories(["m1", "m2"], summary="不可逆", reversible=False)
+    memory.close()

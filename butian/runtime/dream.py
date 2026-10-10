@@ -13,6 +13,8 @@ class DreamRunner:
         CREATE TABLE IF NOT EXISTS verification_queue (queue_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, action_id TEXT NOT NULL, priority REAL NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS dream_candidates (candidate_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, memory_ids TEXT NOT NULL, content TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS dream_lock (lock_id INTEGER PRIMARY KEY CHECK(lock_id=1), owner TEXT NOT NULL, acquired_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS memory_distillations (distillation_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL UNIQUE, source_memory_ids TEXT NOT NULL, summary TEXT NOT NULL, merged_items TEXT NOT NULL, conflicts TEXT NOT NULL, discarded_items TEXT NOT NULL, information_loss REAL NOT NULL, reversible INTEGER NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS memory_abstractions (abstraction_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL UNIQUE, source_memory_ids TEXT NOT NULL, pattern TEXT NOT NULL, supports TEXT NOT NULL, counterexamples TEXT NOT NULL, applicability TEXT NOT NULL, failure_conditions TEXT NOT NULL, abstraction_level INTEGER NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
         ''')
 
     def run(self, *, min_fragments=3, min_interval=3600, budget=10, now=None):
@@ -42,6 +44,50 @@ class DreamRunner:
             self.memory.db.execute("INSERT INTO dream_candidates VALUES (?,?,?,?,?,?)", (candidate_id, run_id, json.dumps([row["memory_id"] for row in rows]), content, "candidate", now))
             self.memory.db.execute("DELETE FROM dream_lock WHERE lock_id=1")
             return {"run_id": run_id, "status": "completed", "candidate_id": candidate_id, "gate": gate}
+
+    def distill_memories(self, memory_ids, *, summary: str, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True):
+        ids = list(dict.fromkeys(memory_ids))
+        if len(ids) < 2 or not summary.strip():
+            raise ValueError("distillation_requires_multiple_memories_and_summary")
+        if not 0 <= information_loss <= 1:
+            raise ValueError("information_loss_out_of_range")
+        if not reversible:
+            raise ValueError("distillation_must_be_reversible")
+        placeholders = ",".join("?" for _ in ids)
+        rows = list(self.memory.db.execute(f"SELECT memory_id FROM memories WHERE memory_id IN ({placeholders}) AND status NOT IN ('invalidated','archived')", ids))
+        if len(rows) != len(ids):
+            raise ValueError("distillation_source_memory_not_found")
+        fingerprint = "|".join(sorted(ids)) + "|" + summary.strip()
+        distillation_id = f"distill_{uuid.uuid4().hex}"
+        now = time.time()
+        with self.memory.db:
+            try:
+                self.memory.db.execute("INSERT INTO memory_distillations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (distillation_id, fingerprint, json.dumps(ids, ensure_ascii=False), summary.strip(), json.dumps(list(merged_items or []), ensure_ascii=False), json.dumps(list(conflicts or []), ensure_ascii=False), json.dumps(list(discarded_items or []), ensure_ascii=False), information_loss, 1, "candidate", now))
+            except Exception as exc:
+                if "UNIQUE" in str(exc).upper():
+                    return dict(self.memory.db.execute("SELECT * FROM memory_distillations WHERE fingerprint=?", (fingerprint,)).fetchone())
+                raise
+        return dict(self.memory.db.execute("SELECT * FROM memory_distillations WHERE distillation_id=?", (distillation_id,)).fetchone())
+
+    def abstract_memories(self, memory_ids, *, pattern: str, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1):
+        ids = list(dict.fromkeys(memory_ids))
+        if len(ids) < 2 or not pattern.strip() or abstraction_level < 1:
+            raise ValueError("abstraction_requires_multiple_memories_and_pattern")
+        placeholders = ",".join("?" for _ in ids)
+        rows = list(self.memory.db.execute(f"SELECT memory_id FROM memories WHERE memory_id IN ({placeholders}) AND status NOT IN ('invalidated','archived')", ids))
+        if len(rows) != len(ids):
+            raise ValueError("abstraction_source_memory_not_found")
+        fingerprint = "|".join(sorted(ids)) + "|" + pattern.strip()
+        abstraction_id = f"abstract_{uuid.uuid4().hex}"
+        now = time.time()
+        with self.memory.db:
+            try:
+                self.memory.db.execute("INSERT INTO memory_abstractions VALUES (?,?,?,?,?,?,?,?,?,?,?)", (abstraction_id, fingerprint, json.dumps(ids, ensure_ascii=False), pattern.strip(), json.dumps(list(supports or ids), ensure_ascii=False), json.dumps(list(counterexamples or []), ensure_ascii=False), json.dumps(list(applicability or []), ensure_ascii=False), json.dumps(list(failure_conditions or []), ensure_ascii=False), abstraction_level, "candidate", now))
+            except Exception as exc:
+                if "UNIQUE" in str(exc).upper():
+                    return dict(self.memory.db.execute("SELECT * FROM memory_abstractions WHERE fingerprint=?", (fingerprint,)).fetchone())
+                raise
+        return dict(self.memory.db.execute("SELECT * FROM memory_abstractions WHERE abstraction_id=?", (abstraction_id,)).fetchone())
 
     def propose_hypothesis(self, candidate_id: str, statement: str, *, prior_reliability: float, argument: str, evidence_refs=None):
         if not 0 <= prior_reliability <= 1:
