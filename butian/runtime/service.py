@@ -59,6 +59,57 @@ class ButianService:
             self.store.db.execute("UPDATE tasks SET status='ready', revision=revision+1, payload=? WHERE task_id=? AND revision=?", (json.dumps({"answer": answer}), row["task_id"], task["revision"]))
         return row["task_id"]
 
+    def ask_peer(self, asker_id: str, expert_id: str, question: str, *, task_id: str | None = None, comparison: dict[str, Any] | None = None):
+        if asker_id == expert_id:
+            raise ValueError("peer_learning_requires_two_members")
+        for member_id in (asker_id, expert_id):
+            if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
+                raise ValueError("member_not_found:" + member_id)
+        learning_id = f"learn_{uuid.uuid4().hex}"
+        self.store.db.execute("INSERT INTO peer_learning VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (learning_id, asker_id, expert_id, task_id, question, None, json.dumps(comparison or {}, ensure_ascii=False), "asked", None, "[]", time.time(), None))
+        return learning_id
+
+    def answer_peer(self, learning_id: str, answer: str, *, method: str | None = None, evidence_ids: list[str] | None = None):
+        row = self.store.db.execute("SELECT * FROM peer_learning WHERE learning_id=?", (learning_id,)).fetchone()
+        if not row or row["status"] != "asked":
+            raise ValueError("peer_learning_not_open")
+        candidate_id = f"mem_{uuid.uuid4().hex}"
+        candidate = {"answer": answer, "method": method, "expert_id": row["expert_id"], "learning_id": learning_id, "verification_required": True}
+        memory = self.memory(row["asker_id"])
+        try:
+            memory.put(candidate_id, "peer_learning_candidate", json.dumps(candidate, ensure_ascii=False), confidence=0.2, weight=0.2, environment={"source": "peer", "expert_id": row["expert_id"]}, source_event_ids=[learning_id], status="candidate")
+        finally:
+            memory.close()
+        ids = evidence_ids or []
+        self.store.db.execute("UPDATE peer_learning SET answer=?, status='candidate', candidate_memory_id=?, evidence_ids=? WHERE learning_id=?", (answer, candidate_id, json.dumps(ids), learning_id))
+        return {"learning_id": learning_id, "candidate_memory_id": candidate_id, "status": "candidate"}
+
+    def verify_peer_learning(self, learning_id: str, *, success: bool, evidence_ids: list[str] | None = None, notes: str = ""):
+        row = self.store.db.execute("SELECT * FROM peer_learning WHERE learning_id=?", (learning_id,)).fetchone()
+        if not row or row["status"] not in ("candidate", "verified", "rejected"):
+            raise ValueError("peer_learning_not_candidate")
+        status = "verified" if success else "rejected"
+        memory = self.memory(row["asker_id"])
+        try:
+            mem = memory.db.execute("SELECT * FROM memories WHERE memory_id=?", (row["candidate_memory_id"],)).fetchone()
+            if mem:
+                new_status = "warm" if success else "candidate"
+                new_weight = min(5.0, float(mem["weight"]) + (1.0 if success else -0.2))
+                new_confidence = min(1.0, float(mem["confidence"]) + (0.2 if success else 0.0))
+                memory.db.execute("UPDATE memories SET status=?, weight=?, confidence=?, updated_at=? WHERE memory_id=?", (new_status, new_weight, new_confidence, time.time(), row["candidate_memory_id"]))
+        finally:
+            memory.close()
+        ids = evidence_ids or json.loads(row["evidence_ids"])
+        with self.store.db:
+            self.store.db.execute("UPDATE peer_learning SET status=?, evidence_ids=?, verified_at=?, comparison=? WHERE learning_id=?", (status, json.dumps(ids), time.time(), json.dumps({**json.loads(row["comparison"]), "verification_notes": notes, "success": success}, ensure_ascii=False), learning_id))
+        return {"learning_id": learning_id, "status": status, "candidate_memory_id": row["candidate_memory_id"]}
+
+    def list_peer_learning(self, *, status: str | None = None, member_id: str | None = None):
+        sql = "SELECT * FROM peer_learning WHERE 1=1"; args: list[Any] = []
+        if status: sql += " AND status=?"; args.append(status)
+        if member_id: sql += " AND (asker_id=? OR expert_id=?)"; args.extend([member_id, member_id])
+        return [dict(row) for row in self.store.db.execute(sql + " ORDER BY created_at DESC", args)]
+
     def submit_handoff(self, handoff: dict[str, Any]):
         required = {"task_id", "task_revision", "member_id", "status", "summary", "evidence_ids", "next_action", "confidence"}
         missing = required - handoff.keys()
