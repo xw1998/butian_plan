@@ -11,6 +11,7 @@ def test_state_machine_rejects_done_to_running():
 
 def test_store_revision_and_idempotent_event(tmp_path):
     store = Store(tmp_path / "team.db")
+    store.add_member("dispatcher", "派活者")
     session = store.create_session("team", "dispatcher", "model-a", {"can_create_child_session": False})
     task = store.create_task(session, "research")
     store.transition_task(task, 1, "ready", "op-1")

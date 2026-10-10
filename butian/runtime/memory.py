@@ -23,9 +23,11 @@ class MemoryStore:
     def close(self):
         self.db.close()
 
-    def put(self, memory_id: str, kind: str, content: str, *, confidence=0.0, weight=1.0, environment=None, source_event_ids=None, status="candidate"):
+    def put(self, memory_id: str, kind: str, content: str, *, confidence=0.0, weight=1.0, environment=None, source_event_ids=None, status="candidate", source_validator=None):
         if status in {"warm", "hot"} and not source_event_ids:
             raise ValueError("evidence_required_for_verified_memory")
+        if source_event_ids and source_validator and not source_validator(list(source_event_ids)):
+            raise ValueError("invalid_memory_source_events")
         now = time.time()
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO memories VALUES (?,?,?,?,?,?,?,?,?,?)", (memory_id, kind, content, status, confidence, weight, json.dumps(environment or {}), json.dumps(source_event_ids or []), now, now))

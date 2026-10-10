@@ -10,6 +10,11 @@ TOOLS = [
     {"name": "butian_session_create", "description": "Create solo or team session", "inputSchema": {"type": "object", "required": ["mode"], "properties": {"mode": {"type": "string", "enum": ["solo", "team"]}, "dispatcher_member_id": {"type": "string"}, "requested_model": {"type": "string"}, "capabilities": {"type": "object"}}}},
     {"name": "butian_task_create", "description": "Create a task", "inputSchema": {"type": "object", "required": ["session_id", "title"], "properties": {"session_id": {"type": "string"}, "title": {"type": "string"}, "assignee_id": {"type": "string"}}}},
     {"name": "butian_task_transition", "description": "Transition a task with revision guard", "inputSchema": {"type": "object", "required": ["task_id", "expected_revision", "target", "operation_key"], "properties": {"task_id": {"type": "string"}, "expected_revision": {"type": "integer"}, "target": {"type": "string"}, "operation_key": {"type": "string"}}}},
+    {"name": "butian_task_claim", "description": "Claim a ready task with a lease", "inputSchema": {"type": "object", "required": ["task_id", "member_id"], "properties": {"task_id": {"type": "string"}, "member_id": {"type": "string"}, "lease_seconds": {"type": "integer"}, "token": {"type": "string"}}}},
+    {"name": "butian_task_release", "description": "Release a task lease and requeue claimed work", "inputSchema": {"type": "object", "required": ["task_id", "lease_id"], "properties": {"task_id": {"type": "string"}, "lease_id": {"type": "string"}}}},
+    {"name": "butian_task_heartbeat", "description": "Renew a task lease", "inputSchema": {"type": "object", "required": ["task_id", "lease_id"], "properties": {"task_id": {"type": "string"}, "lease_id": {"type": "string"}, "lease_seconds": {"type": "integer"}}}},
+    {"name": "butian_user_question", "description": "Ask the user and move a task to waiting_user", "inputSchema": {"type": "object", "required": ["task_id", "revision", "member_id", "question"], "properties": {"task_id": {"type": "string"}, "revision": {"type": "integer"}, "member_id": {"type": "string"}, "question": {"type": "string"}}}},
+    {"name": "butian_user_answer", "description": "Answer an open user question", "inputSchema": {"type": "object", "required": ["question_id", "answer"], "properties": {"question_id": {"type": "string"}, "answer": {"type": "string"}}}},
     {"name": "butian_evidence_verify", "description": "Verify evidence has not changed", "inputSchema": {"type": "object", "required": ["evidence_id"], "properties": {"evidence_id": {"type": "string"}}}},
     {"name": "butian_peer_ask", "description": "Ask a successful member how they solved a task; creates a candidate only", "inputSchema": {"type": "object", "required": ["asker_id", "expert_id", "question"], "properties": {"asker_id": {"type": "string"}, "expert_id": {"type": "string"}, "question": {"type": "string"}, "task_id": {"type": "string"}, "comparison": {"type": "object"}}}},
     {"name": "butian_peer_answer", "description": "Record an expert answer as an unverified candidate", "inputSchema": {"type": "object", "required": ["learning_id", "answer"], "properties": {"learning_id": {"type": "string"}, "answer": {"type": "string"}, "method": {"type": "string"}, "evidence_ids": {"type": "array"}}}},
@@ -39,6 +44,16 @@ def call_tool(service, name, args):
     if name == "butian_task_create": return {"task_id": service.store.create_task(args["session_id"], args["title"], args.get("assignee_id"))}
     if name == "butian_task_transition":
         service.store.transition_task(args["task_id"], args["expected_revision"], args["target"], args["operation_key"]); return {"ok": True}
+    if name == "butian_task_claim":
+        return service.store.claim_task(args["task_id"], args["member_id"], args.get("lease_seconds", 300), args.get("token"))
+    if name == "butian_task_release":
+        service.store.release_lease(args["task_id"], args["lease_id"]); return {"ok": True}
+    if name == "butian_task_heartbeat":
+        service.store.heartbeat(args["task_id"], args["lease_id"], args.get("lease_seconds", 300)); return {"ok": True}
+    if name == "butian_user_question":
+        return {"question_id": service.ask_user(args["task_id"], args["revision"], args["member_id"], args["question"])}
+    if name == "butian_user_answer":
+        return {"task_id": service.answer_user(args["question_id"], args["answer"])}
     if name == "butian_evidence_verify": return service.store.verify_evidence(args["evidence_id"])
     if name == "butian_peer_ask": return {"learning_id": service.ask_peer(args["asker_id"], args["expert_id"], args["question"], task_id=args.get("task_id"), comparison=args.get("comparison"))}
     if name == "butian_peer_answer": return service.answer_peer(args["learning_id"], args["answer"], method=args.get("method"), evidence_ids=args.get("evidence_ids"))

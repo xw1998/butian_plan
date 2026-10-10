@@ -79,7 +79,7 @@ class ButianService:
         memory = self.memory(row["asker_id"])
         try:
             answer_event = self.store.append_event(learning_id, "peer_learning_answered", {"answer": answer, "method": method, "expert_id": row["expert_id"]}, f"{learning_id}:answered")
-            memory.put(candidate_id, "peer_learning_candidate", json.dumps(candidate, ensure_ascii=False), confidence=0.2, weight=0.2, environment={"source": "peer", "expert_id": row["expert_id"]}, source_event_ids=[answer_event], status="candidate")
+            memory.put(candidate_id, "peer_learning_candidate", json.dumps(candidate, ensure_ascii=False), confidence=0.2, weight=0.2, environment={"source": "peer", "expert_id": row["expert_id"]}, source_event_ids=[answer_event], status="candidate", source_validator=lambda ids: self.store.validate_source_events(ids, member_id=row["asker_id"]))
         finally:
             memory.close()
         ids = evidence_ids or []

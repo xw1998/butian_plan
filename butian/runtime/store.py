@@ -83,6 +83,8 @@ class Store:
                 self.db.execute("UPDATE tasks SET lease_id=NULL, lease_until=NULL WHERE task_id=? AND lease_id=?", (task_id, lease_id))
 
     def create_session(self, mode: str, dispatcher_member_id: str | None, requested_model: str | None, capabilities: dict[str, Any]) -> str:
+        if dispatcher_member_id and not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (dispatcher_member_id,)).fetchone():
+            raise ValueError("dispatcher_member_not_found")
         session_id = f"sess_{uuid.uuid4().hex}"
         self.db.execute("INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (session_id, mode, dispatcher_member_id, requested_model, None, "unknown", json.dumps(capabilities), time.time()))
         return session_id
@@ -93,6 +95,9 @@ class Store:
         return task_id
 
     def transition_task(self, task_id: str, expected_revision: int, target: str, operation_key: str, payload: dict[str, Any] | None = None) -> None:
+        existing = self.db.execute("SELECT state FROM operations WHERE idempotency_key=?", (operation_key,)).fetchone()
+        if existing:
+            return
         from ..core.models import TaskStatus
         from ..core.state_machine import transition
         row = self.db.execute("SELECT status, revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
@@ -103,9 +108,6 @@ class Store:
         operation_id = f"op_{uuid.uuid4().hex}"
         now = time.time()
         with self.db:
-            existing = self.db.execute("SELECT state FROM operations WHERE idempotency_key=?", (operation_key,)).fetchone()
-            if existing:
-                return
             self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "prepared", now, None))
             updated = self.db.execute("UPDATE tasks SET status=?, revision=revision+1, payload=? WHERE task_id=? AND revision=?", (target, json.dumps(payload or {}, ensure_ascii=False), task_id, expected_revision)).rowcount
             if updated != 1:
@@ -115,6 +117,22 @@ class Store:
             self.db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)", (event_id, operation_id, operation_key, task_id, "task_transition", json.dumps({"from": row["status"], "to": target, "revision": expected_revision + 1}, ensure_ascii=False), seq, now, "prepared"))
             self.db.execute("UPDATE operations SET state='committed' WHERE operation_id=?", (operation_id,))
             self.db.execute("UPDATE events SET commit_state='committed' WHERE operation_id=?", (operation_id,))
+
+    def validate_source_events(self, event_ids: list[str], *, member_id: str | None = None) -> bool:
+        if not event_ids:
+            return False
+        placeholders = ",".join("?" for _ in event_ids)
+        rows = list(self.db.execute(f"SELECT event_id, aggregate_id FROM events WHERE event_id IN ({placeholders})", event_ids))
+        if len(rows) != len(set(event_ids)):
+            return False
+        if member_id:
+            for row in rows:
+                if row["aggregate_id"] == member_id:
+                    continue
+                linked = self.db.execute("SELECT 1 FROM peer_learning WHERE learning_id=? AND (asker_id=? OR expert_id=?)", (row["aggregate_id"], member_id, member_id)).fetchone()
+                if not linked:
+                    return False
+        return True
 
     def list_tasks(self, status: str | None = None) -> list[dict[str, Any]]:
         if status:
