@@ -1,26 +1,82 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import log, sqrt
+from math import exp, isfinite, lgamma, log, log1p
 from random import Random
-from statistics import NormalDist
 from typing import Iterable, Mapping, Sequence
 
 
 def _unit(value: float, name: str) -> float:
     value = float(value)
-    if not 0.0 <= value <= 1.0:
+    if not isfinite(value) or not 0.0 <= value <= 1.0:
         raise ValueError(f"{name}_out_of_range")
     return value
+
+
+def _beta_continued_fraction(a: float, b: float, x: float) -> float:
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    tiny = 1e-300
+    if abs(d) < tiny:
+        d = tiny
+    d = 1.0 / d
+    h = d
+    for m in range(1, 201):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < tiny:
+            d = tiny
+        c = 1.0 + aa / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < tiny:
+            d = tiny
+        c = 1.0 + aa / c
+        if abs(c) < tiny:
+            c = tiny
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 3e-14:
+            return h
+    raise ArithmeticError("beta_cdf_failed_to_converge")
+
+
+def _regularized_beta(x: float, a: float, b: float) -> float:
+    if x <= 0:
+        return 0.0
+    if x >= 1:
+        return 1.0
+    front = exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * log(x) + b * log1p(-x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _beta_continued_fraction(a, b, x) / a
+    return 1.0 - front * _beta_continued_fraction(b, a, 1.0 - x) / b
+
+
+def _beta_quantile(probability: float, a: float, b: float) -> float:
+    lo, hi = 0.0, 1.0
+    for _ in range(90):
+        mid = (lo + hi) / 2.0
+        if _regularized_beta(mid, a, b) < probability:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
 
 
 @dataclass(frozen=True)
 class BetaBelief:
     alpha: float = 1.0
     beta: float = 1.0
+    observations: float = 0.0
 
     def __post_init__(self) -> None:
-        if self.alpha <= 0 or self.beta <= 0:
+        if not all(isfinite(value) for value in (self.alpha, self.beta, self.observations)) or self.alpha <= 0 or self.beta <= 0 or self.observations < 0:
             raise ValueError("beta_parameters_must_be_positive")
 
     @property
@@ -29,27 +85,26 @@ class BetaBelief:
 
     @property
     def effective_samples(self) -> float:
-        return self.alpha + self.beta
+        return self.observations
+
+    @property
+    def prior_strength(self) -> float:
+        return self.alpha + self.beta - self.observations
 
     def update(self, success_weight: float = 0.0, failure_weight: float = 0.0) -> "BetaBelief":
         if success_weight < 0 or failure_weight < 0:
             raise ValueError("evidence_weights_must_be_nonnegative")
         if success_weight == 0 and failure_weight == 0:
             raise ValueError("evidence_weight_required")
-        return BetaBelief(self.alpha + success_weight, self.beta + failure_weight)
+        return BetaBelief(self.alpha + success_weight, self.beta + failure_weight, self.observations + success_weight + failure_weight)
 
     def interval(self, confidence: float = 0.95) -> tuple[float, float]:
         _unit(confidence, "confidence")
         if confidence <= 0:
             raise ValueError("confidence_must_be_positive")
-        # Wilson interval is a conservative, dependency-free approximation.
-        z = NormalDist().inv_cdf(0.5 + confidence / 2)
-        n = self.effective_samples
-        p = self.mean
-        d = 1 + z * z / n
-        centre = (p + z * z / (2 * n)) / d
-        radius = z * sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-        return max(0.0, centre - radius), min(1.0, centre + radius)
+        tail = (1.0 - confidence) / 2.0
+        return (_beta_quantile(tail, self.alpha, self.beta),
+                _beta_quantile(1.0 - tail, self.alpha, self.beta))
 
 
 def bayesian_evidence_update(belief: BetaBelief, *, outcome: str, evidence_quality: float = 1.0,
@@ -90,7 +145,10 @@ def entropy(probabilities: Iterable[float]) -> float:
 
 def information_gain(prior: Sequence[float], conditional: Sequence[float]) -> float:
     """Information reduction for one explicitly supplied posterior."""
-    return max(0.0, entropy(prior) - entropy(conditional))
+    prior_entropy, posterior_entropy = entropy(prior), entropy(conditional)
+    if posterior_entropy > prior_entropy + 1e-9:
+        raise ValueError("posterior_entropy_exceeds_prior")
+    return max(0.0, prior_entropy - posterior_entropy)
 
 
 def expected_information_gain(prior: Sequence[float], posteriors: Sequence[Sequence[float]], outcome_probabilities: Sequence[float]) -> float:
@@ -108,7 +166,14 @@ def expected_information_gain(prior: Sequence[float], posteriors: Sequence[Seque
         raise ValueError("outcome_probabilities_must_sum_to_one")
     probabilities = raw_probabilities
     prior_entropy = entropy(prior)
-    expected_posterior_entropy = sum(probability * entropy(posterior) for probability, posterior in zip(probabilities, posteriors))
+    posterior_entropies = [entropy(posterior) for posterior in posteriors]
+    for index, (probability, posterior) in enumerate(zip(probabilities, posteriors)):
+        for state_probability, posterior_probability in zip(prior, posterior):
+            if probability * posterior_probability > state_probability + 1e-9:
+                raise ValueError(f"posterior_violates_bayes_consistency:{index}")
+    expected_posterior_entropy = sum(probability * value for probability, value in zip(probabilities, posterior_entropies))
+    if expected_posterior_entropy > prior_entropy + 1e-9:
+        raise ValueError("expected_posterior_entropy_exceeds_prior")
     return max(0.0, prior_entropy - expected_posterior_entropy)
 
 
@@ -138,22 +203,27 @@ class CausalEstimate:
 def difference_in_means(treated: Sequence[float], control: Sequence[float]) -> CausalEstimate:
     if not treated or not control:
         raise ValueError("both_groups_required")
-    if any(value < 0 or value > 1 for value in (*treated, *control)):
+    if any(not isfinite(value) or value < 0 or value > 1 for value in (*treated, *control)):
         raise ValueError("outcome_out_of_range")
     t, c = sum(treated) / len(treated), sum(control) / len(control)
     return CausalEstimate(t, c, t - c, len(treated), len(control))
 
 
-def stratified_effect(strata: Mapping[str, tuple[Sequence[float], Sequence[float]]]) -> CausalEstimate:
-    """Equal-stratum standardization; sample counts do not define the estimand."""
-    if not strata:
-        raise ValueError("strata_required")
-    estimates = [difference_in_means(treated, control) for treated, control in strata.values()]
-    treated_mean = sum(item.treated_mean for item in estimates) / len(estimates)
-    control_mean = sum(item.control_mean for item in estimates) / len(estimates)
+def stratified_effect(strata: Mapping[str, tuple[Sequence[float], Sequence[float]]], *, weights: Mapping[str, float]) -> CausalEstimate:
+    """Standardize to an explicitly declared target population across strata."""
+    if not strata or set(weights) != set(strata):
+        raise ValueError("strata_and_weights_must_match")
+    normalized = {name: float(weight) for name, weight in weights.items()}
+    if any(not isfinite(value) or value < 0 for value in normalized.values()) or abs(sum(normalized.values()) - 1.0) > 1e-9:
+        raise ValueError("stratum_weights_must_sum_to_one")
+    if any(not treated or not control for treated, control in strata.values()):
+        raise ValueError("empty_stratum_group")
+    estimates = {name: difference_in_means(treated, control) for name, (treated, control) in strata.items()}
+    treated_mean = sum(normalized[name] * item.treated_mean for name, item in estimates.items())
+    control_mean = sum(normalized[name] * item.control_mean for name, item in estimates.items())
     return CausalEstimate(treated_mean, control_mean, treated_mean - control_mean,
-                          sum(item.treated_count for item in estimates),
-                          sum(item.control_count for item in estimates))
+                          sum(item.treated_count for item in estimates.values()),
+                          sum(item.control_count for item in estimates.values()))
 
 
 @dataclass(frozen=True)
@@ -164,8 +234,17 @@ class Utility:
     learning: float
     team_value: float
 
+    def __post_init__(self) -> None:
+        if not all(isfinite(value) for value in (self.quality, self.cost, self.risk, self.learning, self.team_value)):
+            raise ValueError("utility_values_must_be_finite")
+        if self.cost < 0 or self.risk < 0:
+            raise ValueError("utility_cost_and_risk_must_be_nonnegative")
+
     def score(self, *, quality_weight: float = 1.0, cost_weight: float = 1.0, risk_weight: float = 1.0,
               learning_weight: float = 0.0, team_weight: float = 0.0) -> float:
+        weights = (quality_weight, cost_weight, risk_weight, learning_weight, team_weight)
+        if not all(isfinite(value) for value in weights) or any(value < 0 for value in weights):
+            raise ValueError("utility_weights_must_be_nonnegative")
         return (quality_weight * self.quality + learning_weight * self.learning + team_weight * self.team_value
                 - cost_weight * self.cost - risk_weight * self.risk)
 
@@ -173,32 +252,40 @@ class Utility:
 def allocate_by_utility(options: Mapping[str, Utility], *, budget: float | None = None) -> list[str]:
     if not options:
         return []
-    if budget is not None and budget < 0:
+    if budget is not None and (not isfinite(budget) or budget < 0):
         raise ValueError("budget_must_be_nonnegative")
     names = list(options)
     if budget is None:
-        return sorted(names, key=lambda name: options[name].score(), reverse=True)
-    if any(options[name].cost < 0 for name in names):
+        return [name for name in sorted(names, key=lambda name: options[name].score(), reverse=True)
+                if options[name].score() > 0]
+    if any(not isfinite(options[name].cost) or options[name].cost < 0 for name in names):
         raise ValueError("option_cost_must_be_nonnegative")
-    # Exact 0/1 knapsack over integerized costs; unlike greedy ranking this
-    # cannot discard a better feasible combination.
-    scale = 1000
-    capacity = int(round(budget * scale))
-    costs = [int(round(options[name].cost * scale)) for name in names]
-    dp = [(0.0, ()) for _ in range(capacity + 1)]
+    # Sparse Pareto frontier avoids allocating memory proportional to budget.
+    frontier: list[tuple[float, float, tuple[int, ...]]] = [(0.0, 0.0, ())]
+    max_states = 100_000
     for index, name in enumerate(names):
-        cost = costs[index]
-        value = options[name].score()
-        for current in range(capacity, cost - 1, -1):
-            candidate = (dp[current - cost][0] + value, dp[current - cost][1] + (index,))
-            if candidate[0] > dp[current][0]:
-                dp[current] = candidate
-    selected_indices = set(dp[capacity][1])
+        option = options[name]
+        value = option.score()
+        if value <= 0 or option.cost > budget:
+            continue
+        candidates = frontier + [(cost + option.cost, score + value, chosen + (index,))
+                                 for cost, score, chosen in frontier if cost + option.cost <= budget]
+        candidates.sort(key=lambda state: (state[0], -state[1]))
+        frontier = []
+        best_score = float("-inf")
+        for state in candidates:
+            if state[1] > best_score:
+                frontier.append(state)
+                best_score = state[1]
+        if len(frontier) > max_states:
+            raise ValueError("knapsack_frontier_limit_exceeded")
+    selected = max(frontier, key=lambda state: state[1])[2]
+    selected_indices = set(selected)
     return [name for index, name in enumerate(names) if index in selected_indices]
 
 
 def queue_metrics(arrival_rate: float, service_rate: float) -> dict[str, float | str]:
-    if arrival_rate < 0 or service_rate <= 0:
+    if not isfinite(arrival_rate) or not isfinite(service_rate) or arrival_rate < 0 or service_rate <= 0:
         raise ValueError("invalid_queue_rates")
     utilization = arrival_rate / service_rate
     return {"arrival_rate": arrival_rate, "service_rate": service_rate, "utilization": utilization,
@@ -217,6 +304,8 @@ class BanditArm:
 
     def observe(self, reward: float) -> "BanditArm":
         _unit(reward, "reward")
+        if reward not in (0.0, 1.0):
+            raise ValueError("bernoulli_bandit_requires_binary_reward")
         return BanditArm(self.successes + reward, self.failures + 1 - reward)
 
 
