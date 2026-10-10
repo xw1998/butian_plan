@@ -11,9 +11,9 @@ from typing import Any
 SCHEMA = """
 PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS members (member_id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, responsibilities TEXT NOT NULL, provider_id TEXT, model_id TEXT);
+CREATE TABLE IF NOT EXISTS members (member_id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, responsibilities TEXT NOT NULL, provider_id TEXT, model_id TEXT, default_strategy_id TEXT NOT NULL DEFAULT 'experience_reuse', strategy_version INTEGER NOT NULL DEFAULT 1, strategy_stages TEXT NOT NULL DEFAULT '[]');
 CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, mode TEXT NOT NULL, dispatcher_member_id TEXT, requested_model TEXT, effective_model TEXT, selection_status TEXT, capabilities TEXT NOT NULL, created_at REAL NOT NULL);
-CREATE TABLE IF NOT EXISTS tasks (task_id TEXT PRIMARY KEY, parent_id TEXT, session_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, assignee_id TEXT, revision INTEGER NOT NULL DEFAULT 1, lease_id TEXT, lease_until REAL, payload TEXT NOT NULL, UNIQUE(task_id, revision));
+CREATE TABLE IF NOT EXISTS tasks (task_id TEXT PRIMARY KEY, parent_id TEXT, session_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, assignee_id TEXT, revision INTEGER NOT NULL DEFAULT 1, lease_id TEXT, lease_until REAL, payload TEXT NOT NULL, strategy_snapshot TEXT NOT NULL DEFAULT '{}', UNIQUE(task_id, revision));
 CREATE TABLE IF NOT EXISTS events (event_id TEXT PRIMARY KEY, operation_id TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, aggregate_id TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, seq INTEGER NOT NULL, created_at REAL NOT NULL, commit_state TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS operations (operation_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, state TEXT NOT NULL, created_at REAL NOT NULL, error TEXT);
 CREATE TABLE IF NOT EXISTS handoffs (task_id TEXT NOT NULL, revision INTEGER NOT NULL, member_id TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL, PRIMARY KEY(task_id, revision));
@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS evidence (evidence_id TEXT PRIMARY KEY, path TEXT NOT
 CREATE TABLE IF NOT EXISTS memory_verifications (verification_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, operation_key TEXT NOT NULL UNIQUE, outcome TEXT NOT NULL, evidence_ids TEXT NOT NULL, environment TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_events_aggregate ON events(aggregate_id, seq);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE TABLE IF NOT EXISTS strategy_steps (step_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, revision INTEGER NOT NULL, member_id TEXT, strategy_id TEXT NOT NULL, strategy_version INTEGER NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL, reason TEXT, output_ref TEXT, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS members_auth (member_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, created_at REAL NOT NULL);
 """
 
@@ -34,12 +35,25 @@ class Store:
         self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        self._migrate_columns()
+
+    def _migrate_columns(self) -> None:
+        member_columns = {row[1] for row in self.db.execute("PRAGMA table_info(members)")}
+        if "default_strategy_id" not in member_columns:
+            self.db.execute("ALTER TABLE members ADD COLUMN default_strategy_id TEXT NOT NULL DEFAULT 'experience_reuse'")
+            self.db.execute("ALTER TABLE members ADD COLUMN strategy_version INTEGER NOT NULL DEFAULT 1")
+            self.db.execute("ALTER TABLE members ADD COLUMN strategy_stages TEXT NOT NULL DEFAULT '[]'")
+        task_columns = {row[1] for row in self.db.execute("PRAGMA table_info(tasks)")}
+        if "strategy_snapshot" not in task_columns:
+            self.db.execute("ALTER TABLE tasks ADD COLUMN strategy_snapshot TEXT NOT NULL DEFAULT '{}'")
 
     def close(self) -> None:
         self.db.close()
 
-    def add_member(self, member_id: str, name: str, role: str = "member", responsibilities: list[str] | None = None, provider_id: str | None = None, model_id: str | None = None) -> None:
-        self.db.execute("INSERT INTO members VALUES (?, ?, ?, ?, ?, ?)", (member_id, name, role, json.dumps(responsibilities or [], ensure_ascii=False), provider_id, model_id))
+    def add_member(self, member_id: str, name: str, role: str = "member", responsibilities: list[str] | None = None, provider_id: str | None = None, model_id: str | None = None, default_strategy_id: str = "experience_reuse", strategy_version: int = 1, strategy_stages: list[str] | None = None) -> None:
+        from ..core.strategies import strategy_snapshot
+        snapshot = strategy_snapshot(default_strategy_id, strategy_stages)
+        self.db.execute("INSERT INTO members(member_id,name,role,responsibilities,provider_id,model_id,default_strategy_id,strategy_version,strategy_stages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (member_id, name, role, json.dumps(responsibilities or [], ensure_ascii=False), provider_id, model_id, default_strategy_id, strategy_version, json.dumps(snapshot["stages"], ensure_ascii=False)))
 
     def set_member_token(self, member_id: str, token: str) -> None:
         if not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
@@ -91,8 +105,48 @@ class Store:
 
     def create_task(self, session_id: str, title: str, assignee_id: str | None = None, parent_id: str | None = None, payload: dict[str, Any] | None = None) -> str:
         task_id = f"task_{uuid.uuid4().hex}"
-        self.db.execute("INSERT INTO tasks(task_id,parent_id,session_id,title,status,assignee_id,revision,payload) VALUES (?,?,?,?,?,?,?,?)", (task_id, parent_id, session_id, title, "todo", assignee_id, 1, json.dumps(payload or {}, ensure_ascii=False)))
+        self.db.execute("INSERT INTO tasks(task_id,parent_id,session_id,title,status,assignee_id,revision,payload,strategy_snapshot) VALUES (?,?,?,?,?,?,?,?,?)", (task_id, parent_id, session_id, title, "todo", assignee_id, 1, json.dumps(payload or {}, ensure_ascii=False), json.dumps({}, ensure_ascii=False)))
         return task_id
+
+    def set_member_strategy(self, member_id: str, strategy_id: str, version: int = 1, stages: list[str] | None = None) -> dict[str, Any]:
+        from ..core.strategies import strategy_snapshot
+        snapshot = strategy_snapshot(strategy_id, stages)
+        updated = self.db.execute("UPDATE members SET default_strategy_id=?, strategy_version=?, strategy_stages=? WHERE member_id=?", (strategy_id, version, json.dumps(snapshot["stages"], ensure_ascii=False), member_id)).rowcount
+        if updated != 1:
+            raise ValueError("member_not_found")
+        return snapshot
+
+    def strategy_for_member(self, member_id: str) -> dict[str, Any]:
+        from ..core.strategies import strategy_snapshot
+        row = self.db.execute("SELECT default_strategy_id, strategy_version, strategy_stages FROM members WHERE member_id=?", (member_id,)).fetchone()
+        if not row:
+            raise ValueError("member_not_found")
+        snapshot = strategy_snapshot(row["default_strategy_id"], json.loads(row["strategy_stages"]) or None)
+        snapshot["version"] = row["strategy_version"]
+        return snapshot
+
+    def assign_strategy(self, task_id: str, strategy_id: str, *, stages: list[str] | None = None, reason: str | None = None, decision_by: str | None = None) -> dict[str, Any]:
+        from ..core.strategies import strategy_snapshot
+        snapshot = strategy_snapshot(strategy_id, stages)
+        snapshot.update({"override": bool(reason), "override_reason": reason, "decision_by": decision_by})
+        updated = self.db.execute("UPDATE tasks SET strategy_snapshot=? WHERE task_id=?", (json.dumps(snapshot, ensure_ascii=False), task_id)).rowcount
+        if updated != 1:
+            raise ValueError("task_not_found")
+        return snapshot
+
+    def record_strategy_step(self, task_id: str, revision: int, strategy_id: str, stage: str, *, member_id: str | None = None, strategy_version: int = 1, status: str = "completed", reason: str | None = None, output_ref: str | None = None) -> str:
+        from ..core.strategies import get_strategy
+        strategy = get_strategy(strategy_id, strategy_version)
+        if stage not in strategy.stages:
+            raise ValueError("unknown_strategy_stage")
+        if status not in {"planned", "running", "completed", "skipped", "failed", "unknown"}:
+            raise ValueError("invalid_strategy_step_status")
+        step_id = f"step_{uuid.uuid4().hex}"
+        self.db.execute("INSERT INTO strategy_steps VALUES (?,?,?,?,?,?,?,?,?,?,?)", (step_id, task_id, revision, member_id, strategy_id, strategy_version, stage, status, reason, output_ref, time.time()))
+        return step_id
+
+    def list_strategy_steps(self, task_id: str) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.db.execute("SELECT * FROM strategy_steps WHERE task_id=? ORDER BY created_at", (task_id,))]
 
     def transition_task(self, task_id: str, expected_revision: int, target: str, operation_key: str, payload: dict[str, Any] | None = None) -> None:
         existing = self.db.execute("SELECT state FROM operations WHERE idempotency_key=?", (operation_key,)).fetchone()

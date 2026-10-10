@@ -35,6 +35,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                 task_id = path.split("/")[3]; self.service.store.release_lease(task_id, body["lease_id"]); self._send(200, {"ok": True}); return
             if path == "/api/questions":
                 qid = self.service.ask_user(body["task_id"], body["revision"], body["member_id"], body["question"]); self._send(201, {"question_id": qid}); return
+            if path == "/api/strategies/recommend":
+                self._send(200, {"recommendations": self.service.recommend_strategies(body["task_features"])}); return
+            if path == "/api/strategies/compose":
+                self._send(200, self.service.compose_strategies(body["member_ids"], body["task_features"])); return
+            if path.startswith("/api/tasks/") and path.endswith("/strategy"):
+                task_id = path.split("/")[3]; self._send(200, self.service.assign_strategy(task_id, body["strategy_id"], body.get("stages"), body.get("reason"), body.get("decision_by"))); return
+            if path.startswith("/api/tasks/") and path.endswith("/strategy-step"):
+                task_id = path.split("/")[3]; step_id = self.service.store.record_strategy_step(task_id, body["revision"], body["strategy_id"], body["stage"], member_id=body.get("member_id"), status=body.get("status", "completed"), reason=body.get("reason"), output_ref=body.get("output_ref")); self._send(201, {"step_id": step_id}); return
             if path.startswith("/api/questions/") and path.endswith("/answer"):
                 qid = path.split("/")[3]; self._send(200, {"task_id": self.service.answer_user(qid, body["answer"])}); return
             self._send(404, {"error": "not_found"})

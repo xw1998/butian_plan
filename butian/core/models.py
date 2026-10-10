@@ -30,6 +30,9 @@ class Member:
     responsibilities: tuple[str, ...] = ()
     provider_id: str | None = None
     model_id: str | None = None
+    default_strategy_id: str = "experience_reuse"
+    strategy_version: int = 1
+    strategy_stages: tuple[str, ...] = ()
 
 @dataclass
 class Handoff:

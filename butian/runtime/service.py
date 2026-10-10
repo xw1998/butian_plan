@@ -18,12 +18,33 @@ class ButianService:
     def close(self):
         self.store.close()
 
-    def add_member(self, member_id: str, name: str, role="member", responsibilities=None, provider_id=None, model_id=None):
-        self.store.add_member(member_id, name, role, responsibilities, provider_id, model_id)
+    def add_member(self, member_id: str, name: str, role="member", responsibilities=None, provider_id=None, model_id=None, default_strategy_id="experience_reuse", strategy_version=1, strategy_stages=None):
+        self.store.add_member(member_id, name, role, responsibilities, provider_id, model_id, default_strategy_id, strategy_version, strategy_stages)
         MemoryStore(self.home / "members" / member_id / "memory.db").close()
 
     def memory(self, member_id: str) -> MemoryStore:
         return MemoryStore(self.home / "members" / member_id / "memory.db")
+
+    def set_member_strategy(self, member_id: str, strategy_id: str, version=1, stages=None):
+        return self.store.set_member_strategy(member_id, strategy_id, version, stages)
+
+    def strategy_for_member(self, member_id: str):
+        return self.store.strategy_for_member(member_id)
+
+    def assign_strategy(self, task_id: str, strategy_id: str, stages=None, reason=None, decision_by=None):
+        return self.store.assign_strategy(task_id, strategy_id, stages=stages, reason=reason, decision_by=decision_by)
+
+    def recommend_strategies(self, task_features: dict[str, Any]):
+        from .strategy_dispatch import recommend
+        return [item.__dict__ for item in recommend(task_features)]
+
+    def compose_strategies(self, member_ids: list[str], task_features: dict[str, Any]):
+        from .strategy_dispatch import compose
+        members = []
+        for member_id in member_ids:
+            strategy = self.store.strategy_for_member(member_id)
+            members.append({"member_id": member_id, **strategy})
+        return compose(members, task_features)
 
     def create_session(self, mode: str, dispatcher_member_id: str | None = None, requested_model: str | None = None, capabilities=None):
         caps = capabilities or {}
