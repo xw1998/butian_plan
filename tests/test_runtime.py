@@ -5,7 +5,7 @@ def test_member_memory_and_model_negotiation(tmp_path):
     service = ButianService(tmp_path)
     service.add_member("m1", "研究员", model_id="special")
     memory = service.memory("m1")
-    memory.put("mem1", "lesson", "先验证证据", confidence=0.9, status="warm")
+    memory.put("mem1", "lesson", "先验证证据", confidence=0.9, source_event_ids=["evt_test"], status="warm")
     assert memory.search("证据")[0]["memory_id"] == "mem1"
     memory.close()
     session = service.create_session("team", "m1", "special", {"can_select_model": False})

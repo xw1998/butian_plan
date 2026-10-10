@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS questions (question_id TEXT PRIMARY KEY, task_id TEXT
 CREATE TABLE IF NOT EXISTS peer_learning (learning_id TEXT PRIMARY KEY, asker_id TEXT NOT NULL, expert_id TEXT NOT NULL, task_id TEXT, question TEXT NOT NULL, answer TEXT, comparison TEXT NOT NULL, status TEXT NOT NULL, candidate_memory_id TEXT, evidence_ids TEXT NOT NULL, created_at REAL NOT NULL, verified_at REAL);
 CREATE INDEX IF NOT EXISTS idx_peer_learning_status ON peer_learning(status, expert_id);
 CREATE TABLE IF NOT EXISTS evidence (evidence_id TEXT PRIMARY KEY, path TEXT NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS memory_verifications (verification_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, operation_key TEXT NOT NULL UNIQUE, outcome TEXT NOT NULL, evidence_ids TEXT NOT NULL, environment TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_events_aggregate ON events(aggregate_id, seq);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 """
@@ -49,12 +50,19 @@ class Store:
         return task_id
 
     def transition_task(self, task_id: str, expected_revision: int, target: str, operation_key: str, payload: dict[str, Any] | None = None) -> None:
+        from ..core.models import TaskStatus
+        from ..core.state_machine import transition
         row = self.db.execute("SELECT status, revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if row:
+            transition(TaskStatus(row["status"]), TaskStatus(target))
         if not row or row["revision"] != expected_revision:
             raise ValueError("revision_conflict")
         operation_id = f"op_{uuid.uuid4().hex}"
         now = time.time()
         with self.db:
+            existing = self.db.execute("SELECT state FROM operations WHERE idempotency_key=?", (operation_key,)).fetchone()
+            if existing:
+                return
             self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "prepared", now, None))
             updated = self.db.execute("UPDATE tasks SET status=?, revision=revision+1, payload=? WHERE task_id=? AND revision=?", (target, json.dumps(payload or {}, ensure_ascii=False), task_id, expected_revision)).rowcount
             if updated != 1:
@@ -91,6 +99,32 @@ class Store:
         status = "valid" if current_hash == row["sha256"] and current_size == row["size"] else "stale"
         self.db.execute("UPDATE evidence SET status=? WHERE evidence_id=?", (status, evidence_id))
         return {"evidence_id": evidence_id, "status": status, "sha256": current_hash, "size": current_size}
+
+    def append_event(self, aggregate_id: str, event_type: str, payload: dict[str, Any], operation_key: str) -> str:
+        existing = self.db.execute("SELECT event_id FROM events WHERE idempotency_key=?", (operation_key,)).fetchone()
+        if existing:
+            return existing[0]
+        event_id = f"evt_{uuid.uuid4().hex}"
+        operation_id = f"op_{uuid.uuid4().hex}"
+        seq = self.db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events").fetchone()[0]
+        self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "committed", time.time(), None))
+        self.db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)", (event_id, operation_id, operation_key, aggregate_id, event_type, json.dumps(payload, ensure_ascii=False), seq, time.time(), "committed"))
+        return event_id
+
+    def record_verification(self, memory_id: str, operation_key: str, outcome: str, evidence_ids: list[str], environment: dict[str, Any] | None = None) -> str:
+        if outcome not in {"success", "failure", "unknown"}:
+            raise ValueError("invalid_verification_outcome")
+        if outcome == "success" and not evidence_ids:
+            raise ValueError("evidence_required_for_success")
+        if self.db.execute("SELECT 1 FROM memory_verifications WHERE operation_key=?", (operation_key,)).fetchone():
+            return self.db.execute("SELECT verification_id FROM memory_verifications WHERE operation_key=?", (operation_key,)).fetchone()[0]
+        for evidence_id in evidence_ids:
+            result = self.verify_evidence(evidence_id)
+            if result["status"] != "valid":
+                raise ValueError("stale_evidence")
+        verification_id = f"ver_{uuid.uuid4().hex}"
+        self.db.execute("INSERT INTO memory_verifications VALUES (?,?,?,?,?,?,?)", (verification_id, memory_id, operation_key, outcome, json.dumps(evidence_ids), json.dumps(environment or {}, ensure_ascii=False), time.time()))
+        return verification_id
 
     def record_evidence(self, path: str | Path) -> str:
         p = Path(path)

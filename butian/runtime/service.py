@@ -66,7 +66,8 @@ class ButianService:
             if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
                 raise ValueError("member_not_found:" + member_id)
         learning_id = f"learn_{uuid.uuid4().hex}"
-        self.store.db.execute("INSERT INTO peer_learning VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (learning_id, asker_id, expert_id, task_id, question, None, json.dumps(comparison or {}, ensure_ascii=False), "asked", None, "[]", time.time(), None))
+        event_id = self.store.append_event(learning_id, "peer_learning_asked", {"asker_id": asker_id, "expert_id": expert_id, "task_id": task_id, "question": question}, f"{learning_id}:asked")
+        self.store.db.execute("INSERT INTO peer_learning VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (learning_id, asker_id, expert_id, task_id, question, None, json.dumps(comparison or {}, ensure_ascii=False), "asked", None, json.dumps([event_id]), time.time(), None))
         return learning_id
 
     def answer_peer(self, learning_id: str, answer: str, *, method: str | None = None, evidence_ids: list[str] | None = None):
@@ -77,7 +78,8 @@ class ButianService:
         candidate = {"answer": answer, "method": method, "expert_id": row["expert_id"], "learning_id": learning_id, "verification_required": True}
         memory = self.memory(row["asker_id"])
         try:
-            memory.put(candidate_id, "peer_learning_candidate", json.dumps(candidate, ensure_ascii=False), confidence=0.2, weight=0.2, environment={"source": "peer", "expert_id": row["expert_id"]}, source_event_ids=[learning_id], status="candidate")
+            answer_event = self.store.append_event(learning_id, "peer_learning_answered", {"answer": answer, "method": method, "expert_id": row["expert_id"]}, f"{learning_id}:answered")
+            memory.put(candidate_id, "peer_learning_candidate", json.dumps(candidate, ensure_ascii=False), confidence=0.2, weight=0.2, environment={"source": "peer", "expert_id": row["expert_id"]}, source_event_ids=[answer_event], status="candidate")
         finally:
             memory.close()
         ids = evidence_ids or []
@@ -86,23 +88,33 @@ class ButianService:
 
     def verify_peer_learning(self, learning_id: str, *, success: bool, evidence_ids: list[str] | None = None, notes: str = ""):
         row = self.store.db.execute("SELECT * FROM peer_learning WHERE learning_id=?", (learning_id,)).fetchone()
-        if not row or row["status"] not in ("candidate", "verified", "rejected"):
+        if not row or row["status"] not in ("candidate", "verified", "rejected", "inconclusive"):
             raise ValueError("peer_learning_not_candidate")
         status = "verified" if success else "rejected"
+        if success:
+            self.store.record_verification(row["candidate_memory_id"], f"{learning_id}:verification:{time.time_ns()}", "success", evidence_ids or [], {"peer_learning_id": learning_id})
+        else:
+            self.store.record_verification(row["candidate_memory_id"], f"{learning_id}:verification:{time.time_ns()}", "failure", evidence_ids or [], {"peer_learning_id": learning_id})
         memory = self.memory(row["asker_id"])
         try:
             mem = memory.db.execute("SELECT * FROM memories WHERE memory_id=?", (row["candidate_memory_id"],)).fetchone()
             if mem:
-                new_status = "warm" if success else "candidate"
-                new_weight = min(5.0, float(mem["weight"]) + (1.0 if success else -0.2))
-                new_confidence = min(1.0, float(mem["confidence"]) + (0.2 if success else 0.0))
+                successful = memory.db.execute("SELECT COUNT(*) FROM memory_events WHERE memory_id=? AND event_type='verification_success'", (row["candidate_memory_id"],)).fetchone()[0]
+                if success:
+                    memory.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"mev_{uuid.uuid4().hex}", row["candidate_memory_id"], "verification_success", json.dumps({"learning_id": learning_id, "evidence_ids": evidence_ids or []}), time.time()))
+                    successful += 1
+                else:
+                    memory.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"mev_{uuid.uuid4().hex}", row["candidate_memory_id"], "verification_failure", json.dumps({"learning_id": learning_id, "evidence_ids": evidence_ids or []}), time.time()))
+                new_status = "warm" if successful >= 2 else "candidate"
+                new_weight = min(5.0, float(mem["weight"]) + (0.5 if success else -0.2))
+                new_confidence = min(1.0, float(mem["confidence"]) + (0.1 if success else 0.0))
                 memory.db.execute("UPDATE memories SET status=?, weight=?, confidence=?, updated_at=? WHERE memory_id=?", (new_status, new_weight, new_confidence, time.time(), row["candidate_memory_id"]))
         finally:
             memory.close()
         ids = evidence_ids or json.loads(row["evidence_ids"])
         with self.store.db:
             self.store.db.execute("UPDATE peer_learning SET status=?, evidence_ids=?, verified_at=?, comparison=? WHERE learning_id=?", (status, json.dumps(ids), time.time(), json.dumps({**json.loads(row["comparison"]), "verification_notes": notes, "success": success}, ensure_ascii=False), learning_id))
-        return {"learning_id": learning_id, "status": status, "candidate_memory_id": row["candidate_memory_id"]}
+        return {"learning_id": learning_id, "status": status, "candidate_memory_id": row["candidate_memory_id"], "memory_status": new_status if 'new_status' in locals() else "candidate"}
 
     def list_peer_learning(self, *, status: str | None = None, member_id: str | None = None):
         sql = "SELECT * FROM peer_learning WHERE 1=1"; args: list[Any] = []

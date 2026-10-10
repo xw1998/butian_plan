@@ -15,7 +15,7 @@ def test_store_revision_and_idempotent_event(tmp_path):
     task = store.create_task(session, "research")
     store.transition_task(task, 1, "ready", "op-1")
     with pytest.raises(ValueError, match="revision_conflict"):
-        store.transition_task(task, 1, "running", "op-2")
+        store.transition_task(task, 1, "claimed", "op-2")
     assert store.list_tasks()[0]["revision"] == 2
     store.close()
 
