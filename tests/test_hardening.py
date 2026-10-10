@@ -105,3 +105,20 @@ def test_import_nvwa_agent_assets_is_read_only_and_idempotent(tmp_path):
     assert first['imported'] == 1 and second['skipped'] == 1
     assert service.store.db.execute("SELECT name FROM members WHERE member_id='src-1'").fetchone()[0] == '数字人甲'
     service.close()
+
+def test_composition_graph_deduplicates_and_tracks_skill_phase(tmp_path):
+    from butian.runtime.memory import MemoryStore
+    from butian.core.experience import SkillPhase
+    memory = MemoryStore(tmp_path / "memory.db")
+    memory.put("a", "lesson", "原子一", weight=0.4)
+    memory.put("b", "lesson", "原子二", weight=0.3)
+    result = memory.compose("c", ["a", "b"], content="复合经验")
+    assert result["gain"] == pytest.approx(0.7)
+    with pytest.raises(ValueError, match="composition_already_exists"):
+        memory.compose("d", ["b", "a"], content="重复复合")
+    with pytest.raises(ValueError, match="components_must_be_unique"):
+        memory.compose("e", ["a", "a"], content="重复组件")
+    assert memory.update_skill("测试", level=.7, marginal=.01).phase == SkillPhase.DEVELOPING
+    assert memory.update_skill("测试", level=.7, marginal=.01).phase == SkillPhase.STABLE
+    assert memory.update_skill("测试", level=.7, marginal=.01, novel_environment=True).phase == SkillPhase.ACTIVATING
+    memory.close()

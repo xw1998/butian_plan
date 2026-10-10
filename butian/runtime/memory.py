@@ -5,6 +5,7 @@ import time
 import uuid
 from pathlib import Path
 from .security import assert_safe_memory_content
+from ..core.experience import SkillPhase, SkillState, composition_gain, decision_value, transition_phase
 
 SCHEMA = '''
 PRAGMA journal_mode=WAL;
@@ -16,6 +17,9 @@ CREATE TABLE IF NOT EXISTS memory_versions (version_id TEXT PRIMARY KEY, memory_
 CREATE TABLE IF NOT EXISTS memory_conflicts (conflict_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, conflicting_memory_id TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_recall_log (recall_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, query TEXT NOT NULL, layer TEXT NOT NULL, used INTEGER NOT NULL, score REAL NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_maintenance (maintenance_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, action TEXT NOT NULL, reason TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS memory_compositions (composition_id TEXT PRIMARY KEY, result_memory_id TEXT NOT NULL, component_memory_ids TEXT NOT NULL, component_fingerprint TEXT NOT NULL UNIQUE, composition_bonus REAL NOT NULL, redundancy_penalty REAL NOT NULL, conflict_penalty REAL NOT NULL, observed_successes INTEGER NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS skill_states (skill_domain TEXT PRIMARY KEY, phase TEXT NOT NULL, level REAL NOT NULL, abstraction_level INTEGER NOT NULL, marginal_gain REAL NOT NULL, plateau_score REAL NOT NULL, activation_count INTEGER NOT NULL, updated_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS skill_events (event_id TEXT PRIMARY KEY, skill_domain TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL);
 '''
 
 class MemoryStore:
@@ -73,6 +77,35 @@ class MemoryStore:
                 layer = "cold" if item["status"] == "cold" else ("candidate" if item["status"] == "candidate" else "active")
                 self.db.execute("INSERT INTO memory_recall_log VALUES (?,?,?,?,?,?,?)", (f"rec_{uuid.uuid4().hex}", item["memory_id"], query, layer, int(used), float(item["weight"]), now))
         return result
+
+    def compose(self, result_memory_id: str, component_memory_ids: list[str], *, content: str, kind="compound", environment=None, source_event_ids=None, composition_bonus=0.0, redundancy_penalty=0.0, conflict_penalty=0.0):
+        """Create one composite memory; duplicate component ids are rejected before scoring."""
+        ids = list(component_memory_ids)
+        if not ids or len(ids) != len(set(ids)):
+            raise ValueError("composition_components_must_be_unique")
+        placeholders = ",".join("?" for _ in ids)
+        rows = list(self.db.execute(f"SELECT memory_id, weight FROM memories WHERE memory_id IN ({placeholders})", ids))
+        if len(rows) != len(ids): raise ValueError("composition_component_not_found")
+        gain = composition_gain([float(row["weight"]) for row in rows], composition_bonus=composition_bonus, redundancy_penalty=redundancy_penalty, conflict_penalty=conflict_penalty)
+        fingerprint = "|".join(sorted(ids))
+        with self.db:
+            existing = self.db.execute("SELECT composition_id FROM memory_compositions WHERE component_fingerprint=?", (fingerprint,)).fetchone()
+            if existing: raise ValueError("composition_already_exists")
+            self.put(result_memory_id, kind, content, confidence=0.2, weight=min(5.0, gain), environment=environment, source_event_ids=source_event_ids, status="candidate")
+            cid = f"cmp_{uuid.uuid4().hex}"
+            self.db.execute("INSERT INTO memory_compositions VALUES (?,?,?,?,?,?,?,?,?)", (cid, result_memory_id, json.dumps(ids), fingerprint, composition_bonus, redundancy_penalty, conflict_penalty, 0, time.time()))
+            self.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"evt_{uuid.uuid4().hex}", result_memory_id, "memory_composed", json.dumps({"components": ids, "gain": gain}), time.time()))
+        return {"composition_id": cid, "memory_id": result_memory_id, "gain": gain}
+
+    def update_skill(self, domain: str, *, level: float, marginal: float, contradiction=False, novel_environment=False, independent_successes=0, composition_successes=0):
+        row = self.db.execute("SELECT * FROM skill_states WHERE skill_domain=?", (domain,)).fetchone()
+        old = SkillState(SkillPhase(row["phase"]), row["level"], row["abstraction_level"], row["marginal_gain"], row["plateau_score"], row["activation_count"]) if row else SkillState()
+        state = transition_phase(SkillState(old.phase, min(1.0, max(0.0, level)), old.abstraction_level, old.marginal_gain, old.plateau_score, old.activation_count), marginal=marginal, contradiction=contradiction, novel_environment=novel_environment, independent_successes=independent_successes, composition_successes=composition_successes)
+        with self.db:
+            self.db.execute("INSERT OR REPLACE INTO skill_states VALUES (?,?,?,?,?,?,?,?)", (domain, state.phase.value, state.level, state.abstraction_level, state.marginal_gain, state.plateau_score, state.activation_count, time.time()))
+            if state.phase != old.phase:
+                self.db.execute("INSERT INTO skill_events VALUES (?,?,?,?,?)", (f"sev_{uuid.uuid4().hex}", domain, "memory_phase_advanced", json.dumps({"from": old.phase.value, "to": state.phase.value}), time.time()))
+        return state
 
     def cool(self, memory_id: str, *, reason="stale"):
         with self.db:

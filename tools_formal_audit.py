@@ -55,3 +55,27 @@ print('HALF_LIFE_DECAY', [(age, round(2 ** (-age / 30), 8)) for age in (0, 30, 6
 # Counterexample search for an under-specified evidence gate:
 # if one success is sufficient for warm, then n=1 passes despite docs saying a single success is insufficient.
 print('SINGLE_SUCCESS_POLICY', {'attempts': 1, 'successes': 1, 'required_repeats': 2, 'expected_status': 'candidate'})
+
+# Experience evolution model audit.
+from butian.core.experience import SkillPhase, SkillState, phase_curve, transition_phase, composition_gain, decision_value
+phases = list(SkillPhase)
+for phase in phases:
+    samples = [phase_curve(i / 100, phase) for i in range(101)]
+    assert samples[0] == 0 and abs(samples[-1] - 1) < 1e-12
+    assert all(0 <= x <= 1 for x in samples)
+    assert all(a <= b for a, b in zip(samples, samples[1:]))
+for state_phase in phases:
+    state = SkillState(state_phase, .7)
+    for contradiction in (False, True):
+        for novel in (False, True):
+            for successes in range(3):
+                next_state = transition_phase(state, marginal=.01, contradiction=contradiction, novel_environment=novel, independent_successes=successes, composition_successes=successes)
+                assert next_state.phase in phases
+                assert next_state.activation_count >= state.activation_count
+assert composition_gain([.4, .3]) == composition_gain([.4, .3])
+assert composition_gain([.4, .3]) != composition_gain([.4, .3, .3])
+for phase in phases:
+    assert 0 <= decision_value(1, 1, 1, 1, 1, phase) <= 1
+print('EXPERIENCE_CURVE_INVARIANTS PASS')
+print('EXPERIENCE_PHASES', [p.value for p in phases])
+print('COMPOSITION_DUPLICATE_POLICY PASS')
