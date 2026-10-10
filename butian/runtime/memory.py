@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS memory_versions (version_id TEXT PRIMARY KEY, memory_
 CREATE TABLE IF NOT EXISTS memory_conflicts (conflict_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, conflicting_memory_id TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_recall_log (recall_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, query TEXT NOT NULL, layer TEXT NOT NULL, used INTEGER NOT NULL, score REAL NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_recall_decisions (recall_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, query TEXT NOT NULL, outcome TEXT NOT NULL, missed INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS memory_validation_batches (batch_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, state TEXT NOT NULL, sample_count INTEGER NOT NULL DEFAULT 0, pass_count INTEGER NOT NULL DEFAULT 0, fail_count INTEGER NOT NULL DEFAULT 0, evidence_refs TEXT NOT NULL DEFAULT '[]', notes TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_maintenance (maintenance_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, action TEXT NOT NULL, reason TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_compositions (composition_id TEXT PRIMARY KEY, result_memory_id TEXT NOT NULL, component_memory_ids TEXT NOT NULL, component_fingerprint TEXT NOT NULL UNIQUE, composition_bonus REAL NOT NULL, redundancy_penalty REAL NOT NULL, conflict_penalty REAL NOT NULL, observed_successes INTEGER NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS skill_states (skill_domain TEXT PRIMARY KEY, phase TEXT NOT NULL, level REAL NOT NULL, abstraction_level INTEGER NOT NULL, marginal_gain REAL NOT NULL, plateau_score REAL NOT NULL, activation_count INTEGER NOT NULL, updated_at REAL NOT NULL);
@@ -44,10 +45,16 @@ class MemoryStore:
     def close(self):
         self.db.close()
 
-    def put(self, memory_id: str, kind: str, content: str, *, confidence=0.0, weight=1.0, environment=None, source_event_ids=None, status="candidate", source_validator=None, parent_version_id=None, change_reason=None):
+    def put(self, memory_id: str, kind: str, content: str, *, confidence=0.0, weight=1.0, environment=None, source_event_ids=None, status="candidate", source_validator=None, parent_version_id=None, change_reason=None, validation_state=None, knowledge_source=None):
         environment = environment or {}
         source_event_ids = list(source_event_ids or [])
         assert_safe_memory_content(memory_id, kind, content, json.dumps(environment, ensure_ascii=False))
+        if validation_state is not None and validation_state not in {"pending_prototype", "prototype_received", "batch_validating", "validated", "rejected", "inconclusive"}:
+            raise ValueError("invalid_validation_state")
+        if validation_state in {"pending_prototype", "prototype_received", "batch_validating"}:
+            if status in {"warm", "hot"}:
+                raise ValueError("unvalidated_hardware_hypothesis_cannot_be_verified")
+            status = "pending_validation"
         if status in {"warm", "hot"} and not source_event_ids:
             raise ValueError("evidence_required_for_verified_memory")
         if source_event_ids and source_validator and not source_validator(source_event_ids):
@@ -68,11 +75,51 @@ class MemoryStore:
             self.db.execute("DELETE FROM memory_fts WHERE memory_id=?", (memory_id,))
             self.db.execute("INSERT INTO memory_fts(memory_id,content) VALUES (?,?)", (memory_id, content))
             self.db.execute("INSERT INTO memory_versions(version_id,memory_id,version,parent_version_id,content,environment,change_reason,evidence_refs,version_status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)", (version_id, memory_id, version, parent_version_id, content, json.dumps(environment, ensure_ascii=False), change_reason, json.dumps(source_event_ids, ensure_ascii=False), status, now))
+            if validation_state:
+                self.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"evt_{uuid.uuid4().hex}", memory_id, "validation_state", json.dumps({"state": validation_state, "knowledge_source": knowledge_source}, ensure_ascii=False), now))
             if previous and previous["content"] != content:
                 conflict = self.db.execute("SELECT memory_id FROM memories WHERE memory_id!=? AND content=? AND status NOT IN ('invalidated','archived') LIMIT 1", (memory_id, content)).fetchone()
                 if conflict:
                     self.db.execute("INSERT INTO memory_conflicts VALUES (?,?,?,?,?,?)", (f"conf_{uuid.uuid4().hex}", memory_id, conflict["memory_id"], "same_content_different_memory", "open", now))
         return version_id
+
+    def create_validation_batch(self, memory_id: str, *, sample_count: int, notes: str | None = None, batch_id: str | None = None):
+        if sample_count < 1:
+            raise ValueError("validation_sample_count_must_be_positive")
+        if not self.get(memory_id):
+            raise ValueError("memory_not_found")
+        now = time.time()
+        batch_id = batch_id or f"batch_{uuid.uuid4().hex}"
+        with self.db:
+            self.db.execute("INSERT INTO memory_validation_batches(batch_id,memory_id,state,sample_count,notes,created_at,updated_at) VALUES (?,?,?,?,?,?,?)", (batch_id, memory_id, "pending_prototype", sample_count, notes, now, now))
+            self.db.execute("UPDATE memories SET status='pending_validation' WHERE memory_id=? AND status='candidate'", (memory_id,))
+        return batch_id
+
+    def update_validation_batch(self, batch_id: str, state: str, *, pass_count: int = 0, fail_count: int = 0, evidence_refs=None, notes: str | None = None):
+        allowed = {"pending_prototype", "prototype_received", "batch_validating", "validated", "rejected", "inconclusive"}
+        if state not in allowed:
+            raise ValueError("invalid_validation_state")
+        row = self.db.execute("SELECT * FROM memory_validation_batches WHERE batch_id=?", (batch_id,)).fetchone()
+        if not row:
+            raise ValueError("validation_batch_not_found")
+        transitions = {"pending_prototype": {"prototype_received", "inconclusive"}, "prototype_received": {"batch_validating", "inconclusive"}, "batch_validating": {"validated", "rejected", "inconclusive"}, "inconclusive": {"prototype_received", "batch_validating"}, "validated": set(), "rejected": set()}
+        if state != row["state"] and state not in transitions[row["state"]]:
+            raise ValueError("invalid_validation_transition")
+        if pass_count < 0 or fail_count < 0 or pass_count + fail_count > row["sample_count"]:
+            raise ValueError("invalid_validation_counts")
+        if state == "validated" and (pass_count + fail_count != row["sample_count"] or fail_count != 0 or not evidence_refs):
+            raise ValueError("validated_requires_complete_batch_evidence")
+        now = time.time()
+        self.db.execute("UPDATE memory_validation_batches SET state=?,pass_count=?,fail_count=?,evidence_refs=?,notes=?,updated_at=? WHERE batch_id=?", (state, pass_count, fail_count, json.dumps(list(evidence_refs or []), ensure_ascii=False), notes, now, batch_id))
+        if state == "validated":
+            self.db.execute("UPDATE memories SET status='warm' WHERE memory_id=? AND status IN ('candidate','pending_validation')", (row["memory_id"],))
+            self.db.execute("UPDATE memory_versions SET version_status='warm' WHERE memory_id=? AND version=(SELECT MAX(version) FROM memory_versions WHERE memory_id=?)", (row["memory_id"], row["memory_id"]))
+        elif state == "rejected":
+            self.db.execute("UPDATE memories SET status='disputed' WHERE memory_id=? AND status='pending_validation'", (row["memory_id"],))
+        return dict(self.db.execute("SELECT * FROM memory_validation_batches WHERE batch_id=?", (batch_id,)).fetchone())
+
+    def list_validation_batches(self, memory_id: str):
+        return [dict(row) for row in self.db.execute("SELECT * FROM memory_validation_batches WHERE memory_id=? ORDER BY created_at", (memory_id,))]
 
     def get(self, memory_id: str):
         row = self.db.execute("SELECT * FROM memories WHERE memory_id=?", (memory_id,)).fetchone()

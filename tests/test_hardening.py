@@ -154,3 +154,28 @@ def test_lesson_recall_is_explicit_audited_and_searches_both_memory_types(tmp_pa
     assert service.record_recall_outcome("m", packet["recall_id"], used_memory_ids=[], missed=True) is True
     assert service.recall_audit("m")[0]["missed"] == 1
     service.close()
+
+
+def test_current_memory_is_overwritten_but_history_is_auditable(tmp_path):
+    memory = MemoryStore(tmp_path / "memory.db")
+    memory.put("m", "experience", "旧方法", source_event_ids=["e1"])
+    memory.put("m", "experience", "新方法", source_event_ids=["e2"], change_reason="实测改进")
+    assert memory.get("m")["content"] == "新方法"
+    assert [row["content"] for row in memory.list_versions("m")] == ["旧方法", "新方法"]
+    memory.audit_version_chain("m")
+    memory.close()
+
+
+def test_hardware_hypothesis_waits_for_batch_validation(tmp_path):
+    memory = MemoryStore(tmp_path / "memory.db")
+    memory.put("pcb", "practice_hypothesis", "该电源布局应稳定", knowledge_source="model", validation_state="pending_prototype")
+    assert memory.get("pcb")["status"] == "pending_validation"
+    batch = memory.create_validation_batch("pcb", sample_count=3, notes="样机回来后批量测试")
+    memory.update_validation_batch(batch, "prototype_received")
+    memory.update_validation_batch(batch, "batch_validating")
+    with pytest.raises(ValueError, match="validated_requires_complete_batch_evidence"):
+        memory.update_validation_batch(batch, "validated", pass_count=2, evidence_refs=["lab:1"])
+    result = memory.update_validation_batch(batch, "validated", pass_count=3, evidence_refs=["lab:1", "lab:2", "lab:3"])
+    assert result["state"] == "validated"
+    assert memory.get("pcb")["status"] == "warm"
+    memory.close()
