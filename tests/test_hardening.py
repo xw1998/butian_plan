@@ -211,9 +211,67 @@ def test_memory_dream_distillation_and_abstraction_are_auditable_and_idempotent(
     again = dream.distill_memories(["m2", "m1"], summary="电源布局测试摘要", information_loss=.1)
     assert distill["distillation_id"] == again["distillation_id"]
     assert distill["status"] == "candidate" and distill["reversible"] == 1
-    abstract = dream.abstract_memories(["m1", "m2"], pattern="布局必须结合负载条件验证", supports=["m1", "m2"], counterexamples=["e3"], applicability=["同一电源拓扑"], failure_conditions=["负载变化"], abstraction_level=1)
+    abstract = dream.abstract_memories(["m1", "m2"], pattern="布局必须结合负载条件验证", supports=["m1", "m2"], counterexamples=["e1"], applicability=["同一电源拓扑"], failure_conditions=["负载变化"], abstraction_level=1)
     assert abstract["status"] == "candidate"
     assert '负载变化' in abstract["failure_conditions"]
     with pytest.raises(ValueError, match="distillation_must_be_reversible"):
         dream.distill_memories(["m1", "m2"], summary="不可逆", reversible=False)
+    memory.close()
+
+
+def test_dream_distillation_invalidates_stale_source_snapshot(tmp_path):
+    from butian.runtime.dream import DreamRunner
+    memory = MemoryStore(tmp_path / "memory.db")
+    dream = DreamRunner(memory)
+    memory.put("a", "lesson", "原始内容A")
+    memory.put("b", "lesson", "原始内容B")
+    first = dream.distill_memories(["a", "b"], summary="整理摘要")
+    repeated = dream.distill_memories(["b", "a"], summary="整理摘要")
+    assert first["distillation_id"] == repeated["distillation_id"]
+    memory.put("a", "lesson", "修订内容A")
+    revised = dream.distill_memories(["a", "b"], summary="整理摘要")
+    assert revised["distillation_id"] != first["distillation_id"]
+    assert len(memory.db.execute("SELECT * FROM memory_distillations").fetchall()) == 2
+    memory.close()
+
+
+def test_dream_rejects_unlinked_abstract_support_and_unknown_counterexample(tmp_path):
+    from butian.runtime.dream import DreamRunner
+    memory = MemoryStore(tmp_path / "memory.db")
+    dream = DreamRunner(memory)
+    memory.put("a", "lesson", "记忆A")
+    memory.put("b", "lesson", "记忆B")
+    with pytest.raises(ValueError, match="abstraction_support_must_be_source_memory"):
+        dream.abstract_memories(["a", "b"], pattern="模式", supports=["outside"])
+    with pytest.raises(ValueError, match="abstraction_counterexample_not_found"):
+        dream.abstract_memories(["a", "b"], pattern="模式", counterexamples=["missing"])
+    memory.close()
+
+
+def test_dream_recovers_stale_lock_and_keeps_fresh_lock(tmp_path):
+    from butian.runtime.dream import DreamRunner
+    memory = MemoryStore(tmp_path / "memory.db")
+    dream = DreamRunner(memory)
+    for mid in ("a", "b"):
+        memory.put(mid, "lesson", mid)
+    memory.db.execute("INSERT INTO dream_lock VALUES (1,?,?)", ("crashed", 10.0))
+    assert dream.run(min_fragments=2, min_interval=0, lock_timeout=5, now=20)["status"] == "completed"
+    memory.db.execute("INSERT INTO dream_lock VALUES (1,?,?)", ("active", 21.0))
+    blocked = dream.run(min_fragments=2, min_interval=0, lock_timeout=5, now=22)
+    assert blocked["reason"] == "locked"
+    memory.close()
+
+
+def test_recording_verification_does_not_complete_unstarted_actions(tmp_path):
+    from butian.runtime.dream import DreamRunner
+    memory = MemoryStore(tmp_path / "memory.db")
+    dream = DreamRunner(memory)
+    memory.put("a", "lesson", "经验A")
+    memory.put("b", "lesson", "经验B")
+    candidate = dream.run(min_fragments=2, min_interval=0)
+    hypothesis = dream.propose_hypothesis(candidate["candidate_id"], "待验证假设", prior_reliability=.5, argument="依据有限")
+    action = dream.schedule_verification(hypothesis, "已授权动作", cost=1, risk=.1, expected_information_gain=.5, authorized=True)
+    dream.record_verification(hypothesis, outcome="unknown", evidence_refs=[])
+    row = memory.db.execute("SELECT status FROM verification_actions WHERE action_id=?", (action["action_id"],)).fetchone()
+    assert row["status"] == "queued"
     memory.close()
