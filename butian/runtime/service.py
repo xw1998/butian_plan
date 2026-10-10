@@ -29,6 +29,46 @@ class ButianService:
             raise ValueError("member_memory_access_denied")
         return MemoryStore(self.home / "members" / member_id / "memory.db")
 
+    def recall_for_decision(self, member_id: str, query: str, *, decision_id: str, environment=None, limit=20):
+        if not decision_id.strip() or not query.strip():
+            raise ValueError("decision_id_and_query_required")
+        memory = self.memory(member_id)
+        try:
+            items = memory.recall_for_decision(query, limit=limit, environment=environment)
+            recall_id = f"recall_{uuid.uuid4().hex}"
+            memory.record_decision_recall(recall_id, decision_id, query, "recalled" if items else "no_match", False)
+            for item in items:
+                reference = json.loads(item["environment"] or "{}")
+                current = environment or {}
+                common = reference.keys() & current.keys()
+                item["environment_match"] = None if not common else all(reference[key] == current[key] for key in common)
+                item["needs_revalidation"] = item["status"] in {"cold", "candidate", "disputed"} or item["environment_match"] is False
+                item["recall_confidence"] = "low" if item["needs_revalidation"] else "unassessed"
+            return {"recall_id": recall_id, "decision_id": decision_id, "query": query, "memories": items, "no_match": not bool(items)}
+        finally:
+            memory.close()
+
+    def record_recall_outcome(self, member_id: str, recall_id: str, *, used_memory_ids: list[str], missed: bool):
+        memory = self.memory(member_id)
+        try:
+            row = memory.db.execute("SELECT * FROM memory_recall_decisions WHERE recall_id=?", (recall_id,)).fetchone()
+            if not row:
+                raise ValueError("recall_decision_not_found")
+            memory.db.execute("UPDATE memory_recall_log SET used=0 WHERE query=? AND created_at>=?", (row["query"], row["created_at"]))
+            for memory_id in set(used_memory_ids):
+                memory.db.execute("UPDATE memory_recall_log SET used=1 WHERE memory_id=? AND query=? AND created_at>=?", (memory_id, row["query"], row["created_at"]))
+            memory.db.execute("UPDATE memory_recall_decisions SET outcome=?, missed=? WHERE recall_id=?", ("missed" if missed else "complete", int(missed), recall_id))
+            return True
+        finally:
+            memory.close()
+
+    def recall_audit(self, member_id: str):
+        memory = self.memory(member_id)
+        try:
+            return memory.recall_audit()
+        finally:
+            memory.close()
+
     def set_member_strategy(self, member_id: str, strategy_id: str, version=1, stages=None):
         return self.store.set_member_strategy(member_id, strategy_id, version, stages)
 

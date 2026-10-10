@@ -26,6 +26,9 @@ CREATE INDEX IF NOT EXISTS idx_events_aggregate ON events(aggregate_id, seq);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE TABLE IF NOT EXISTS strategy_steps (step_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, revision INTEGER NOT NULL, member_id TEXT, strategy_id TEXT NOT NULL, strategy_version INTEGER NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL, reason TEXT, output_ref TEXT, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS members_auth (member_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS provider_sessions (provider_session_id TEXT PRIMARY KEY, task_id TEXT, member_id TEXT NOT NULL, provider_id TEXT NOT NULL, model TEXT, status TEXT NOT NULL, last_provider_event_id TEXT, reason TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS provider_outputs (provider_session_id TEXT NOT NULL, provider_event_id TEXT NOT NULL, text TEXT NOT NULL, model TEXT, created_at REAL NOT NULL, PRIMARY KEY(provider_session_id, provider_event_id));
+CREATE INDEX IF NOT EXISTS idx_provider_sessions_task ON provider_sessions(task_id, status);
 """
 
 class Store:
@@ -49,6 +52,40 @@ class Store:
 
     def close(self) -> None:
         self.db.close()
+
+    def create_provider_session(self, member_id: str, provider_id: str, *, task_id: str | None = None, model: str | None = None, provider_session_id: str | None = None) -> str:
+        session_id = provider_session_id or f"psess_{uuid.uuid4().hex}"
+        now = time.time()
+        self.db.execute("INSERT INTO provider_sessions VALUES (?,?,?,?,?,?,?,?,?,?)", (session_id, task_id, member_id, provider_id, model, "running", None, None, now, now))
+        return session_id
+
+    def provider_session(self, provider_session_id: str) -> dict[str, Any]:
+        row = self.db.execute("SELECT * FROM provider_sessions WHERE provider_session_id=?", (provider_session_id,)).fetchone()
+        if not row:
+            raise ValueError("provider_session_not_found")
+        return dict(row)
+
+    def record_provider_output(self, provider_session_id: str, provider_event_id: str, text: str, model: str | None = None) -> bool:
+        with self.db:
+            session = self.provider_session(provider_session_id)
+            if session["status"] != "running":
+                raise ValueError("provider_session_terminal")
+            inserted = self.db.execute("INSERT OR IGNORE INTO provider_outputs VALUES (?,?,?,?,?)", (provider_session_id, provider_event_id, text, model, time.time())).rowcount
+            if inserted:
+                self.db.execute("UPDATE provider_sessions SET last_provider_event_id=?, updated_at=? WHERE provider_session_id=?", (provider_event_id, time.time(), provider_session_id))
+        return bool(inserted)
+
+    def finish_provider_session(self, provider_session_id: str, status: str, reason: str | None = None) -> dict[str, Any]:
+        terminal = {"completed", "cancelled", "provider_lost", "unknown"}
+        if status not in terminal | {"cancelling", "running"}:
+            raise ValueError("invalid_provider_session_status")
+        with self.db:
+            current = self.provider_session(provider_session_id)["status"]
+            allowed = {"running": terminal | {"cancelling"}, "cancelling": {"cancelled", "provider_lost", "unknown"}}
+            if status not in allowed.get(current, set()):
+                raise ValueError("invalid_provider_session_transition")
+            self.db.execute("UPDATE provider_sessions SET status=?, reason=?, updated_at=? WHERE provider_session_id=?", (status, reason, time.time(), provider_session_id))
+        return self.provider_session(provider_session_id)
 
     def add_member(self, member_id: str, name: str, role: str = "member", responsibilities: list[str] | None = None, provider_id: str | None = None, model_id: str | None = None, default_strategy_id: str = "experience_reuse", strategy_version: int = 1, strategy_stages: list[str] | None = None) -> None:
         from ..core.strategies import strategy_snapshot

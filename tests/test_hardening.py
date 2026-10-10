@@ -122,3 +122,35 @@ def test_composition_graph_deduplicates_and_tracks_skill_phase(tmp_path):
     assert memory.update_skill("测试", level=.7, marginal=.01).phase == SkillPhase.STABLE
     assert memory.update_skill("测试", level=.7, marginal=.01, novel_environment=True).phase == SkillPhase.ACTIVATING
     memory.close()
+
+def test_memory_versions_form_unbounded_evidence_linked_chain(tmp_path):
+    memory = MemoryStore(tmp_path / "memory.db")
+    parent = None
+    for index in range(1, 105):
+        parent = memory.put(
+            "m-chain", "lesson", f"迭代步骤 {index}",
+            environment={"runtime": "test", "revision": index},
+            source_event_ids=[f"evt:{index}"], status="candidate",
+            parent_version_id=parent, change_reason=f"验证修订 {index}",
+        )
+    versions = memory.list_versions("m-chain")
+    assert len(versions) == 104
+    assert [item["version"] for item in versions] == list(range(1, 105))
+    assert versions[-1]["parent_version_id"] == versions[-2]["version_id"]
+    assert memory.get("m-chain")["content"] == "迭代步骤 104"
+    memory.audit_version_chain("m-chain")
+    memory.close()
+
+def test_lesson_recall_is_explicit_audited_and_searches_both_memory_types(tmp_path):
+    service = ButianService(tmp_path / "home")
+    service.add_member("m", "工程师")
+    memory = service.memory("m")
+    memory.put("lesson", "lesson", "不要把未知依赖版本当成兼容", status="candidate", environment={"os": "x"})
+    memory.put("experience", "experience", "未知依赖版本必须先实测", status="candidate", environment={"os": "x"})
+    memory.close()
+    packet = service.recall_for_decision("m", "未知依赖版本兼容性", decision_id="task:1:plan", environment={"os": "x"})
+    assert {item["kind"] for item in packet["memories"]} == {"lesson", "experience"}
+    assert packet["decision_id"] == "task:1:plan"
+    assert service.record_recall_outcome("m", packet["recall_id"], used_memory_ids=[], missed=True) is True
+    assert service.recall_audit("m")[0]["missed"] == 1
+    service.close()

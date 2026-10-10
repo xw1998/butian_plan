@@ -60,3 +60,18 @@ def test_claim_token_is_checked(tmp_path):
     lease = store.claim_task(task, "worker", token="secret")
     assert lease["lease_id"].startswith("lease_")
     store.close()
+
+def test_generic_provider_session_outputs_are_idempotent_and_terminal(tmp_path):
+    from butian.runtime.store import Store
+    store = Store(tmp_path / "team.db")
+    store.add_member("m", "成员", provider_id="generic-agent")
+    session_id = store.create_provider_session("m", "generic-agent", task_id="task-x")
+    assert store.record_provider_output(session_id, "event-1", "partial") is True
+    assert store.record_provider_output(session_id, "event-1", "duplicate") is False
+    assert store.provider_session(session_id)["last_provider_event_id"] == "event-1"
+    assert store.finish_provider_session(session_id, "completed")["status"] == "completed"
+    with pytest.raises(ValueError, match="provider_session_terminal"):
+        store.record_provider_output(session_id, "event-2", "late")
+    with pytest.raises(ValueError, match="invalid_provider_session_transition"):
+        store.finish_provider_session(session_id, "running")
+    store.close()

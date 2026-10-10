@@ -40,3 +40,19 @@ def test_memory_degradation_is_persisted_and_does_not_invalidate_by_score_alone(
     second_weight = store.db.execute("select weight from memories where memory_id='m'").fetchone()[0]
     assert second_weight == pytest.approx(first_weight)
     store.close()
+
+def test_lesson_uses_same_degradation_counterevidence_and_rewarm_gates(tmp_path):
+    store = MemoryStore(tmp_path / "memory.db")
+    store.put("lesson", "lesson", "版本不匹配时不可推定兼容", confidence=1.0, weight=1.0, environment={"python": "3.11", "library": "1.0"}, source_event_ids=["evt:verified"], status="warm")
+    degraded = store.assess_memory_degradation("lesson", now=31 * 86400, half_life_days=30, current_environment={"python": "3.12", "library": "2.0"}, consecutive_failures=2, contradiction_count=1)
+    assert degraded.score > 0
+    row = store.db.execute("SELECT status, weight FROM memories WHERE memory_id='lesson'").fetchone()
+    assert row["status"] == "disputed" and row["weight"] < 1.0
+    store.put("lesson", "lesson", "修正：版本不匹配需先做兼容性实测", confidence=.4, weight=.3, environment={"python": "3.12", "library": "2.0"}, source_event_ids=["evt:counterexample"], status="candidate", change_reason="新环境反证，重写适用条件")
+    assert store.list_versions("lesson")[-1]["version_status"] == "candidate"
+    store.db.execute("UPDATE memories SET status='cold' WHERE memory_id='lesson'")
+    with pytest.raises(ValueError, match="evidence_required_for_rewarm"):
+        store.rewarm("lesson", success=True)
+    assert store.rewarm("lesson", success=True, evidence_ref="evt:reproduced") == "warm"
+    store.audit_version_chain("lesson")
+    store.close()

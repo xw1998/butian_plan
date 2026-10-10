@@ -6,6 +6,9 @@ from .runtime.service import ButianService
 TOOLS = [
     {"name": "butian_status", "description": "Return Butian runtime status", "inputSchema": {"type": "object", "properties": {}}},
     {"name": "butian_memory_search", "description": "Search a member's isolated memory", "inputSchema": {"type": "object", "required": ["member_id", "query"], "properties": {"member_id": {"type": "string"}, "query": {"type": "string"}, "kind": {"type": "string"}}}},
+    {"name": "butian_memory_recall", "description": "Recall relevant experience and lessons before a task decision", "inputSchema": {"type": "object", "required": ["member_id", "query", "decision_id"], "properties": {"member_id": {"type": "string"}, "query": {"type": "string"}, "decision_id": {"type": "string"}, "environment": {"type": "object"}, "limit": {"type": "integer"}}}},
+    {"name": "butian_memory_recall_outcome", "description": "Record whether recalled memories were used and whether recall missed relevant lessons", "inputSchema": {"type": "object", "required": ["member_id", "recall_id", "used_memory_ids", "missed"], "properties": {"member_id": {"type": "string"}, "recall_id": {"type": "string"}, "used_memory_ids": {"type": "array", "items": {"type": "string"}}, "missed": {"type": "boolean"}}}},
+    {"name": "butian_memory_recall_audit", "description": "Inspect recall outcomes and missed-memory audits", "inputSchema": {"type": "object", "required": ["member_id"], "properties": {"member_id": {"type": "string"}}}},
     {"name": "butian_task_list", "description": "List orchestration tasks", "inputSchema": {"type": "object", "properties": {"status": {"type": "string"}}}},
     {"name": "butian_session_create", "description": "Create solo or team session", "inputSchema": {"type": "object", "required": ["mode"], "properties": {"mode": {"type": "string", "enum": ["solo", "team"]}, "dispatcher_member_id": {"type": "string"}, "requested_model": {"type": "string"}, "capabilities": {"type": "object"}}}},
     {"name": "butian_task_create", "description": "Create a task", "inputSchema": {"type": "object", "required": ["session_id", "title"], "properties": {"session_id": {"type": "string"}, "title": {"type": "string"}, "assignee_id": {"type": "string"}}}},
@@ -78,4 +81,10 @@ def call_tool(service, name, args):
         memory = service.memory(args["member_id"])
         try: return {"memories": memory.search(args["query"], kind=args.get("kind"))}
         finally: memory.close()
+    if name == "butian_memory_recall":
+        return service.recall_for_decision(args["member_id"], args["query"], decision_id=args["decision_id"], environment=args.get("environment"), limit=args.get("limit", 20))
+    if name == "butian_memory_recall_outcome":
+        return {"ok": service.record_recall_outcome(args["member_id"], args["recall_id"], used_memory_ids=args["used_memory_ids"], missed=args["missed"])}
+    if name == "butian_memory_recall_audit":
+        return {"decisions": service.recall_audit(args["member_id"])}
     raise ValueError("unknown_tool")
