@@ -47,11 +47,15 @@ def marginal_gain(gains: Iterable[float], window: int = 5) -> float:
 
 def transition_phase(state: SkillState, *, marginal: float, contradiction: bool = False,
                      novel_environment: bool = False, independent_successes: int = 0,
-                     composition_successes: int = 0) -> SkillState:
+                     composition_successes: int = 0, regression_evidence: bool = False) -> SkillState:
     """Explicit spiral transitions; no phase jump without observable evidence."""
     phase = state.phase
     next_phase = phase
-    if phase == SkillPhase.ESTABLISHING and state.level >= 0.2:
+    if regression_evidence and contradiction and phase in {SkillPhase.TRANSCENDING, SkillPhase.INTEGRATING}:
+        next_phase = SkillPhase.ACTIVATING
+    elif regression_evidence and contradiction and phase == SkillPhase.ACTIVATING:
+        next_phase = SkillPhase.DEVELOPING
+    elif phase == SkillPhase.ESTABLISHING and state.level >= 0.2:
         next_phase = SkillPhase.DEVELOPING
     elif phase == SkillPhase.DEVELOPING and marginal < 0.05 and state.level >= 0.5:
         next_phase = SkillPhase.STABLE
@@ -62,7 +66,7 @@ def transition_phase(state: SkillState, *, marginal: float, contradiction: bool 
     elif phase == SkillPhase.INTEGRATING and composition_successes >= 2:
         next_phase = SkillPhase.TRANSCENDING
     activation_count = state.activation_count + int(phase == SkillPhase.STABLE and next_phase == SkillPhase.ACTIVATING)
-    return SkillState(next_phase, min(1.0, max(0.0, state.level)), state.abstraction_level + int(next_phase != phase and next_phase in {SkillPhase.INTEGRATING, SkillPhase.TRANSCENDING}), max(0.0, marginal), min(1.0, max(0.0, 1 - marginal / 0.05)) if phase == SkillPhase.DEVELOPING else state.plateau_score, activation_count)
+    return SkillState(next_phase, min(1.0, max(0.0, state.level)), max(0, state.abstraction_level + int(next_phase == SkillPhase.TRANSCENDING) - int(phase == SkillPhase.TRANSCENDING and next_phase != phase)), max(0.0, marginal), min(1.0, max(0.0, 1 - marginal / 0.05)) if phase == SkillPhase.DEVELOPING else state.plateau_score, activation_count)
 
 def composition_gain(component_gains: Iterable[float], *, composition_bonus: float = 0.0,
                     redundancy_penalty: float = 0.0, conflict_penalty: float = 0.0) -> float:

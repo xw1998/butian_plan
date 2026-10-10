@@ -72,7 +72,7 @@ def test_memory_versions_layers_and_rewarm(tmp_path):
     assert memory.search("版本二")[0]["content"] == "版本二"
     assert memory.cool("m1")
     assert memory.search("版本二")[0]["status"] == "cold"
-    assert memory.rewarm("m1", success=True) == "warm"
+    assert memory.rewarm("m1", success=True, evidence_ref="evt:rewarm") == "warm"
     memory.close()
 
 def test_dream_gates_and_candidate_audit(tmp_path):

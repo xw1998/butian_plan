@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 from .security import assert_safe_memory_content
 from ..core.experience import SkillPhase, SkillState, composition_gain, decision_value, transition_phase
+from ..core.degradation import assess_degradation, environment_drift
 
 SCHEMA = '''
 PRAGMA journal_mode=WAL;
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS memory_maintenance (maintenance_id TEXT PRIMARY KEY, 
 CREATE TABLE IF NOT EXISTS memory_compositions (composition_id TEXT PRIMARY KEY, result_memory_id TEXT NOT NULL, component_memory_ids TEXT NOT NULL, component_fingerprint TEXT NOT NULL UNIQUE, composition_bonus REAL NOT NULL, redundancy_penalty REAL NOT NULL, conflict_penalty REAL NOT NULL, observed_successes INTEGER NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS skill_states (skill_domain TEXT PRIMARY KEY, phase TEXT NOT NULL, level REAL NOT NULL, abstraction_level INTEGER NOT NULL, marginal_gain REAL NOT NULL, plateau_score REAL NOT NULL, activation_count INTEGER NOT NULL, updated_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS skill_events (event_id TEXT PRIMARY KEY, skill_domain TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS memory_degradation (memory_id TEXT PRIMARY KEY, base_weight REAL NOT NULL, base_confidence REAL NOT NULL, base_status TEXT NOT NULL, score REAL NOT NULL, freshness REAL NOT NULL, state TEXT NOT NULL, reasons TEXT NOT NULL, model_version TEXT NOT NULL, assessed_at REAL NOT NULL);
 '''
 
 class MemoryStore:
@@ -29,6 +31,9 @@ class MemoryStore:
         self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        degradation_columns = {row[1] for row in self.db.execute("PRAGMA table_info(memory_degradation)")}
+        if degradation_columns and "base_status" not in degradation_columns:
+            self.db.execute("ALTER TABLE memory_degradation ADD COLUMN base_status TEXT NOT NULL DEFAULT 'warm'")
 
     def close(self):
         self.db.close()
@@ -97,15 +102,36 @@ class MemoryStore:
             self.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"evt_{uuid.uuid4().hex}", result_memory_id, "memory_composed", json.dumps({"components": ids, "gain": gain}), time.time()))
         return {"composition_id": cid, "memory_id": result_memory_id, "gain": gain}
 
-    def update_skill(self, domain: str, *, level: float, marginal: float, contradiction=False, novel_environment=False, independent_successes=0, composition_successes=0):
+    def update_skill(self, domain: str, *, level: float, marginal: float, contradiction=False, novel_environment=False, independent_successes=0, composition_successes=0, regression_evidence=False):
         row = self.db.execute("SELECT * FROM skill_states WHERE skill_domain=?", (domain,)).fetchone()
         old = SkillState(SkillPhase(row["phase"]), row["level"], row["abstraction_level"], row["marginal_gain"], row["plateau_score"], row["activation_count"]) if row else SkillState()
-        state = transition_phase(SkillState(old.phase, min(1.0, max(0.0, level)), old.abstraction_level, old.marginal_gain, old.plateau_score, old.activation_count), marginal=marginal, contradiction=contradiction, novel_environment=novel_environment, independent_successes=independent_successes, composition_successes=composition_successes)
+        state = transition_phase(SkillState(old.phase, min(1.0, max(0.0, level)), old.abstraction_level, old.marginal_gain, old.plateau_score, old.activation_count), marginal=marginal, contradiction=contradiction, novel_environment=novel_environment, independent_successes=independent_successes, composition_successes=composition_successes, regression_evidence=regression_evidence)
         with self.db:
             self.db.execute("INSERT OR REPLACE INTO skill_states VALUES (?,?,?,?,?,?,?,?)", (domain, state.phase.value, state.level, state.abstraction_level, state.marginal_gain, state.plateau_score, state.activation_count, time.time()))
             if state.phase != old.phase:
-                self.db.execute("INSERT INTO skill_events VALUES (?,?,?,?,?)", (f"sev_{uuid.uuid4().hex}", domain, "memory_phase_advanced", json.dumps({"from": old.phase.value, "to": state.phase.value}), time.time()))
+                self.db.execute("INSERT INTO skill_events VALUES (?,?,?,?,?)", (f"sev_{uuid.uuid4().hex}", domain, "memory_phase_regressed" if list(SkillPhase).index(state.phase) < list(SkillPhase).index(old.phase) else "memory_phase_advanced", json.dumps({"from": old.phase.value, "to": state.phase.value, "regression_evidence": regression_evidence}), time.time()))
         return state
+
+    def assess_memory_degradation(self, memory_id: str, *, now: float | None = None, half_life_days: float = 30.0, current_environment=None, consecutive_failures: int = 0, contradiction_count: int = 0, dependency_drift_score: float = 0.0, hard_failure: bool = False):
+        row = self.db.execute("SELECT environment, created_at FROM memories WHERE memory_id=?", (memory_id,)).fetchone()
+        if not row:
+            raise ValueError("memory_not_found")
+        reference = json.loads(row["environment"] or "{}")
+        current = current_environment or reference
+        drift = environment_drift(reference, current)
+        timestamp = time.time() if now is None else float(now)
+        assessment = assess_degradation(age_days=max(0.0, (timestamp - row["created_at"]) / 86400.0), half_life_days=half_life_days, consecutive_failures=consecutive_failures, contradiction_count=contradiction_count, environment_drift_score=drift, dependency_drift_score=dependency_drift_score, hard_failure=hard_failure)
+        with self.db:
+            base = self.db.execute("SELECT base_weight, base_confidence, base_status FROM memory_degradation WHERE memory_id=?", (memory_id,)).fetchone()
+            base_row = self.db.execute("SELECT weight, confidence, status FROM memories WHERE memory_id=?", (memory_id,)).fetchone()
+            base_weight = float(base["base_weight"]) if base else float(base_row["weight"])
+            base_confidence = float(base["base_confidence"]) if base else float(base_row["confidence"])
+            base_status = str(base["base_status"]) if base else str(base_row["status"])
+            status = "disputed" if assessment.state == "disputed" and base_status in {"warm", "hot"} else base_status
+            self.db.execute("INSERT OR REPLACE INTO memory_degradation(memory_id,base_weight,base_confidence,base_status,score,freshness,state,reasons,model_version,assessed_at) VALUES (?,?,?,?,?,?,?,?,?,?)", (memory_id, base_weight, base_confidence, base_status, assessment.score, assessment.freshness, assessment.state, json.dumps(assessment.reasons), assessment.model_version, timestamp))
+            self.db.execute("UPDATE memories SET weight=?, confidence=?, status=?, updated_at=? WHERE memory_id=?", (base_weight * assessment.freshness, base_confidence * assessment.freshness, status, timestamp, memory_id))
+            self.db.execute("INSERT INTO memory_maintenance VALUES (?,?,?,?,?)", (f"maint_{uuid.uuid4().hex}", memory_id, "degradation_assessed", json.dumps({"score": assessment.score, "state": assessment.state, "reasons": assessment.reasons}), timestamp))
+        return assessment
 
     def cool(self, memory_id: str, *, reason="stale"):
         with self.db:
@@ -115,6 +141,8 @@ class MemoryStore:
         return changed == 1
 
     def rewarm(self, memory_id: str, *, success: bool, evidence_ref: str | None = None):
+        if success and not evidence_ref:
+            raise ValueError("evidence_required_for_rewarm")
         with self.db:
             row = self.db.execute("SELECT status, weight, confidence FROM memories WHERE memory_id=?", (memory_id,)).fetchone()
             if not row or row["status"] != "cold": raise ValueError("cold_memory_not_found")
@@ -122,5 +150,7 @@ class MemoryStore:
             weight = min(5.0, float(row["weight"]) + (0.25 if success else -0.1))
             confidence = min(1.0, float(row["confidence"]) + (0.05 if success else 0.0))
             self.db.execute("UPDATE memories SET status=?, weight=?, confidence=?, updated_at=? WHERE memory_id=?", (status, weight, confidence, time.time(), memory_id))
+            if success:
+                self.db.execute("DELETE FROM memory_degradation WHERE memory_id=?", (memory_id,))
             self.db.execute("INSERT INTO memory_maintenance VALUES (?,?,?,?,?)", (f"maint_{uuid.uuid4().hex}", memory_id, "rewarm", json.dumps({"success": success, "evidence_ref": evidence_ref}), time.time()))
         return status
