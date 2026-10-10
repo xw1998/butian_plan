@@ -22,7 +22,11 @@ class ButianService:
         self.store.add_member(member_id, name, role, responsibilities, provider_id, model_id, default_strategy_id, strategy_version, strategy_stages)
         MemoryStore(self.home / "members" / member_id / "memory.db").close()
 
-    def memory(self, member_id: str) -> MemoryStore:
+    def memory(self, member_id: str, *, actor_member_id: str | None = None) -> MemoryStore:
+        if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
+            raise ValueError("member_not_found")
+        if actor_member_id is not None and actor_member_id != member_id:
+            raise ValueError("member_memory_access_denied")
         return MemoryStore(self.home / "members" / member_id / "memory.db")
 
     def set_member_strategy(self, member_id: str, strategy_id: str, version=1, stages=None):
