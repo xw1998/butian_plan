@@ -8,6 +8,9 @@ class DreamRunner:
         self.memory = memory
         self.memory.db.executescript('''
         CREATE TABLE IF NOT EXISTS dream_runs (run_id TEXT PRIMARY KEY, started_at REAL NOT NULL, status TEXT NOT NULL, gate_snapshot TEXT NOT NULL, candidate_count INTEGER NOT NULL DEFAULT 0, reason TEXT);
+        CREATE TABLE IF NOT EXISTS hypotheses (hypothesis_id TEXT PRIMARY KEY, candidate_id TEXT, statement TEXT NOT NULL, prior_reliability REAL NOT NULL, argument TEXT NOT NULL, status TEXT NOT NULL, evidence_refs TEXT NOT NULL DEFAULT '[]', created_at REAL NOT NULL, updated_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS verification_actions (action_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, description TEXT NOT NULL, cost REAL NOT NULL, risk REAL NOT NULL, expected_information_gain REAL NOT NULL, authorized INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS verification_queue (queue_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, action_id TEXT NOT NULL, priority REAL NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS dream_candidates (candidate_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, memory_ids TEXT NOT NULL, content TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS dream_lock (lock_id INTEGER PRIMARY KEY CHECK(lock_id=1), owner TEXT NOT NULL, acquired_at REAL NOT NULL);
         ''')
@@ -39,3 +42,50 @@ class DreamRunner:
             self.memory.db.execute("INSERT INTO dream_candidates VALUES (?,?,?,?,?,?)", (candidate_id, run_id, json.dumps([row["memory_id"] for row in rows]), content, "candidate", now))
             self.memory.db.execute("DELETE FROM dream_lock WHERE lock_id=1")
             return {"run_id": run_id, "status": "completed", "candidate_id": candidate_id, "gate": gate}
+
+    def propose_hypothesis(self, candidate_id: str, statement: str, *, prior_reliability: float, argument: str, evidence_refs=None):
+        if not 0 <= prior_reliability <= 1:
+            raise ValueError("prior_reliability_out_of_range")
+        if not statement.strip() or not argument.strip():
+            raise ValueError("hypothesis_statement_and_argument_required")
+        if not self.memory.db.execute("SELECT 1 FROM dream_candidates WHERE candidate_id=?", (candidate_id,)).fetchone():
+            raise ValueError("dream_candidate_not_found")
+        hypothesis_id = f"hyp_{uuid.uuid4().hex}"
+        now = time.time()
+        self.memory.db.execute("INSERT INTO hypotheses VALUES (?,?,?,?,?,?,?,?,?)", (hypothesis_id, candidate_id, statement, prior_reliability, argument, "candidate", json.dumps(list(evidence_refs or []), ensure_ascii=False), now, now))
+        return hypothesis_id
+
+    def schedule_verification(self, hypothesis_id: str, description: str, *, cost: float, risk: float, expected_information_gain: float, authorized=False):
+        if cost < 0 or not 0 <= risk <= 1 or expected_information_gain < 0:
+            raise ValueError("invalid_verification_action_metrics")
+        if not self.memory.db.execute("SELECT 1 FROM hypotheses WHERE hypothesis_id=?", (hypothesis_id,)).fetchone():
+            raise ValueError("hypothesis_not_found")
+        action_id = f"act_{uuid.uuid4().hex}"
+        now = time.time()
+        priority = expected_information_gain / (1 + cost) * (1 - risk)
+        status = "queued" if authorized else "awaiting_authorization"
+        self.memory.db.execute("INSERT INTO verification_actions VALUES (?,?,?,?,?,?,?,?,?,?)", (action_id, hypothesis_id, description, cost, risk, expected_information_gain, int(authorized), status, now, now))
+        if authorized:
+            self.memory.db.execute("INSERT INTO verification_queue VALUES (?,?,?,?,?,?,?)", (f"queue_{uuid.uuid4().hex}", hypothesis_id, action_id, priority, "information_gain_cost_risk", "queued", now))
+        return {"action_id": action_id, "priority": priority, "status": status}
+
+    def record_verification(self, hypothesis_id: str, *, outcome: str, evidence_refs, new_memory_id: str | None = None, new_content: str | None = None):
+        if outcome not in {"supported", "rejected", "unknown", "execution_failed"}:
+            raise ValueError("invalid_verification_outcome")
+        refs = list(evidence_refs or [])
+        if outcome in {"supported", "rejected"} and not refs:
+            raise ValueError("verification_evidence_required")
+        if not self.memory.db.execute("SELECT 1 FROM hypotheses WHERE hypothesis_id=?", (hypothesis_id,)).fetchone():
+            raise ValueError("hypothesis_not_found")
+        status = "supported" if outcome == "supported" else ("rejected" if outcome == "rejected" else "unknown")
+        now = time.time()
+        self.memory.db.execute("UPDATE hypotheses SET status=?,evidence_refs=?,updated_at=? WHERE hypothesis_id=?", (status, json.dumps(refs, ensure_ascii=False), now, hypothesis_id))
+        self.memory.db.execute("UPDATE verification_actions SET status='completed',updated_at=? WHERE hypothesis_id=? AND status IN ('queued','running')", (now, hypothesis_id))
+        if new_memory_id and new_content and outcome == "supported":
+            self.memory.put(new_memory_id, "experience", new_content, source_event_ids=refs, status="candidate", change_reason="dream_hypothesis_verified")
+        elif new_memory_id and new_content and outcome == "rejected":
+            self.memory.put(new_memory_id, "lesson", new_content, source_event_ids=refs, status="candidate", change_reason="dream_hypothesis_rejected")
+        return {"hypothesis_id": hypothesis_id, "status": status, "evidence_refs": refs}
+
+    def verification_queue(self, limit=20):
+        return [dict(row) for row in self.memory.db.execute("SELECT * FROM verification_queue WHERE status='queued' ORDER BY priority DESC, created_at LIMIT ?", (limit,))]

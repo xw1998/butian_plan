@@ -89,7 +89,27 @@ def entropy(probabilities: Iterable[float]) -> float:
 
 
 def information_gain(prior: Sequence[float], conditional: Sequence[float]) -> float:
+    """Information reduction for one explicitly supplied posterior."""
     return max(0.0, entropy(prior) - entropy(conditional))
+
+
+def expected_information_gain(prior: Sequence[float], posteriors: Sequence[Sequence[float]], outcome_probabilities: Sequence[float]) -> float:
+    """Expected entropy reduction across mutually exclusive observations.
+
+    The caller must provide a normalized prior, outcome probabilities, and one
+    normalized posterior per outcome. No outcome or posterior is inferred.
+    """
+    if len(posteriors) != len(outcome_probabilities) or not posteriors:
+        raise ValueError("posterior_outcome_length_mismatch")
+    raw_probabilities = [float(value) for value in outcome_probabilities]
+    if any(value < 0 or value > 1 for value in raw_probabilities):
+        raise ValueError("outcome_probability_out_of_range")
+    if abs(sum(raw_probabilities) - 1.0) > 1e-9:
+        raise ValueError("outcome_probabilities_must_sum_to_one")
+    probabilities = raw_probabilities
+    prior_entropy = entropy(prior)
+    expected_posterior_entropy = sum(probability * entropy(posterior) for probability, posterior in zip(probabilities, posteriors))
+    return max(0.0, prior_entropy - expected_posterior_entropy)
 
 
 def score_information_action(actions: Mapping[str, tuple[Sequence[float], Sequence[float]]], *, cost_weight: float = 0.0,
@@ -155,16 +175,26 @@ def allocate_by_utility(options: Mapping[str, Utility], *, budget: float | None 
         return []
     if budget is not None and budget < 0:
         raise ValueError("budget_must_be_nonnegative")
-    ranked = sorted(options, key=lambda name: options[name].score(), reverse=True)
+    names = list(options)
     if budget is None:
-        return ranked
-    selected, spent = [], 0.0
-    for name in ranked:
-        cost = options[name].cost
-        if spent + cost <= budget:
-            selected.append(name)
-            spent += cost
-    return selected
+        return sorted(names, key=lambda name: options[name].score(), reverse=True)
+    if any(options[name].cost < 0 for name in names):
+        raise ValueError("option_cost_must_be_nonnegative")
+    # Exact 0/1 knapsack over integerized costs; unlike greedy ranking this
+    # cannot discard a better feasible combination.
+    scale = 1000
+    capacity = int(round(budget * scale))
+    costs = [int(round(options[name].cost * scale)) for name in names]
+    dp = [(0.0, ()) for _ in range(capacity + 1)]
+    for index, name in enumerate(names):
+        cost = costs[index]
+        value = options[name].score()
+        for current in range(capacity, cost - 1, -1):
+            candidate = (dp[current - cost][0] + value, dp[current - cost][1] + (index,))
+            if candidate[0] > dp[current][0]:
+                dp[current] = candidate
+    selected_indices = set(dp[capacity][1])
+    return [name for index, name in enumerate(names) if index in selected_indices]
 
 
 def queue_metrics(arrival_rate: float, service_rate: float) -> dict[str, float | str]:

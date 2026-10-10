@@ -47,3 +47,18 @@ def test_utility_queue_and_bandit_guards():
     bandit.observe(chosen, 1)
     with pytest.raises(ValueError):
         bandit.observe("missing", 1)
+
+
+def test_expected_information_gain_requires_outcome_model():
+    assert expected_information_gain([.5, .5], [[1, 0], [0, 1]], [.5, .5]) == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="outcome_probabilities_must_sum_to_one"):
+        expected_information_gain([.5, .5], [[1, 0], [0, 1]], [.4, .4])
+
+
+def test_budget_allocation_finds_best_combination_not_greedy():
+    options = {
+        "large": Utility(8, 1, 0, 0, 0),
+        "a": Utility(5, .5, 0, 0, 0),
+        "b": Utility(5, .5, 0, 0, 0),
+    }
+    assert set(allocate_by_utility(options, budget=1.0)) == {"a", "b"}

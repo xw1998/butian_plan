@@ -179,3 +179,23 @@ def test_hardware_hypothesis_waits_for_batch_validation(tmp_path):
     assert result["state"] == "validated"
     assert memory.get("pcb")["status"] == "warm"
     memory.close()
+
+
+def test_dream_hypothesis_argument_and_verification_drive(tmp_path):
+    from butian.runtime.dream import DreamRunner
+    memory = MemoryStore(tmp_path / "memory.db")
+    dream = DreamRunner(memory)
+    for index in range(2):
+        memory.put(f"f{index}", "lesson", f"历史经验 {index}")
+    result = dream.run(min_fragments=2, min_interval=0)
+    hypothesis_id = dream.propose_hypothesis(result["candidate_id"], "布局假设成立", prior_reliability=.6, argument="两条相似经验支持", evidence_refs=["memory:f0"])
+    pending = dream.schedule_verification(hypothesis_id, "样机批量测试", cost=2, risk=.2, expected_information_gain=.8)
+    assert pending["status"] == "awaiting_authorization"
+    queued = dream.schedule_verification(hypothesis_id, "低风险仿真", cost=1, risk=.1, expected_information_gain=.4, authorized=True)
+    assert queued["status"] == "queued" and dream.verification_queue()
+    with pytest.raises(ValueError, match="verification_evidence_required"):
+        dream.record_verification(hypothesis_id, outcome="supported", evidence_refs=[])
+    outcome = dream.record_verification(hypothesis_id, outcome="supported", evidence_refs=["lab:1"], new_memory_id="new", new_content="验证后的经验")
+    assert outcome["status"] == "supported"
+    assert memory.get("new")["content"] == "验证后的经验"
+    memory.close()
