@@ -10,13 +10,13 @@ from ..core.degradation import assess_degradation, environment_drift
 
 SCHEMA = '''
 PRAGMA journal_mode=WAL;
-CREATE TABLE IF NOT EXISTS memories (memory_id TEXT PRIMARY KEY, kind TEXT NOT NULL, content TEXT NOT NULL, status TEXT NOT NULL, confidence REAL NOT NULL, weight REAL NOT NULL, environment TEXT NOT NULL, source_event_ids TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS memories (memory_id TEXT PRIMARY KEY, kind TEXT NOT NULL, content TEXT NOT NULL, status TEXT NOT NULL, confidence REAL NOT NULL, weight REAL NOT NULL, environment TEXT NOT NULL, source_event_ids TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL, recall_count INTEGER NOT NULL DEFAULT 0, useful_count INTEGER NOT NULL DEFAULT 0, harmful_count INTEGER NOT NULL DEFAULT 0, last_recalled_at REAL, last_used_at REAL);
 CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(memory_id UNINDEXED, content);
 CREATE TABLE IF NOT EXISTS memory_events (event_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories(kind, status);
 CREATE TABLE IF NOT EXISTS memory_versions (version_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, version INTEGER NOT NULL, parent_version_id TEXT, content TEXT NOT NULL, environment TEXT NOT NULL, change_reason TEXT, evidence_refs TEXT NOT NULL DEFAULT '[]', version_status TEXT NOT NULL DEFAULT 'candidate', created_at REAL NOT NULL, UNIQUE(memory_id, version));
 CREATE TABLE IF NOT EXISTS memory_conflicts (conflict_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, conflicting_memory_id TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
-CREATE TABLE IF NOT EXISTS memory_recall_log (recall_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, query TEXT NOT NULL, layer TEXT NOT NULL, used INTEGER NOT NULL, score REAL NOT NULL, created_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS memory_recall_log (recall_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, query TEXT NOT NULL, layer TEXT NOT NULL, used INTEGER NOT NULL, score REAL NOT NULL, created_at REAL NOT NULL, decision_id TEXT);
 CREATE TABLE IF NOT EXISTS memory_recall_decisions (recall_id TEXT PRIMARY KEY, decision_id TEXT NOT NULL, query TEXT NOT NULL, outcome TEXT NOT NULL, missed INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_validation_batches (batch_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, state TEXT NOT NULL, sample_count INTEGER NOT NULL DEFAULT 0, pass_count INTEGER NOT NULL DEFAULT 0, fail_count INTEGER NOT NULL DEFAULT 0, evidence_refs TEXT NOT NULL DEFAULT '[]', notes TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_maintenance (maintenance_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, action TEXT NOT NULL, reason TEXT NOT NULL, created_at REAL NOT NULL);
@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS memory_compositions (composition_id TEXT PRIMARY KEY,
 CREATE TABLE IF NOT EXISTS skill_states (skill_domain TEXT PRIMARY KEY, phase TEXT NOT NULL, level REAL NOT NULL, abstraction_level INTEGER NOT NULL, marginal_gain REAL NOT NULL, plateau_score REAL NOT NULL, activation_count INTEGER NOT NULL, updated_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS skill_events (event_id TEXT PRIMARY KEY, skill_domain TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_degradation (memory_id TEXT PRIMARY KEY, base_weight REAL NOT NULL, base_confidence REAL NOT NULL, base_status TEXT NOT NULL, score REAL NOT NULL, freshness REAL NOT NULL, state TEXT NOT NULL, reasons TEXT NOT NULL, model_version TEXT NOT NULL, assessed_at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS practice_observations (observation_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, independent_key TEXT NOT NULL, outcome TEXT NOT NULL, evidence_ref TEXT, environment TEXT NOT NULL, created_at REAL NOT NULL, UNIQUE(memory_id, independent_key));
 '''
 
 class MemoryStore:
@@ -37,6 +38,13 @@ class MemoryStore:
         degradation_columns = {row[1] for row in self.db.execute("PRAGMA table_info(memory_degradation)")}
         if degradation_columns and "base_status" not in degradation_columns:
             self.db.execute("ALTER TABLE memory_degradation ADD COLUMN base_status TEXT NOT NULL DEFAULT 'warm'")
+        memory_columns = {row[1] for row in self.db.execute("PRAGMA table_info(memories)")}
+        for column, definition in (("recall_count", "INTEGER NOT NULL DEFAULT 0"), ("useful_count", "INTEGER NOT NULL DEFAULT 0"), ("harmful_count", "INTEGER NOT NULL DEFAULT 0"), ("last_recalled_at", "REAL"), ("last_used_at", "REAL")):
+            if column not in memory_columns:
+                self.db.execute(f"ALTER TABLE memories ADD COLUMN {column} {definition}")
+        recall_columns = {row[1] for row in self.db.execute("PRAGMA table_info(memory_recall_log)")}
+        if "decision_id" not in recall_columns:
+            self.db.execute("ALTER TABLE memory_recall_log ADD COLUMN decision_id TEXT")
         version_columns = {row[1] for row in self.db.execute("PRAGMA table_info(memory_versions)")}
         if version_columns and "evidence_refs" not in version_columns:
             self.db.execute("ALTER TABLE memory_versions ADD COLUMN evidence_refs TEXT NOT NULL DEFAULT '[]'")
@@ -71,7 +79,7 @@ class MemoryStore:
                 if not parent or parent["memory_id"] != memory_id:
                     raise ValueError("invalid_memory_version_parent")
             version = int(latest["version"] if latest else 0) + 1
-            self.db.execute("INSERT INTO memories VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(memory_id) DO UPDATE SET kind=excluded.kind,content=excluded.content,status=excluded.status,confidence=excluded.confidence,weight=excluded.weight,environment=excluded.environment,source_event_ids=excluded.source_event_ids,updated_at=excluded.updated_at", (memory_id, kind, content, status, confidence, weight, json.dumps(environment, ensure_ascii=False), json.dumps(source_event_ids, ensure_ascii=False), now, now))
+            self.db.execute("INSERT INTO memories(memory_id,kind,content,status,confidence,weight,environment,source_event_ids,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(memory_id) DO UPDATE SET kind=excluded.kind,content=excluded.content,status=excluded.status,confidence=excluded.confidence,weight=excluded.weight,environment=excluded.environment,source_event_ids=excluded.source_event_ids,updated_at=excluded.updated_at", (memory_id, kind, content, status, confidence, weight, json.dumps(environment, ensure_ascii=False), json.dumps(source_event_ids, ensure_ascii=False), now, now))
             self.db.execute("DELETE FROM memory_fts WHERE memory_id=?", (memory_id,))
             self.db.execute("INSERT INTO memory_fts(memory_id,content) VALUES (?,?)", (memory_id, content))
             self.db.execute("INSERT INTO memory_versions(version_id,memory_id,version,parent_version_id,content,environment,change_reason,evidence_refs,version_status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)", (version_id, memory_id, version, parent_version_id, content, json.dumps(environment, ensure_ascii=False), change_reason, json.dumps(source_event_ids, ensure_ascii=False), status, now))
@@ -167,10 +175,13 @@ class MemoryStore:
         with self.db:
             for item in result:
                 layer = "cold" if item["status"] == "cold" else ("candidate" if item["status"] == "candidate" else "active")
-                self.db.execute("INSERT INTO memory_recall_log VALUES (?,?,?,?,?,?,?)", (f"rec_{uuid.uuid4().hex}", item["memory_id"], query, layer, int(used), float(item["weight"]), now))
+                self.db.execute("INSERT INTO memory_recall_log(recall_id,memory_id,query,layer,used,score,created_at) VALUES (?,?,?,?,?,?,?)", (f"rec_{uuid.uuid4().hex}", item["memory_id"], query, layer, int(used), float(item["weight"]), now))
+                self.db.execute("UPDATE memories SET recall_count=recall_count+1,last_recalled_at=? WHERE memory_id=?", (now, item["memory_id"]))
+                item["recall_count"] = int(item.get("recall_count", 0)) + 1
+                item["last_recalled_at"] = now
         return result
 
-    def recall_for_decision(self, query: str, *, limit=20, environment=None):
+    def recall_for_decision(self, query: str, *, limit=20, environment=None, decision_id=None):
         tokens = list(dict.fromkeys(token for token in query.split() if len(token) >= 2))
         if len(tokens) <= 1 and len(query.strip()) >= 2:
             normalized = query.strip().replace(" ", "")
@@ -185,8 +196,58 @@ class MemoryStore:
         now = time.time()
         with self.db:
             for item in result:
-                self.db.execute("INSERT INTO memory_recall_log VALUES (?,?,?,?,?,?,?)", (f"rec_{uuid.uuid4().hex}", item["memory_id"], query, "decision", 0, float(item["weight"]), now))
+                self.db.execute("INSERT INTO memory_recall_log(recall_id,memory_id,query,layer,used,score,created_at,decision_id) VALUES (?,?,?,?,?,?,?,?)", (f"rec_{uuid.uuid4().hex}", item["memory_id"], query, "decision", 0, float(item["weight"]), now, decision_id))
+                self.db.execute("UPDATE memories SET recall_count=recall_count+1,last_recalled_at=? WHERE memory_id=?", (now, item["memory_id"]))
+                item["recall_count"] = int(item.get("recall_count", 0)) + 1
+                item["last_recalled_at"] = now
         return result
+
+    def record_practice_outcome(self, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None):
+        """把一次真实实践写成候选经验/教训；两次独立有证据成功后才升 warm。"""
+        if outcome not in {"success", "failure", "unknown"}:
+            raise ValueError("invalid_practice_outcome")
+        if not independent_key.strip():
+            raise ValueError("independent_key_required")
+        if outcome == "success" and not evidence_ref:
+            raise ValueError("practice_success_evidence_required")
+        row = self.get(memory_id)
+        if not row:
+            self.put(memory_id, kind, content, confidence=0.2, weight=0.5, environment=environment, source_event_ids=list(source_event_ids or []), status="candidate", change_reason="practice_observation")
+        try:
+            with self.db:
+                self.db.execute("INSERT INTO practice_observations VALUES (?,?,?,?,?,?,?)", (f"obs_{uuid.uuid4().hex}", memory_id, independent_key, outcome, evidence_ref, json.dumps(environment or {}, ensure_ascii=False), time.time()))
+        except sqlite3.IntegrityError:
+            raise ValueError("duplicate_independent_observation")
+        successes = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='success' AND evidence_ref IS NOT NULL", (memory_id,)).fetchone()[0]
+        failures = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='failure'", (memory_id,)).fetchone()[0]
+        if successes >= 2:
+            self.db.execute("UPDATE memories SET status='warm', confidence=MIN(1.0, confidence+0.1), weight=MIN(5.0, weight+0.25), updated_at=? WHERE memory_id=? AND status IN ('candidate','pending_validation')", (time.time(), memory_id))
+        elif failures:
+            self.db.execute("UPDATE memories SET status='candidate', weight=MAX(0.1, weight-0.1), updated_at=? WHERE memory_id=?", (time.time(), memory_id))
+        return {"memory_id": memory_id, "status": self.get(memory_id)["status"], "successes": successes, "failures": failures}
+
+    def record_usage_feedback(self, memory_id: str, *, outcome: str, evidence_ref: str | None = None):
+        if outcome not in {"useful", "harmful", "unused", "unknown"}:
+            raise ValueError("invalid_memory_usage_outcome")
+        if outcome in {"useful", "harmful"} and not evidence_ref:
+            raise ValueError("usage_feedback_evidence_required")
+        row = self.get(memory_id)
+        if not row:
+            raise ValueError("memory_not_found")
+        now = time.time()
+        with self.db:
+            if outcome == "useful":
+                weight = min(5.0, float(row["weight"]) + 0.1)
+                status = "warm" if row["status"] == "cold" else row["status"]
+                self.db.execute("UPDATE memories SET useful_count=useful_count+1,last_used_at=?,weight=?,status=?,updated_at=? WHERE memory_id=?", (now, weight, status, now, memory_id))
+            elif outcome == "harmful":
+                weight = max(0.0, float(row["weight"]) - 0.25)
+                status = "disputed" if row["status"] in {"warm", "hot"} else row["status"]
+                self.db.execute("UPDATE memories SET harmful_count=harmful_count+1,last_used_at=?,weight=?,status=?,updated_at=? WHERE memory_id=?", (now, weight, status, now, memory_id))
+            elif outcome == "unused":
+                self.db.execute("UPDATE memories SET last_used_at=? WHERE memory_id=?", (now, memory_id))
+            self.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"evt_{uuid.uuid4().hex}", memory_id, "usage_feedback", json.dumps({"outcome": outcome, "evidence_ref": evidence_ref}, ensure_ascii=False), now))
+        return self.get(memory_id)
 
     def record_decision_recall(self, recall_id: str, decision_id: str, query: str, outcome: str, missed: bool):
         self.db.execute("INSERT INTO memory_recall_decisions VALUES (?,?,?,?,?,?)", (recall_id, decision_id, query, outcome, int(missed), time.time()))
@@ -251,9 +312,9 @@ class MemoryStore:
 
     def cool(self, memory_id: str, *, reason="stale"):
         with self.db:
-            changed = self.db.execute("UPDATE memories SET status='cold', updated_at=? WHERE memory_id=? AND status IN ('warm','hot')", (time.time(), memory_id)).rowcount
+            changed = self.db.execute("UPDATE memories SET status='cold', updated_at=? WHERE memory_id=? AND status IN ('warm','hot','disputed','candidate','pending_validation')", (time.time(), memory_id)).rowcount
             if changed:
-                self.db.execute("UPDATE memory_versions SET version_status='cold' WHERE memory_id=? AND version_status IN ('warm','hot')", (memory_id,))
+                self.db.execute("UPDATE memory_versions SET version_status='cold' WHERE memory_id=? AND version_status IN ('warm','hot','candidate')", (memory_id,))
                 self.db.execute("INSERT INTO memory_maintenance VALUES (?,?,?,?,?)", (f"maint_{uuid.uuid4().hex}", memory_id, "cool", reason, time.time()))
         return changed == 1
 
