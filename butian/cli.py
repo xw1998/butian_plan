@@ -94,11 +94,11 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
             if args.command == "dispatcher" and args.dispatcher_command == "set":
                 service.set_dispatcher_config(args.member_id); emit({"dispatcher_member_id": args.member_id}); return 0
             if args.command == "migrate" and args.migrate_command == "preflight":
-                emit(service.preflight_members(args.source_path, roles_dir=args.roles_dir)); return 0
+                raise ValueError("historical_identity_migration_out_of_scope")
             if args.command == "migrate" and args.migrate_command == "import":
-                emit(service.import_members(args.source_path, roles_dir=args.roles_dir, update_existing=args.update_existing, import_memories=not args.no_memories)); return 0
+                raise ValueError("historical_identity_migration_out_of_scope")
             if args.command == "migrate" and args.migrate_command == "runs":
-                emit({"runs": service.list_migration_runs()}); return 0
+                raise ValueError("historical_identity_migration_out_of_scope")
             if args.command == "hypothesis" and args.hypothesis_command == "get":
                 emit(service.get_hypothesis(args.hypothesis_id)); return 0
             if args.command == "hypothesis" and args.hypothesis_command == "start":

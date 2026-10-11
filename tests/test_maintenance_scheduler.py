@@ -59,7 +59,7 @@ def test_maintenance_scans_decay_and_schedules_cold_review(tmp_path):
         finally:
             memory.close()
         result = service.maintenance_tick()
-        member = result["members"][0]["memories"]
+        member = next(item["memories"] for item in result["members"] if item["member_id"] == "m")
         assert member["assessed"] == 1
         assert member["cooled"] == 1
         assert member["rewarmed"] == 0
@@ -70,7 +70,8 @@ def test_maintenance_scans_decay_and_schedules_cold_review(tmp_path):
         finally:
             memory.close()
         result = service.maintenance_tick()
-        assert result["members"][0]["memories"]["review_due"] == 1
+        member_result = next(item for item in result["members"] if item["member_id"] == "m")
+        assert member_result["memories"]["review_due"] == 1
         assert service.store.db.execute("SELECT COUNT(*) FROM events WHERE event_type='memory_review_due'").fetchone()[0] == 1
     finally:
         service.close()

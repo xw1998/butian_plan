@@ -336,6 +336,9 @@ def test_service_bootstraps_structured_builtin_personas_without_overwriting(tmp_
         identities = [json.loads(row[1]) for row in rows]
         assert all(identity["origin"] == "butian_builtin" for identity in identities)
         assert all(identity["traits"] and identity["domains"] for identity in identities)
+        assert all(identity["rank"] and identity["reports_to"] == "system_dispatcher" for identity in identities)
+        assert all(identity["provider_id"] is None and identity["model_id"] is None for identity in identities)
+        assert all(identity["reasoning_effort"] is None and identity["max_tokens"] is None and identity["model_tier"] is None for identity in identities)
         assert all("特质:" not in json.loads(row[2])[0] for row in rows)
         assert all((tmp_path / "members" / row[0] / "memory.db").is_file() for row in rows)
         service.store.db.execute("UPDATE members SET name='用户改名' WHERE member_id='xu_wei'")
