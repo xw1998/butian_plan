@@ -404,7 +404,9 @@ class ToolStore:
         CREATE TABLE IF NOT EXISTS tool_issue_pairs (
             pair_id TEXT PRIMARY KEY, issue_id TEXT NOT NULL, repair_version INTEGER NOT NULL,
             environment TEXT NOT NULL, input_hash TEXT NOT NULL, before_outcome TEXT NOT NULL,
-            after_outcome TEXT NOT NULL, created_at REAL NOT NULL, UNIQUE(issue_id, repair_version, environment, input_hash)
+            after_outcome TEXT NOT NULL, created_at REAL NOT NULL,
+            before_execution_id TEXT, after_execution_id TEXT,
+            UNIQUE(issue_id, repair_version, environment, input_hash)
         );
 
         CREATE TABLE IF NOT EXISTS tool_circuit_breakers (
@@ -450,6 +452,10 @@ class ToolStore:
         for name, definition in (("execution_id", "TEXT"), ("input_hash", "TEXT"), ("expected_output", "TEXT")):
             if name not in verification_columns:
                 self.store.db.execute(f"ALTER TABLE tool_verifications ADD COLUMN {name} {definition}")
+        pair_columns = {row[1] for row in self.store.db.execute("PRAGMA table_info(tool_issue_pairs)")}
+        for name, definition in (("before_execution_id", "TEXT"), ("after_execution_id", "TEXT")):
+            if name not in pair_columns:
+                self.store.db.execute(f"ALTER TABLE tool_issue_pairs ADD COLUMN {name} {definition}")
         columns = {row[1] for row in self.store.db.execute("PRAGMA table_info(tool_executions)")}
         for name, definition in (("runtime_backend", "TEXT NOT NULL DEFAULT 'python_host'"), ("isolation_level", "TEXT NOT NULL DEFAULT 'host_process'"), ("isolation_capabilities", "TEXT NOT NULL DEFAULT '{}'"), ("business_assertions", "TEXT NOT NULL DEFAULT '[]'")):
             if name not in columns:
@@ -785,6 +791,10 @@ class ToolStore:
 
             raise ValueError("tool_access_denied")
 
+        if actor != tool["owner_member_id"]:
+            valid_share = self.store.db.execute("SELECT 1 FROM tool_shares WHERE tool_id=? AND recipient_member_id=? AND status IN ('active','trial') AND (expires_at IS NULL OR expires_at>?) AND permission IN ('team_readonly','team_execute')", (tool_id, actor, time.time())).fetchone()
+            if not valid_share:
+                raise ValueError("tool_access_denied")
         return [dict(row) for row in self.store.db.execute("SELECT * FROM tool_issues WHERE tool_id=? ORDER BY created_at", (tool_id,))]
 
 
@@ -868,8 +878,11 @@ class ToolStore:
 
         execution = self.store.db.execute("SELECT * FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
 
-        if not execution or (execution["tool_id"], execution["version"], execution["actor_member_id"], execution["status"]) != (row["tool_id"], row["repair_version"], confirmer_member_id, "success"):
-
+        if not execution or (execution["tool_id"], execution["version"], execution["actor_member_id"]) != (row["tool_id"], row["repair_version"], confirmer_member_id):
+            raise ValueError("tool_repair_execution_mismatch")
+        if bool(resolved) and execution["status"] != "success":
+            raise ValueError("tool_repair_execution_mismatch")
+        if not bool(resolved) and execution["status"] not in {"success", "failed", "cancelled"}:
             raise ValueError("tool_repair_execution_mismatch")
 
         status = "resolved" if resolved else "reopened"
@@ -924,7 +937,7 @@ class ToolStore:
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone())
 
     def _issue_event(self, issue_id, actor, event_type, from_status, to_status, payload=None, key=None):
-        key = key or f"issue:{issue_id}:{event_type}:{to_status}"
+        key = key or f"issue:{issue_id}:{event_type}:{uuid.uuid4().hex}"
         self.store.db.execute("INSERT OR IGNORE INTO tool_issue_events VALUES (?,?,?,?,?,?,?,?,?)", ("ievent_" + uuid.uuid4().hex, issue_id, event_type, actor, from_status, to_status, json.dumps(payload or {}, ensure_ascii=False), key, time.time()))
 
     def record_issue_pair(self, actor_member_id, issue_id, *, repair_version, environment, input_hash, before_outcome, after_outcome):
@@ -936,14 +949,23 @@ class ToolStore:
         repair = self.store.db.execute("SELECT 1 FROM tool_versions WHERE tool_id=? AND version=?", (row["tool_id"], repair_version)).fetchone()
         if not repair or repair_version <= int(row["version"]): raise ValueError("tool_version_not_found")
         if not isinstance(input_hash, str) or not input_hash.strip(): raise ValueError("tool_pair_input_hash_required")
-        executions = self.store.db.execute("SELECT version,status,input_hash FROM tool_executions WHERE tool_id=? AND input_hash=? AND version IN (?,?)", (row["tool_id"], input_hash, row["version"], repair_version)).fetchall()
-        observed = {int(item["version"]): item["status"] for item in executions}
+        normalized=json.dumps(environment or {},sort_keys=True,ensure_ascii=False)
+        issue_environment = row["environment"] or "{}"
+        if json.loads(issue_environment) != (environment or {}):
+            raise ValueError("tool_pair_environment_mismatch")
+        executions = self.store.db.execute("SELECT execution_id,version,status,input_hash,dry_run FROM tool_executions WHERE tool_id=? AND input_hash=? AND version IN (?,?) ORDER BY finished_at DESC", (row["tool_id"], input_hash, row["version"], repair_version)).fetchall()
+        observed = {}
+        execution_ids = {}
+        for item in executions:
+            if int(item["dry_run"]):
+                continue
+            observed.setdefault(int(item["version"]), item["status"])
+            execution_ids.setdefault(int(item["version"]), item["execution_id"])
         expected = {row["version"]: before_outcome, repair_version: after_outcome}
         status_map = {"success": "success", "failure": "failed", "unknown": "unknown", "cancelled": "cancelled"}
         if any(version not in observed or observed[version] != status_map[outcome] for version, outcome in expected.items()):
             raise ValueError("tool_pair_execution_evidence_required")
-        normalized=json.dumps(environment or {},sort_keys=True,ensure_ascii=False)
-        self.store.db.execute("INSERT OR IGNORE INTO tool_issue_pairs VALUES (?,?,?,?,?,?,?,?)",("pair_"+uuid.uuid4().hex,issue_id,repair_version,normalized,input_hash,before_outcome,after_outcome,time.time()))
+        self.store.db.execute("INSERT OR IGNORE INTO tool_issue_pairs (pair_id,issue_id,repair_version,environment,input_hash,before_outcome,after_outcome,created_at,before_execution_id,after_execution_id) VALUES (?,?,?,?,?,?,?,?,?,?)",("pair_"+uuid.uuid4().hex,issue_id,repair_version,normalized,input_hash,before_outcome,after_outcome,time.time(),execution_ids[row["version"]],execution_ids[repair_version]))
         return self.issue_statistics(actor_member_id,row["tool_id"],version=repair_version,environment=environment)
 
     def issue_statistics(self, actor_member_id, tool_id, *, version=None, environment=None):
@@ -973,7 +995,7 @@ class ToolStore:
             z=1.96; p=wins/discordant; denom=1 + z*z/discordant
             center=(p + z*z/(2*discordant))/denom
             radius=z*math.sqrt((p*(1-p)/discordant) + z*z/(4*discordant*discordant))/denom
-            improvement_interval={"status":"estimated","lower":max(0.0, center-radius),"upper":min(1.0, center+radius)}
+            improvement_interval={"status":"estimated","metric":"paired_discordant_improvement_rate","confidence":0.95,"lower":max(-1.0, 2.0*(center-radius)-1.0),"upper":min(1.0, 2.0*(center+radius)-1.0)}
         return {"tool_id":tool_id,"version":version,"environment":environment or {},"counts":counts,"reliability_lower":wilson_lower(counts["success"],counts["failure"]),"sample_count":sum(counts.values()),"paired":{"n":len(comparable),"improved":wins,"regressed":losses,"net_improved":wins-losses,"improvement_confidence_interval":improvement_interval}}
 
     def triage_issue(self, actor_member_id, issue_id, *, status="triaged", reason="", due_seconds=86400):
@@ -986,9 +1008,16 @@ class ToolStore:
         if status=="rejected" and not reason.strip(): raise ValueError("tool_issue_rejection_reason_required")
         escalation_target = self.store.get_setting("dispatcher_member_id") if status == "rejected" else None
         if status == "rejected" and not escalation_target: raise ValueError("issue_dispatcher_not_configured")
-        now=time.time(); self.store.db.execute("UPDATE tool_issues SET status=?,triage_owner_member_id=?,triage_reason=?,rejection_reason=?,escalation_to_member_id=?,escalated_at=?,due_at=?,updated_at=? WHERE issue_id=?",(status,actor_member_id,reason or None,reason if status=="rejected" else None,escalation_target,now if status=="rejected" else None,now+max(1,float(due_seconds)),now,issue_id))
-        self._event(row["tool_id"],row["version"],"issue_triaged",{"issue_id":issue_id,"status":status,"reason":reason},f"issue:{issue_id}:triage:{status}")
-        self._issue_event(issue_id, actor_member_id, "triaged", row["status"], status, {"reason":reason})
+        now=time.time()
+        self.store.db.execute("BEGIN")
+        try:
+            self.store.db.execute("UPDATE tool_issues SET status=?,triage_owner_member_id=?,triage_reason=?,rejection_reason=?,escalation_to_member_id=?,escalated_at=?,due_at=?,updated_at=? WHERE issue_id=?",(status,actor_member_id,reason or None,reason if status=="rejected" else None,escalation_target,now if status=="rejected" else None,now+max(1,float(due_seconds)),now,issue_id))
+            self._event(row["tool_id"],row["version"],"issue_triaged",{"issue_id":issue_id,"status":status,"reason":reason},f"issue:{issue_id}:triage:{status}")
+            self._issue_event(issue_id, actor_member_id, "triaged", row["status"], status, {"reason":reason})
+            self.store.db.commit()
+        except BaseException:
+            self.store.db.rollback()
+            raise
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
     def request_issue_information(self, actor_member_id, issue_id, *, request):
@@ -996,7 +1025,11 @@ class ToolStore:
         if not row: raise ValueError("tool_issue_not_found")
         if actor_member_id != self._tool(row["tool_id"])["owner_member_id"] or not request.strip(): raise ValueError("tool_access_denied" if not request.strip() else "tool_access_denied")
         if row["status"] not in {"open","triaged","repairing","needs_information"}: raise ValueError("invalid_tool_issue_transition")
-        now=time.time(); self.store.db.execute("UPDATE tool_issues SET status='needs_information',requested_information=?,updated_at=? WHERE issue_id=?",(request,now,issue_id)); self._event(row["tool_id"],row["version"],"issue_information_requested",{"issue_id":issue_id,"request":request},f"issue:{issue_id}:information:{request}"); self._issue_event(issue_id, actor_member_id, "information_requested", row["status"], "needs_information", {"request":request})
+        now=time.time(); self.store.db.execute("BEGIN")
+        try:
+            self.store.db.execute("UPDATE tool_issues SET status='needs_information',requested_information=?,updated_at=? WHERE issue_id=?",(request,now,issue_id)); self._event(row["tool_id"],row["version"],"issue_information_requested",{"issue_id":issue_id,"request":request},f"issue:{issue_id}:information:{uuid.uuid4().hex}"); self._issue_event(issue_id, actor_member_id, "information_requested", row["status"], "needs_information", {"request":request}); self.store.db.commit()
+        except BaseException:
+            self.store.db.rollback(); raise
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
     def provide_issue_information(self, reporter_member_id, issue_id, *, information):
@@ -1004,8 +1037,12 @@ class ToolStore:
         if not row: raise ValueError("tool_issue_not_found")
         if reporter_member_id != row["reporter_member_id"]: raise ValueError("tool_issue_reporter_required")
         if row["status"] != "needs_information" or not information.strip(): raise ValueError("tool_issue_information_not_requested")
-        now=time.time(); self.store.db.execute("UPDATE tool_issues SET status='open',requested_information=NULL,description=description || char(10) || 'Reporter information: ' || ?,updated_at=? WHERE issue_id=?",(information,now,issue_id)); self._issue_event(issue_id, reporter_member_id, "information_provided", row["status"], "open")
-        self._event(row["tool_id"],row["version"],"issue_information_provided",{"issue_id":issue_id},f"issue:{issue_id}:information-provided:{hashlib.sha256(information.encode()).hexdigest()}")
+        now=time.time(); self.store.db.execute("BEGIN")
+        try:
+            self.store.db.execute("UPDATE tool_issues SET status='open',requested_information=NULL,description=description || char(10) || 'Reporter information: ' || ?,updated_at=? WHERE issue_id=?",(information,now,issue_id)); self._issue_event(issue_id, reporter_member_id, "information_provided", row["status"], "open", {"information_hash": hashlib.sha256(information.encode()).hexdigest()}, f"issue:{issue_id}:information-provided:{uuid.uuid4().hex}")
+            self._event(row["tool_id"],row["version"],"issue_information_provided",{"issue_id":issue_id},f"issue:{issue_id}:information-provided:{uuid.uuid4().hex}"); self.store.db.commit()
+        except BaseException:
+            self.store.db.rollback(); raise
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
     def link_duplicate_issue(self, actor_member_id, issue_id, duplicate_of):

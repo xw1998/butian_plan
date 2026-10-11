@@ -84,9 +84,19 @@ class ButianService:
                 results.append(result)
                 self.store.append_event(member_id, "maintenance_failed", result, "maintenance_" + uuid.uuid4().hex)
         owners = [row[0] for row in self.store.db.execute("SELECT DISTINCT triage_owner_member_id FROM tool_issues WHERE triage_owner_member_id IS NOT NULL").fetchall()]
-        escalation_result = [item for owner in owners for item in self.expire_tool_issue_escalations(owner)]
-        external_learning = self.learning.process_learning_queue(limit=1)
-        return {"status": "completed", "members": results, "issue_escalations": escalation_result, "external_learning": "authorized_url_queue", "external_learning_result": external_learning}
+        escalation_result = []
+        for owner in owners:
+            try:
+                escalation_result.extend(self.expire_tool_issue_escalations(owner))
+            except Exception as exc:
+                escalation_result.append({"status": "failed", "owner_member_id": owner, "reason": type(exc).__name__ + ":" + str(exc)})
+        try:
+            external_learning = self.learning.process_learning_queue(limit=1)
+            learning_error = None
+        except Exception as exc:
+            external_learning = None
+            learning_error = type(exc).__name__ + ":" + str(exc)
+        return {"status": "completed", "members": results, "issue_escalations": escalation_result, "external_learning": "authorized_url_queue", "external_learning_result": external_learning, "external_learning_error": learning_error}
 
     def _maintain_member_memories(self, member_id: str) -> dict[str, Any]:
         """Assess active memories and schedule review for cold ones without inventing evidence."""

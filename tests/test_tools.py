@@ -1015,3 +1015,44 @@ def test_issue_triage_timeout_pair_stats_and_breaker_are_explicit(tmp_path):
         assert [row["event_type"] for row in breaker_events][-4:] == ["circuit_breaker_opened", "circuit_breaker_recovered"] * 2
     finally:
         service.close()
+
+
+def test_audit_regressions_failed_repair_reopens_and_information_events_are_unique(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "text"}, "permissions": ["execute"], "entrypoint": ["python", "tool.py"]}
+        service.add_tool_version("m1", tool_id, "print('v1')", manifest)
+        issue = service.report_tool_issue("m1", tool_id, 1, description="broken")
+        service.add_tool_version("m1", tool_id, "raise RuntimeError('broken')", {**manifest, "description": "v2"})
+        repair = service.repair_tool_issue("m1", issue["issue_id"], repair_version=2, diagnosis="candidate")
+        failed = service.execute_tool("m1", tool_id, 2, {}, verification_only=True)
+        assert failed["status"] == "failed"
+        assert service.confirm_tool_repair("m1", issue["issue_id"], execution_id=failed["execution_id"], resolved=False)["status"] == "reopened"
+        info_issue = service.report_tool_issue("m1", tool_id, 1, description="needs details")
+        for index in range(2):
+            service.request_tool_issue_information("m1", info_issue["issue_id"], request=f"question-{index}")
+            service.provide_tool_issue_information("m1", info_issue["issue_id"], information=f"answer-{index}")
+        count = service.store.db.execute("SELECT count(*) FROM tool_issue_events WHERE issue_id=? AND event_type IN ('information_requested','information_provided')", (info_issue["issue_id"],)).fetchone()[0]
+        assert count == 4
+    finally:
+        service.close()
+
+
+def test_audit_regressions_pair_requires_issue_environment(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        manifest = {**MANIFEST, "permissions": ["execute"], "entrypoint": ["python", "tool.py"]}
+        service.add_tool_version("m1", tool_id, "print('v1')", manifest)
+        service.add_tool_version("m1", tool_id, "print('v2')", {**manifest, "description": "v2"})
+        issue = service.report_tool_issue("m1", tool_id, 1, description="regression", environment={"kind": "lab"})
+        before = service.execute_tool("m1", tool_id, 1, "same", verification_only=True)
+        after = service.execute_tool("m1", tool_id, 2, "same", verification_only=True)
+        with pytest.raises(ValueError, match="tool_pair_environment_mismatch"):
+            service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "other"}, input_hash=before["input_hash"], before_outcome="success", after_outcome="success")
+        result = service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "lab"}, input_hash=before["input_hash"], before_outcome="success", after_outcome="success")
+        assert result["paired"]["n"] == 1
+        assert result["paired"]["improvement_confidence_interval"]["status"] == "unknown"
+    finally:
+        service.close()
