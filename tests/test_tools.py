@@ -937,6 +937,25 @@ def test_context_cards_include_only_authorized_current_contracts(tmp_path):
         service.close()
 
 
+def test_repair_and_duplicate_guards_reject_audited_false_evidence(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        service.add_tool_version("m1", tool_id, "print('v1')", {**MANIFEST, "permissions": ["execute"]})
+        issue = service.report_tool_issue("m1", tool_id, 1, description="bad")
+        with pytest.raises(ValueError, match="tool_repair_version_must_be_newer"):
+            service.repair_tool_issue("m1", issue["issue_id"], repair_version=1, diagnosis="same version")
+        with pytest.raises(ValueError, match="tool_issue_diagnosis_required"):
+            service.repair_tool_issue("m1", issue["issue_id"], repair_version=1, diagnosis="")
+        issue2 = service.report_tool_issue("m1", tool_id, 1, description="duplicate")
+        service.store.db.execute("UPDATE tool_issues SET duplicate_of=? WHERE issue_id=?", (issue2["issue_id"], issue["issue_id"]))
+        with pytest.raises(ValueError, match="duplicate_issue_cycle"):
+            service.link_duplicate_tool_issue("m1", issue2["issue_id"], issue["issue_id"])
+        with pytest.raises(ValueError, match="tool_version_not_found"):
+            service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=99, environment={}, input_hash="fake", before_outcome="failure", after_outcome="success")
+    finally:
+        service.close()
+
 def test_context_cards_filter_version_mismatch_and_execute_shares(tmp_path):
     service = make_service(tmp_path)
     try:
@@ -959,6 +978,7 @@ def test_issue_triage_timeout_pair_stats_and_breaker_are_explicit(tmp_path):
     try:
         tool_id = propose(service)["tool_id"]
         service.add_tool_version("m1", tool_id, "print('ok')", {**MANIFEST, "permissions": ["execute"], "entrypoint": ["python", "tool.py"]})
+        service.add_tool_version("m1", tool_id, "print('fixed')", {**MANIFEST, "permissions": ["execute"], "entrypoint": ["python", "tool.py"], "description": "fixed"})
         issue = service.report_tool_issue("m1", tool_id, 1, description="bad output", environment={"kind": "lab"})
         assert issue["triage_owner_member_id"] == "m1"
         assert service.triage_tool_issue("m1", issue["issue_id"], status="triaged")["status"] == "triaged"
@@ -974,9 +994,12 @@ def test_issue_triage_timeout_pair_stats_and_breaker_are_explicit(tmp_path):
         issue2 = service.report_tool_issue("m1", tool_id, 1, description="another issue")
         service.triage_tool_issue("m1", issue2["issue_id"], status="triaged", due_seconds=1)
         assert service.expire_tool_issue_escalations("m1", now=issue2["due_at"] + 2)[0]["escalated_at"] is not None
-        service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=1, environment={"kind": "lab"}, input_hash="same", before_outcome="failure", after_outcome="success")
-        stats = service.tool_issue_statistics("m1", tool_id, version=1, environment={"kind": "lab"})
-        assert stats["paired"]["improved"] == 1
+        before = service.execute_tool("m1", tool_id, 1, "same", verification_only=True)
+        after = service.execute_tool("m1", tool_id, 2, "same", verification_only=True)
+        service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "lab"}, input_hash=before["input_hash"], before_outcome="success", after_outcome="success")
+        stats = service.tool_issue_statistics("m1", tool_id, version=2, environment={"kind": "lab"})
+        assert stats["paired"]["n"] == 1
+        assert stats["paired"]["improved"] == 0
         service.open_tool_circuit_breaker("m1", tool_id, 1, reason="security")
         with pytest.raises(ValueError, match="tool_circuit_breaker_open"):
             service.execute_tool("m1", tool_id, 1, "x", verification_only=True)

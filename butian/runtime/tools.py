@@ -803,6 +803,10 @@ class ToolStore:
 
             raise ValueError("tool_access_denied")
 
+        if not isinstance(diagnosis, str) or not diagnosis.strip():
+            raise ValueError("tool_issue_diagnosis_required")
+        if not isinstance(repair_version, int) or repair_version <= int(row["version"]):
+            raise ValueError("tool_repair_version_must_be_newer")
         if not self.store.db.execute("SELECT 1 FROM tool_versions WHERE tool_id=? AND version=?", (row["tool_id"], repair_version)).fetchone():
 
             raise ValueError("tool_version_not_found")
@@ -929,6 +933,15 @@ class ToolStore:
         if actor_member_id != self._tool(row["tool_id"])["owner_member_id"]: raise ValueError("tool_access_denied")
         allowed={"success","failure","unknown","cancelled"}
         if before_outcome not in allowed or after_outcome not in allowed: raise ValueError("invalid_pair_outcome")
+        repair = self.store.db.execute("SELECT 1 FROM tool_versions WHERE tool_id=? AND version=?", (row["tool_id"], repair_version)).fetchone()
+        if not repair or repair_version <= int(row["version"]): raise ValueError("tool_version_not_found")
+        if not isinstance(input_hash, str) or not input_hash.strip(): raise ValueError("tool_pair_input_hash_required")
+        executions = self.store.db.execute("SELECT version,status,input_hash FROM tool_executions WHERE tool_id=? AND input_hash=? AND version IN (?,?)", (row["tool_id"], input_hash, row["version"], repair_version)).fetchall()
+        observed = {int(item["version"]): item["status"] for item in executions}
+        expected = {row["version"]: before_outcome, repair_version: after_outcome}
+        status_map = {"success": "success", "failure": "failed", "unknown": "unknown", "cancelled": "cancelled"}
+        if any(version not in observed or observed[version] != status_map[outcome] for version, outcome in expected.items()):
+            raise ValueError("tool_pair_execution_evidence_required")
         normalized=json.dumps(environment or {},sort_keys=True,ensure_ascii=False)
         self.store.db.execute("INSERT OR IGNORE INTO tool_issue_pairs VALUES (?,?,?,?,?,?,?,?)",("pair_"+uuid.uuid4().hex,issue_id,repair_version,normalized,input_hash,before_outcome,after_outcome,time.time()))
         return self.issue_statistics(actor_member_id,row["tool_id"],version=repair_version,environment=environment)
@@ -948,8 +961,8 @@ class ToolStore:
         if version is not None: paired_sql += " AND repair_version=?"; paired_args.append(version)
         pairs=self.store.db.execute(paired_sql,paired_args).fetchall()
         if environment is not None:
-            env=json.dumps(environment or {},sort_keys=True)
-            pairs=self.store.db.execute(paired_sql.replace("SELECT before_outcome,after_outcome","SELECT before_outcome,after_outcome") + " AND environment=?", paired_args+[env]).fetchall()
+            env=json.dumps(environment or {},sort_keys=True,ensure_ascii=False)
+            pairs=self.store.db.execute(paired_sql + " AND environment=?", paired_args+[env]).fetchall()
         comparable=[r for r in pairs if r["before_outcome"] in {"success","failure"} and r["after_outcome"] in {"success","failure"}]
         wins=sum(r["before_outcome"]=="failure" and r["after_outcome"]=="success" for r in comparable)
         losses=sum(r["before_outcome"]=="success" and r["after_outcome"]=="failure" for r in comparable)
@@ -993,6 +1006,14 @@ class ToolStore:
         if actor_member_id != self._tool(row["tool_id"])["owner_member_id"]: raise ValueError("tool_access_denied")
         if row["tool_id"] != parent["tool_id"] or issue_id == duplicate_of: raise ValueError("invalid_duplicate_issue")
         if row["duplicate_of"]: return dict(row)
+        cursor = duplicate_of
+        seen = set()
+        while cursor:
+            if cursor in seen or cursor == issue_id:
+                raise ValueError("duplicate_issue_cycle")
+            seen.add(cursor)
+            linked = self.store.db.execute("SELECT duplicate_of FROM tool_issues WHERE issue_id=?", (cursor,)).fetchone()
+            cursor = linked["duplicate_of"] if linked else None
         now=time.time(); self.store.db.execute("UPDATE tool_issues SET duplicate_of=?,status='resolved',updated_at=? WHERE issue_id=?",(duplicate_of,now,issue_id))
         self._event(row["tool_id"],row["version"],"issue_duplicate_linked",{"issue_id":issue_id,"duplicate_of":duplicate_of},f"issue:{issue_id}:duplicate:{duplicate_of}")
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
