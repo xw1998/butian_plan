@@ -1000,9 +1000,18 @@ def test_issue_triage_timeout_pair_stats_and_breaker_are_explicit(tmp_path):
         stats = service.tool_issue_statistics("m1", tool_id, version=2, environment={"kind": "lab"})
         assert stats["paired"]["n"] == 1
         assert stats["paired"]["improved"] == 0
+        assert stats["paired"]["improvement_confidence_interval"] == {"status": "unknown", "lower": None, "upper": None}
+        duplicate = service.report_tool_issue("m1", tool_id, 1, description="duplicate issue")
+        linked = service.link_duplicate_tool_issue("m1", duplicate["issue_id"], issue["issue_id"])
+        assert linked["status"] != "resolved"
+        assert linked["duplicate_of"] == issue["issue_id"]
         service.open_tool_circuit_breaker("m1", tool_id, 1, reason="security")
         with pytest.raises(ValueError, match="tool_circuit_breaker_open"):
             service.execute_tool("m1", tool_id, 1, "x", verification_only=True)
         assert service.recover_tool_circuit_breaker("m1", tool_id, 1)["status"] == "recovered"
+        service.open_tool_circuit_breaker("m1", tool_id, 1, reason="security-again")
+        service.recover_tool_circuit_breaker("m1", tool_id, 1)
+        breaker_events = service.store.db.execute("SELECT event_type FROM tool_events WHERE tool_id=? AND version=1 AND event_type LIKE 'circuit_breaker_%' ORDER BY created_at", (tool_id,)).fetchall()
+        assert [row["event_type"] for row in breaker_events][-4:] == ["circuit_breaker_opened", "circuit_breaker_recovered"] * 2
     finally:
         service.close()

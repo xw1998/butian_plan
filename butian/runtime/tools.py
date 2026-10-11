@@ -966,7 +966,15 @@ class ToolStore:
         comparable=[r for r in pairs if r["before_outcome"] in {"success","failure"} and r["after_outcome"] in {"success","failure"}]
         wins=sum(r["before_outcome"]=="failure" and r["after_outcome"]=="success" for r in comparable)
         losses=sum(r["before_outcome"]=="success" and r["after_outcome"]=="failure" for r in comparable)
-        return {"tool_id":tool_id,"version":version,"environment":environment or {},"counts":counts,"reliability_lower":wilson_lower(counts["success"],counts["failure"]),"sample_count":sum(counts.values()),"paired":{"n":len(comparable),"improved":wins,"regressed":losses,"net_improved":wins-losses}}
+        discordant=wins + losses
+        if discordant == 0:
+            improvement_interval={"status":"unknown","lower":None,"upper":None}
+        else:
+            z=1.96; p=wins/discordant; denom=1 + z*z/discordant
+            center=(p + z*z/(2*discordant))/denom
+            radius=z*math.sqrt((p*(1-p)/discordant) + z*z/(4*discordant*discordant))/denom
+            improvement_interval={"status":"estimated","lower":max(0.0, center-radius),"upper":min(1.0, center+radius)}
+        return {"tool_id":tool_id,"version":version,"environment":environment or {},"counts":counts,"reliability_lower":wilson_lower(counts["success"],counts["failure"]),"sample_count":sum(counts.values()),"paired":{"n":len(comparable),"improved":wins,"regressed":losses,"net_improved":wins-losses,"improvement_confidence_interval":improvement_interval}}
 
     def triage_issue(self, actor_member_id, issue_id, *, status="triaged", reason="", due_seconds=86400):
         row=self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()
@@ -1014,7 +1022,7 @@ class ToolStore:
             seen.add(cursor)
             linked = self.store.db.execute("SELECT duplicate_of FROM tool_issues WHERE issue_id=?", (cursor,)).fetchone()
             cursor = linked["duplicate_of"] if linked else None
-        now=time.time(); self.store.db.execute("UPDATE tool_issues SET duplicate_of=?,status='resolved',updated_at=? WHERE issue_id=?",(duplicate_of,now,issue_id))
+        now=time.time(); self.store.db.execute("UPDATE tool_issues SET duplicate_of=?,updated_at=? WHERE issue_id=?",(duplicate_of,now,issue_id))
         self._event(row["tool_id"],row["version"],"issue_duplicate_linked",{"issue_id":issue_id,"duplicate_of":duplicate_of},f"issue:{issue_id}:duplicate:{duplicate_of}")
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
@@ -1042,13 +1050,13 @@ class ToolStore:
 
     def open_circuit_breaker(self, actor_member_id, tool_id, version, *, scope="version", reason="risk"):
         if actor_member_id != self._tool(tool_id)["owner_member_id"]: raise ValueError("tool_access_denied")
-        now=time.time(); self.store.db.execute("INSERT OR REPLACE INTO tool_circuit_breakers VALUES (?,?,?,?,?,?,?,?)",(tool_id,version,scope,reason,"open",now,None,None)); self._event(tool_id,version,"circuit_breaker_opened",{"scope":scope,"reason":reason},f"breaker:{tool_id}:{version}:{scope}:open:{int(now)}"); return dict(self.store.db.execute("SELECT * FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND scope=?",(tool_id,version,scope)).fetchone())
+        now=time.time(); self.store.db.execute("INSERT OR REPLACE INTO tool_circuit_breakers VALUES (?,?,?,?,?,?,?,?)",(tool_id,version,scope,reason,"open",now,None,None)); self._event(tool_id,version,"circuit_breaker_opened",{"scope":scope,"reason":reason},f"breaker:{tool_id}:{version}:{scope}:open:{uuid.uuid4().hex}"); return dict(self.store.db.execute("SELECT * FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND scope=?",(tool_id,version,scope)).fetchone())
 
     def recover_circuit_breaker(self, actor_member_id, tool_id, version, *, scope="version"):
         if actor_member_id != self._tool(tool_id)["owner_member_id"]: raise ValueError("tool_access_denied")
         now=time.time(); cur=self.store.db.execute("UPDATE tool_circuit_breakers SET status='recovered',recovered_at=?,recovered_by=? WHERE tool_id=? AND version=? AND scope=? AND status='open'",(now,actor_member_id,tool_id,version,scope))
         if cur.rowcount != 1: raise ValueError("tool_circuit_breaker_not_open")
-        self._event(tool_id,version,"circuit_breaker_recovered",{"scope":scope},f"breaker:{tool_id}:{version}:{scope}:recovered"); return dict(self.store.db.execute("SELECT * FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND scope=?",(tool_id,version,scope)).fetchone())
+        self._event(tool_id,version,"circuit_breaker_recovered",{"scope":scope},f"breaker:{tool_id}:{version}:{scope}:recovered:{uuid.uuid4().hex}"); return dict(self.store.db.execute("SELECT * FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND scope=?",(tool_id,version,scope)).fetchone())
 
     def list_executions(self, actor_member_id: str, *, tool_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
 
