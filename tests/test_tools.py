@@ -950,3 +950,33 @@ def test_context_cards_filter_version_mismatch_and_execute_shares(tmp_path):
         assert service.tools.context_cards("m2", "execute", limit=10) == []
     finally:
         service.close()
+
+def test_issue_triage_timeout_pair_stats_and_breaker_are_explicit(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        service.add_tool_version("m1", tool_id, "print('ok')", {**MANIFEST, "permissions": ["execute"], "entrypoint": ["python", "tool.py"]})
+        issue = service.report_tool_issue("m1", tool_id, 1, description="bad output", environment={"kind": "lab"})
+        assert issue["triage_owner_member_id"] == "m1"
+        assert service.triage_tool_issue("m1", issue["issue_id"], status="triaged")["status"] == "triaged"
+        with pytest.raises(ValueError, match="invalid_tool_issue_transition"):
+            service.triage_tool_issue("m1", issue["issue_id"], status="resolved")
+        requested = service.request_tool_issue_information("m1", issue["issue_id"], request="need reproduction")
+        assert requested["status"] == "needs_information"
+        with pytest.raises(ValueError, match="tool_issue_rejection_reason_required"):
+            service.triage_tool_issue("m1", issue["issue_id"], status="rejected")
+        service.set_dispatcher_config("m2")
+        rejected = service.triage_tool_issue("m1", issue["issue_id"], status="rejected", reason="cannot reproduce")
+        assert rejected["escalation_to_member_id"] == "m2"
+        issue2 = service.report_tool_issue("m1", tool_id, 1, description="another issue")
+        service.triage_tool_issue("m1", issue2["issue_id"], status="triaged", due_seconds=1)
+        assert service.expire_tool_issue_escalations("m1", now=issue2["due_at"] + 2)[0]["escalated_at"] is not None
+        service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=1, environment={"kind": "lab"}, input_hash="same", before_outcome="failure", after_outcome="success")
+        stats = service.tool_issue_statistics("m1", tool_id, version=1, environment={"kind": "lab"})
+        assert stats["paired"]["improved"] == 1
+        service.open_tool_circuit_breaker("m1", tool_id, 1, reason="security")
+        with pytest.raises(ValueError, match="tool_circuit_breaker_open"):
+            service.execute_tool("m1", tool_id, 1, "x", verification_only=True)
+        assert service.recover_tool_circuit_breaker("m1", tool_id, 1)["status"] == "recovered"
+    finally:
+        service.close()

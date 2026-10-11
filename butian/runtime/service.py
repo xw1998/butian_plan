@@ -749,6 +749,33 @@ class ButianService:
     def review_tool_security_issue(self, member_id, issue_id, **details):
         return self.tools.review_security_issue(member_id, issue_id, **details)
 
+    def triage_tool_issue(self, member_id, issue_id, **details):
+        return self.tools.triage_issue(member_id, issue_id, **details)
+
+    def request_tool_issue_information(self, member_id, issue_id, **details):
+        return self.tools.request_issue_information(member_id, issue_id, **details)
+
+    def provide_tool_issue_information(self, member_id, issue_id, *, information):
+        return self.tools.provide_issue_information(member_id, issue_id, information=information)
+
+    def link_duplicate_tool_issue(self, member_id, issue_id, duplicate_of):
+        return self.tools.link_duplicate_issue(member_id, issue_id, duplicate_of)
+
+    def expire_tool_issue_escalations(self, member_id, **details):
+        return self.tools.expire_issue_escalations(member_id, **details)
+
+    def record_tool_issue_pair(self, member_id, issue_id, **details):
+        return self.tools.record_issue_pair(member_id, issue_id, **details)
+
+    def tool_issue_statistics(self, member_id, tool_id, **details):
+        return self.tools.issue_statistics(member_id, tool_id, **details)
+
+    def open_tool_circuit_breaker(self, member_id, tool_id, version, **details):
+        return self.tools.open_circuit_breaker(member_id, tool_id, version, **details)
+
+    def recover_tool_circuit_breaker(self, member_id, tool_id, version, **details):
+        return self.tools.recover_circuit_breaker(member_id, tool_id, version, **details)
+
     def propose_tool(self, owner_member_id: str, name: str, description: str, **costs):
         return self.tools.propose(owner_member_id, name, description, **costs)
 
