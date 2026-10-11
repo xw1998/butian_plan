@@ -35,14 +35,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         task_id = (body or {}).get("task_id")
         if not task_id and self.path.startswith("/api/tasks/"):
             task_id = self.path.split("/")[3]
-        if not actor and task_id:
-            row = self.service.store.db.execute("SELECT assignee_id, session_id FROM tasks WHERE task_id=?", (task_id,)).fetchone()
-            if row:
-                actor = row["assignee_id"] or (self.service.store.db.execute("SELECT dispatcher_member_id FROM sessions WHERE session_id=?", (row["session_id"],)).fetchone() or {"dispatcher_member_id": None})["dispatcher_member_id"]
-        if not actor and body and body.get("provider_session_id"):
-            row = self.service.store.db.execute("SELECT member_id FROM provider_sessions WHERE provider_session_id=?", (body["provider_session_id"],)).fetchone()
-            if row:
-                actor = row["member_id"]
+        # Authentication must come from the caller; resource ownership is checked separately.
+        # Inferring an actor from a task/provider session would turn an unauthenticated read
+        # or write into an authenticated request.
         target = target_member_id or (body or {}).get("member_id") or actor
         if not actor:
             self._send(401, {"error": "actor_member_id_required"})
@@ -66,6 +61,13 @@ class ApiHandler(BaseHTTPRequestHandler):
                 content_type = "text/html; charset=utf-8" if target.suffix == ".html" else "text/css; charset=utf-8" if target.suffix == ".css" else "application/javascript; charset=utf-8" if target.suffix == ".js" else "application/octet-stream"
                 raw = target.read_bytes(); self.send_response(200); self.send_header("Content-Type", content_type); self.send_header("Content-Length", str(len(raw))); self.end_headers(); self.wfile.write(raw); return
             self._send(404, {"error": "not_found"}); return
+        if self.path == "/api/migration/runs":
+            self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
+        public_get = {"/api/status"}
+        member_query_get = {"/api/tools", "/api/evolution"}
+        if self.path not in public_get and urlparse(self.path).path not in member_query_get:
+            if not self._require_member():
+                return
         if self.path.startswith("/api/experiments/") and self.path.endswith("/failures"):
             experiment_id = self.path.split("/")[3]
             self._send(200, {"samples": self.experiments.failure_samples(experiment_id)}); return
@@ -100,7 +102,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         if self.path == "/api/members":
             self._send(200, {"members": [dict(row) for row in self.service.store.db.execute("SELECT * FROM members ORDER BY member_id")]}); return
         if self.path == "/api/migration/runs":
-            self._send(200, {"runs": self.service.list_migration_runs()}); return
+            self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
         if self.path == "/api/hypotheses":
             self._send(200, {"hypotheses": [dict(row) for row in self.service.store.db.execute("SELECT * FROM practice_hypotheses ORDER BY updated_at DESC")]}); return
         if self.path == "/api/knowledge/claims":
@@ -131,9 +133,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         try:
             body = self._body(); path = urlparse(self.path).path
             protected = ("/api/memory/", "/api/providers/", "/api/evolution/",
-                         "/api/tools", "/api/tasks/", "/api/goals/", "/api/sessions/",
+                         "/api/tools", "/api/tasks", "/api/goals/", "/api/sessions/",
                          "/api/evidence", "/api/hypotheses/",
-                         "/api/knowledge/", "/api/questions", "/api/strategies/")
+                         "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments")
             if path.startswith(protected) and not (path == "/api/providers/cancel" and not body.get("provider_session_id")) and not self._require_member(body):
                 return
             if path == "/api/tools/issues/report":
@@ -145,21 +147,21 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/tools/issues/confirm":
                 result = self.service.confirm_tool_repair(body["member_id"], body["issue_id"], execution_id=body["execution_id"], resolved=body["resolved"]); self._send(200, result); return
             if path == "/api/tools/execute":
-                result = self.service.execute_tool(body["member_id"], body["tool_id"], body["version"], body.get("input"), dry_run=body.get("dry_run", False), task_id=body.get("task_id"), share_id=body.get("share_id"), timeout_seconds=body.get("timeout_seconds", 10), max_output_bytes=body.get("max_output_bytes", 65536)); self._send(200, result); return
+                result = self.service.execute_tool(body["member_id"], body["tool_id"], body["version"], body.get("input"), dry_run=body.get("dry_run", False), verification_only=body.get("verification_only", False), task_id=body.get("task_id"), share_id=body.get("share_id"), security_review_issue_id=body.get("security_review_issue_id"), timeout_seconds=body.get("timeout_seconds", 10), max_output_bytes=body.get("max_output_bytes", 65536)); self._send(200, result); return
             if path == "/api/tools/executions":
                 self._send(200, {"executions": self.service.list_tool_executions(body["member_id"], tool_id=body.get("tool_id"), limit=body.get("limit", 50))}); return
             if path == "/api/tools/propose":
-                result = self.service.propose_tool(body["member_id"], body["name"], body["description"], reuse_lower=body["reuse_lower"], manual_cost_upper=body["manual_cost_upper"], call_cost_lower=body["call_cost_lower"], build_cost_upper=body["build_cost_upper"], maintenance_cost_upper=body["maintenance_cost_upper"], risk_cost_upper=body["risk_cost_upper"], manifest=body.get("manifest")); self._send(201, result); return
+                result = self.service.propose_tool(body["member_id"], body["name"], body["description"], reuse_lower=body["reuse_lower"], manual_cost_upper=body["manual_cost_upper"], call_cost_lower=body["call_cost_lower"], build_cost_upper=body["build_cost_upper"], maintenance_cost_upper=body["maintenance_cost_upper"], risk_cost_upper=body["risk_cost_upper"], manifest=body.get("manifest"), manual_cost_lower=body.get("manual_cost_lower"), call_cost_upper=body.get("call_cost_upper"), cost_unit=body.get("cost_unit")); self._send(201, result); return
             if path == "/api/tools/version":
                 result = self.service.add_tool_version(body["member_id"], body["tool_id"], body["content"], body["manifest"]); self._send(201, result); return
             if path == "/api/tools/verify":
-                result = self.service.verify_tool(body["member_id"], body["tool_id"], body["version"], body["outcome"], independent_key=body["independent_key"], task_id=body.get("task_id"), evidence_ids=body.get("evidence_ids"), environment=body.get("environment")); self._send(200, result); return
+                result = self.service.verify_tool(body["member_id"], body["tool_id"], body["version"], body["outcome"], independent_key=body["independent_key"], task_id=body.get("task_id"), evidence_ids=body.get("evidence_ids"), environment=body.get("environment"), execution_id=body.get("execution_id"), input_hash=body.get("input_hash"), expected_output=body.get("expected_output")); self._send(200, result); return
             if path == "/api/tools/share":
                 result = self.service.share_tool(body["member_id"], body["tool_id"], body["recipient_member_id"], permission=body.get("permission", "team_readonly")); self._send(201, result); return
             if path == "/api/tools/accept":
                 self._send(200, self.service.accept_tool_share(body["member_id"], body["share_id"])); return
             if path == "/api/tools/trial":
-                self._send(200, self.service.trial_tool(body["member_id"], body["share_id"], body["outcome"], independent_key=body["independent_key"], task_id=body.get("task_id"), environment=body.get("environment"))); return
+                self._send(200, self.service.trial_tool(body["member_id"], body["share_id"], body["outcome"], independent_key=body["independent_key"], task_id=body.get("task_id"), environment=body.get("environment"), evidence_ids=body.get("evidence_ids"), execution_id=body.get("execution_id"), input_hash=body.get("input_hash"), expected_output=body.get("expected_output"))); return
             if path == "/api/tools/archive":
                 self._send(200, self.service.archive_tool(body["member_id"], body["tool_id"], reason=body.get("reason", "maintenance"))); return
             if path == "/api/tools/restore":
@@ -220,9 +222,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/members":
                 self.service.add_member(body["member_id"], body["name"], body.get("role", "member"), body.get("responsibilities"), body.get("provider_id"), body.get("model_id")); self._send(201, {"member_id": body["member_id"]}); return
             if path == "/api/migration/preflight":
-                self._send(200, self.service.preflight_members(body["source_path"], roles_dir=body.get("roles_dir"))); return
+                self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
             if path == "/api/migration/import":
-                result = self.service.import_members(body["source_path"], roles_dir=body.get("roles_dir"), update_existing=body.get("update_existing", False), import_memories=body.get("import_memories", False)); self._send(201, result); return
+                self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
             if path == "/api/goals/submit":
                 self._send(201, self.service.submit_goal(body["goal"], mode=body.get("mode", "solo"), member_id=body.get("member_id"), dispatcher_member_id=body.get("dispatcher_member_id"), requested_model=body.get("requested_model"), capabilities=body.get("capabilities"), environment=body.get("environment"), member_ids=body.get("member_ids"), subtasks=body.get("subtasks"))); return
             if path == "/api/goals/run-team":
@@ -268,8 +270,15 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/sessions/dispatcher":
                 self.service.set_dispatcher_config(body["member_id"]); self._send(200, {"dispatcher_member_id": body["member_id"]}); return
             if path == "/api/tasks/review":
-                self._send(200, self.service.review_task(body["task_id"], body["revision"], body["verdict"], reviewer_member_id=body.get("reviewer_member_id"), notes=body.get("notes", ""), rework_limit=body.get("rework_limit", 3))); return
+                actor, _ = self._member_credentials(body)
+                if not actor or body.get("reviewer_member_id") not in {None, actor}:
+                    self._send(403, {"error": "reviewer_identity_mismatch"}); return
+                self._send(200, self.service.review_task(body["task_id"], body["revision"], body["verdict"], reviewer_member_id=actor, actor_member_id=actor, notes=body.get("notes", ""), rework_limit=body.get("rework_limit", 3))); return
             if path == "/api/tasks":
+                actor, _ = self._member_credentials(body)
+                session = self.service.store.session(body["session_id"])
+                if actor not in {session.get("dispatcher_member_id"), body.get("assignee_id")}:
+                    self._send(403, {"error": "task_create_forbidden"}); return
                 task_id = self.service.store.create_task(body["session_id"], body["title"], body.get("assignee_id"), body.get("parent_id"), body.get("payload")); self._send(201, {"task_id": task_id}); return
             if path.startswith("/api/tasks/") and path.endswith("/claim"):
                 task_id = path.split("/")[3]; self._send(200, self.service.store.claim_task(task_id, body["member_id"], body.get("lease_seconds", 300), body.get("token"))); return

@@ -137,10 +137,13 @@ class Store:
         return self.provider_session(provider_session_id)
 
     @serialized_write
-    def add_member(self, member_id: str, name: str, role: str = "member", responsibilities: list[str] | None = None, provider_id: str | None = None, model_id: str | None = None, default_strategy_id: str = "experience_reuse", strategy_version: int = 1, strategy_stages: list[str] | None = None) -> None:
+    def add_member(self, member_id: str, name: str, role: str = "member", responsibilities: list[str] | None = None, provider_id: str | None = None, model_id: str | None = None, default_strategy_id: str = "experience_reuse", strategy_version: int = 1, strategy_stages: list[str] | None = None, *, persona: dict[str, Any] | None = None) -> None:
         from ..core.strategies import strategy_snapshot
         snapshot = strategy_snapshot(default_strategy_id, strategy_stages)
-        self.db.execute("INSERT INTO members(member_id,name,role,responsibilities,provider_id,model_id,default_strategy_id,strategy_version,strategy_stages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (member_id, name, role, json.dumps(responsibilities or [], ensure_ascii=False), provider_id, model_id, default_strategy_id, strategy_version, json.dumps(snapshot["stages"], ensure_ascii=False)))
+        identity = persona or {}
+        columns = "member_id,name,role,responsibilities,provider_id,model_id,default_strategy_id,strategy_version,strategy_stages,persona,rank,reports_to,reasoning_effort,max_tokens,model_tier,tool_policy"
+        values = (member_id, name, role, json.dumps(responsibilities or [], ensure_ascii=False), provider_id, model_id, default_strategy_id, strategy_version, json.dumps(snapshot["stages"], ensure_ascii=False), json.dumps(identity, ensure_ascii=False), identity.get("rank"), identity.get("reports_to"), identity.get("reasoning_effort"), identity.get("max_tokens"), identity.get("model_tier"), json.dumps(identity.get("tool_policy", {}), ensure_ascii=False))
+        self.db.execute(f"INSERT INTO members({columns}) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", values)
 
     @serialized_write
     def set_member_token(self, member_id: str, token: str) -> None:
@@ -362,6 +365,9 @@ class Store:
         for evidence_id in evidence_ids:
             if not self.db.execute("SELECT 1 FROM evidence WHERE evidence_id=?", (evidence_id,)).fetchone():
                 raise ValueError(f"handoff_evidence_not_found:{evidence_id}")
+            evidence = self.verify_evidence(evidence_id, actor_member_id=member_id)
+            if evidence.get("status") not in {"verified", "valid"}:
+                raise ValueError(f"handoff_evidence_invalid:{evidence_id}:{evidence.get('status')}")
 
     def validate_source_events(self, event_ids: list[str], *, member_id: str | None = None) -> bool:
         if not event_ids:

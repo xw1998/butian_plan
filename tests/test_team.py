@@ -74,14 +74,14 @@ class TeamGoalHttpTests(unittest.TestCase):
             except urlerror.HTTPError as exc:
                 return exc.code, json.loads(exc.read())
         try:
-            status, invalid = post("/api/goals/submit", {"goal": "目标", "mode": "team", "member_id": "m0", "member_ids": ["m1"]})
-            self.assertEqual(status, 400)
-            self.assertIn("team_plan_required", invalid["error"])
-            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+            status, created = post("/api/goals/submit", {"goal": "目标", "mode": "team", "member_id": "m0", "member_ids": ["m1"]})
+            self.assertEqual(status, 201)
+            self.assertEqual(len(created["data"]["children"]), 1)
+            self.assertEqual(created["data"]["children"][0]["member_id"], "m1")
             status, created = post("/api/goals/submit", {"goal": "联合评估", "mode": "team", "member_id": "m0", "member_ids": ["m1"], "subtasks": ["验证数据"]})
             self.assertEqual(status, 201)
             task_id = created["data"]["task_id"]
-            status, result = post("/api/goals/run-team", {"task_id": task_id})
+            status, result = post("/api/goals/run-team", {"task_id": task_id, "actor_member_id": "m0"})
             self.assertEqual(status, 200)
             self.assertEqual(result["data"]["status"], "awaiting_child_reviews")
         finally:
@@ -282,15 +282,21 @@ class NaturalLanguageTeamGoalTests(unittest.TestCase):
         finally:
             svc.close()
 
-    def test_team_goal_requires_explicit_nonempty_plan_before_writing(self):
-        svc, _ = _svc()
+    def test_team_goal_generates_deterministic_plan_when_omitted(self):
+        home = Path(tempfile.mkdtemp(prefix="butian_team_goal_auto_"))
+        command = [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"]
+        (home / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
+        svc = ButianService(home)
         try:
             svc.add_member("m0", "派活者")
-            svc.add_member("m1", "执行一")
-            with self.assertRaisesRegex(ValueError, "team_plan_required"):
-                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"])
-            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
-            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 0)
+            svc.add_member("m1", "执行一", provider_id="local-command", model_id="local-command")
+            result = svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"])
+            self.assertEqual(result["status"], "dispatched")
+            self.assertEqual(len(result["children"]), 1)
+            child = next(task for task in svc.store.list_tasks() if task["task_id"] == result["children"][0]["task_id"])
+            self.assertIn("目标", child["title"])
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 1)
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 2)
         finally:
             svc.close()
 
@@ -369,20 +375,20 @@ def test_task_heartbeat_and_cancel_http_routes():
         except urlerror.HTTPError as exc:
             return exc.code, json.loads(exc.read())
     try:
-        status, heartbeat = post(f"/api/tasks/{task_id}/heartbeat", {"lease_id": lease["lease_id"], "lease_seconds": 300})
+        status, heartbeat = post(f"/api/tasks/{task_id}/heartbeat", {"lease_id": lease["lease_id"], "lease_seconds": 300, "actor_member_id": "worker"})
         assert status == 200 and heartbeat["data"]["ok"] is True
-        status, missing = post(f"/api/tasks/{task_id}/heartbeat", {})
+        status, missing = post(f"/api/tasks/{task_id}/heartbeat", {"actor_member_id": "worker"})
         assert status == 400 and missing["error"] == "missing_field"
         current_revision = service.store.db.execute("SELECT revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()["revision"]
-        status, cancelled = post(f"/api/tasks/{task_id}/cancel", {"revision": current_revision})
+        status, cancelled = post(f"/api/tasks/{task_id}/cancel", {"revision": current_revision, "actor_member_id": "worker"})
         assert status == 200, cancelled
         assert cancelled["data"]["status"] == "cancelled"
-        status, invalid_revision = post(f"/api/tasks/{task_id}/cancel", {"revision": current_revision})
+        status, invalid_revision = post(f"/api/tasks/{task_id}/cancel", {"revision": current_revision, "actor_member_id": "worker"})
         assert status == 400 and invalid_revision["error"] == "revision_conflict"
         provider_session_id = service.store.create_provider_session("worker", "manual")
-        status, provider_cancel = post("/api/providers/cancel", {"provider_session_id": provider_session_id})
+        status, provider_cancel = post("/api/providers/cancel", {"provider_session_id": provider_session_id, "actor_member_id": "worker"})
         assert status == 200 and provider_cancel["data"]["status"] == "cancelled"
-        status, missing_provider = post("/api/providers/cancel", {})
+        status, missing_provider = post("/api/providers/cancel", {"actor_member_id": "worker"})
         assert status == 400 and missing_provider["error"] == "missing_field"
     finally:
         server.shutdown()

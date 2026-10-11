@@ -15,6 +15,7 @@ from .provider_runtime import ProviderRuntime
 from ..adapters.config import load_registry_from_env
 from .dream import DreamRunner
 from .tools import ToolStore
+from .backup import create_backup, verify_backup, restore_backup
 
 class ButianService:
     def __init__(self, home: str | Path | None = None):
@@ -29,6 +30,7 @@ class ButianService:
         self.hypotheses = HypothesisStore(self.store.db)
         self.learning = LearningStore(self.store.db)
         self.tools = ToolStore(self.store, self.home)
+        self.bootstrap_personas()
         # Provider 从 BUTIAN_PROVIDERS_FILE 或 <home>/providers.json 加载；无效条目记录错误、不静默丢弃
         self.providers, self.provider_config_errors, self.provider_config_path = load_registry_from_env(self.home)
         self.provider_runtime = ProviderRuntime(self.store, self.providers)
@@ -39,6 +41,15 @@ class ButianService:
         if self._maintenance_enabled:
             self._maintenance_thread = threading.Thread(target=self._maintenance_loop, name="butian-maintenance", daemon=True)
             self._maintenance_thread.start()
+
+    def create_backup(self, destination: str | Path):
+        return create_backup(self.home, destination)
+
+    def verify_backup(self, backup: str | Path):
+        return verify_backup(backup)
+
+    def restore_backup(self, backup: str | Path, destination: str | Path):
+        return restore_backup(backup, destination)
 
     def close(self):
         self._maintenance_stop.set()
@@ -275,8 +286,8 @@ class ButianService:
                     memory.close()
         return results
 
-    def add_member(self, member_id: str, name: str, role="member", responsibilities=None, provider_id=None, model_id=None, default_strategy_id="experience_reuse", strategy_version=1, strategy_stages=None):
-        self.store.add_member(member_id, name, role, responsibilities, provider_id, model_id, default_strategy_id, strategy_version, strategy_stages)
+    def add_member(self, member_id: str, name: str, role="member", responsibilities=None, provider_id=None, model_id=None, default_strategy_id="experience_reuse", strategy_version=1, strategy_stages=None, *, persona=None):
+        self.store.add_member(member_id, name, role, responsibilities, provider_id, model_id, default_strategy_id, strategy_version, strategy_stages, persona=persona)
         MemoryStore(self.home / "members" / member_id / "memory.db").close()
 
     def bootstrap_personas(self) -> list[str]:
@@ -285,18 +296,13 @@ class ButianService:
         return seed_default_personas(self)
 
     def preflight_members(self, source_path: str, *, roles_dir: str | Path | None = None) -> dict:
-        from .migration import MemberAssetMigrator
-        return MemberAssetMigrator(self).preflight(source_path, roles_dir=roles_dir)
+        raise ValueError("historical_identity_migration_out_of_scope")
 
     def import_members(self, source_path: str, *, roles_dir: str | Path | None = None, update_existing: bool = False, import_memories: bool = False) -> dict:
-        from .migration import MemberAssetMigrator
-        return MemberAssetMigrator(self).import_agents(source_path, roles_dir=roles_dir, update_existing=update_existing, import_memories=import_memories)
+        raise ValueError("historical_identity_migration_out_of_scope")
 
     def list_migration_runs(self, *, limit: int = 50) -> list[dict]:
-        from .migration import MemberAssetMigrator
-        MemberAssetMigrator(self)  # 幂等建表
-        rows = self.store.db.execute("SELECT * FROM migration_runs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
-        return [{**dict(row), "details": json.loads(row["details"])} for row in rows]
+        return []
 
     def require_member_access(self, member_id: str, *, actor_member_id: str | None, token: str | None = None) -> None:
         """Enforce an explicit actor boundary for external member-scoped calls."""
@@ -520,6 +526,9 @@ class ButianService:
                 artifact_path = artifact_dir / f"{child['task_id']}.txt"
                 artifact_path.write_text(text, encoding="utf-8")
                 evidence_id = self.record_evidence(artifact_path, root=artifact_dir, owner_member_id=child["assignee_id"], actor_member_id=child["assignee_id"])
+                dispatcher = session.get("dispatcher_member_id") or root.get("assignee_id")
+                if dispatcher and dispatcher != child["assignee_id"]:
+                    self.store.grant_evidence_access(evidence_id, dispatcher, actor_member_id=child["assignee_id"])
                 self.store.transition_task(child["task_id"], current["revision"], "review", f"team:{task_id}:review:{child['task_id']}:{current['revision']}", payload={"provider_status": status, "provider_output": text, "provider_session_id": provider_row["provider_session_id"], "artifact_path": str(artifact_path), "evidence_id": evidence_id})
                 latest_child = self.store.db.execute("SELECT lease_id FROM tasks WHERE task_id=?", (child["task_id"],)).fetchone()
                 if latest_child and latest_child["lease_id"]:
@@ -583,14 +592,28 @@ class ButianService:
 
     @staticmethod
     def _team_subtask_plan(goal: str, subtasks: list[str] | None, count: int) -> list[str]:
-        if not isinstance(subtasks, list) or not subtasks:
-            raise ValueError("team_plan_required")
-        if any(not isinstance(item, str) or not item.strip() for item in subtasks):
-            raise ValueError("invalid_subtask")
-        plans = [item.strip() for item in subtasks]
-        if len(plans) != count:
-            raise ValueError("subtasks_member_count_mismatch")
-        return plans
+        """Create a deterministic plan when the caller supplies only a team goal.
+
+        Explicit plans remain authoritative. The generated plan is deliberately
+        procedural rather than pretending that a provider has reasoned about the
+        domain: each worker gets a bounded investigation/implementation slice and
+        the parent task remains the final review and integration gate.
+        """
+        if count <= 0:
+            raise ValueError("team_workers_required")
+        if subtasks is not None:
+            if not isinstance(subtasks, list) or not subtasks:
+                raise ValueError("invalid_subtasks")
+            if any(not isinstance(item, str) or not item.strip() for item in subtasks):
+                raise ValueError("invalid_subtask")
+            plans = [item.strip() for item in subtasks]
+            if len(plans) != count:
+                raise ValueError("subtasks_member_count_mismatch")
+            return plans
+        return [
+            f"围绕目标“{goal}”完成第 {index + 1} 个独立工作切片：检查现状、提出可验证结果，记录证据、风险和未完成项；不要宣称未实际验证的成功。"
+            for index in range(count)
+        ]
 
     def switch_session_mode(self, session_id: str, mode: str, *, current_member_id: str | None = None) -> dict[str, Any]:
         """模式切换：不丢任务/记忆，只影响后续编排；团队→单人不动运行中任务。"""
@@ -618,15 +641,21 @@ class ButianService:
     def task_tree(self, session_id: str | None = None) -> list[dict[str, Any]]:
         return self.store.task_tree(session_id)
 
-    def review_task(self, task_id: str, revision: int, verdict: str, *, reviewer_member_id: str | None = None, notes: str = "", rework_limit: int = 3) -> dict[str, Any]:
+    def review_task(self, task_id: str, revision: int, verdict: str, *, reviewer_member_id: str | None = None, actor_member_id: str | None = None, notes: str = "", rework_limit: int = 3) -> dict[str, Any]:
         """审核入口：approve→done（受 handoff 门槛保护）；rework→ready（受返工次数上限保护）。"""
         if verdict not in {"approve", "rework"}:
             raise ValueError("invalid_review_verdict")
         if reviewer_member_id and not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (reviewer_member_id,)).fetchone():
             raise ValueError("reviewer_member_not_found")
+        if actor_member_id and reviewer_member_id != actor_member_id:
+            raise ValueError("reviewer_identity_mismatch")
         task = next((t for t in self.store.list_tasks() if t["task_id"] == task_id), None)
         if not task:
             raise ValueError("task_not_found")
+        session = self.store.session(task["session_id"])
+        allowed_reviewers = {session.get("dispatcher_member_id"), task.get("assignee_id")}
+        if reviewer_member_id and reviewer_member_id not in allowed_reviewers:
+            raise ValueError("reviewer_not_authorized")
         handoff = self.store.db.execute("SELECT payload FROM handoffs WHERE task_id=? AND revision=?", (task_id, revision)).fetchone()
         if verdict == "approve":
             self.store.transition_task(task_id, revision, "done", f"review_approve_{task_id}_{revision}_{reviewer_member_id}", payload={**self._task_payload(task), "review_verdict": "approve", "reviewer_member_id": reviewer_member_id, "review_notes": notes})
@@ -712,6 +741,9 @@ class ButianService:
 
     def confirm_tool_repair(self, member_id, issue_id, **details):
         return self.tools.confirm_repair(member_id, issue_id, **details)
+
+    def review_tool_security_issue(self, member_id, issue_id, **details):
+        return self.tools.review_security_issue(member_id, issue_id, **details)
 
     def propose_tool(self, owner_member_id: str, name: str, description: str, **costs):
         return self.tools.propose(owner_member_id, name, description, **costs)
