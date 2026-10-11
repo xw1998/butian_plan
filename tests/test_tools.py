@@ -831,6 +831,8 @@ def test_security_issue_requires_independent_execution_evidence_review(tmp_path)
     try:
         service.add_member("m3", "独立审查者")
         service.add_member("m4", "备用审查者")
+        service.store.set_member_token("m3", "secret-m3")
+        service.store.set_member_token("m4", "secret-m4")
         tool_id = propose(service)["tool_id"]
         manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "text"}, "permissions": ["execute"], "entrypoint": ["python", "tool.py"], "risk_level": "low"}
         service.add_tool_version("m1", tool_id, "print('v1')", manifest)
@@ -844,7 +846,7 @@ def test_security_issue_requires_independent_execution_evidence_review(tmp_path)
             service.review_tool_security_issue("m1", issue["issue_id"], execution_id="missing", evidence_ids=["report"], resolved=True)
         evidence_path = tmp_path / "independent-review.log"
         evidence_path.write_text("reviewed", encoding="utf-8")
-        evidence_id = service.store.record_evidence(evidence_path, owner_member_id="m4", actor_member_id="m4", token="")
+        evidence_id = service.store.record_evidence(evidence_path, owner_member_id="m4", actor_member_id="m4", token="secret-m4")
         run = service.execute_tool("m4", tool_id, 2, {}, verification_only=True, security_review_issue_id=issue["issue_id"])
         with pytest.raises(ValueError, match="execution_mismatch"):
             service.review_tool_security_issue("m4", issue["issue_id"], execution_id="missing", evidence_ids=["report"], resolved=True)
@@ -878,6 +880,8 @@ def test_security_review_rejects_fake_foreign_and_tampered_evidence_and_reopens(
     try:
         service.add_member("m3", "独立审查者")
         service.add_member("m4", "证据所有者")
+        service.store.set_member_token("m3", "secret-m3")
+        service.store.set_member_token("m4", "secret-m4")
         tool_id = propose(service)["tool_id"]
         manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "text"}, "permissions": ["execute"], "entrypoint": ["python", "tool.py"], "risk_level": "low"}
         service.add_tool_version("m1", tool_id, "print('v1')", manifest)
@@ -889,18 +893,18 @@ def test_security_review_rejects_fake_foreign_and_tampered_evidence_and_reopens(
             service.review_tool_security_issue("m3", issue["issue_id"], execution_id=run["execution_id"], evidence_ids=["ev_missing"], resolved=True)
         foreign_path = tmp_path / "foreign.log"
         foreign_path.write_text("foreign", encoding="utf-8")
-        foreign_id = service.store.record_evidence(foreign_path, owner_member_id="m4", actor_member_id="m4", token="")
+        foreign_id = service.store.record_evidence(foreign_path, owner_member_id="m4", actor_member_id="m4", token="secret-m4")
         with pytest.raises(ValueError, match="evidence_access_denied"):
             service.review_tool_security_issue("m3", issue["issue_id"], execution_id=run["execution_id"], evidence_ids=[foreign_id], resolved=True)
         own_path = tmp_path / "own.log"
         own_path.write_text("original", encoding="utf-8")
-        own_id = service.store.record_evidence(own_path, owner_member_id="m3", actor_member_id="m3", token="")
+        own_id = service.store.record_evidence(own_path, owner_member_id="m3", actor_member_id="m3", token="secret-m3")
         own_path.write_text("tampered", encoding="utf-8")
         with pytest.raises(ValueError, match="evidence_invalid"):
             service.review_tool_security_issue("m3", issue["issue_id"], execution_id=run["execution_id"], evidence_ids=[own_id], resolved=True)
         valid_path = tmp_path / "valid.log"
         valid_path.write_text("valid", encoding="utf-8")
-        valid_id = service.store.record_evidence(valid_path, owner_member_id="m3", actor_member_id="m3", token="")
+        valid_id = service.store.record_evidence(valid_path, owner_member_id="m3", actor_member_id="m3", token="secret-m3")
         first = service.review_tool_security_issue("m3", issue["issue_id"], execution_id=run["execution_id"], evidence_ids=[valid_id], resolved=False)
         assert first["status"] == "reopened"
         service.add_tool_version("m1", tool_id, "print('v3')", {**manifest, "description": "second patch"})

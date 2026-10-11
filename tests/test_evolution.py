@@ -18,6 +18,7 @@ from butian.runtime.service import ButianService
 
 def _seed(service: ButianService):
     service.add_member("m1", "成员一")
+    service.store.set_member_token("m1", "secret")
     memory = service.memory("m1")
     memory.put("mem_a", "experience", "经验 A：先校准再测量", status="warm", source_event_ids=["ev_a"])
     memory.put("mem_b", "experience", "经验 B：环境漂移需复检", status="warm", source_event_ids=["ev_b"])
@@ -114,7 +115,7 @@ def test_evolution_http_routes(tmp_path):
     base = f"http://127.0.0.1:{server.server_address[1]}"
     try:
         def _read(path, data=None):
-            req = urlrequest.Request(base + path, data=data, headers={"Content-Type": "application/json"}, method="POST" if data is not None else "GET")
+            req = urlrequest.Request(base + path, data=data, headers={"Content-Type": "application/json", "X-Butian-Member": "m1", "X-Butian-Token": "secret"}, method="POST" if data is not None else "GET")
             try:
                 with urlrequest.urlopen(req) as resp:
                     return json.loads(resp.read())

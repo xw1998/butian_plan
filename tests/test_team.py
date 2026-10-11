@@ -59,6 +59,8 @@ class TeamGoalHttpTests(unittest.TestCase):
         svc = ButianService(home)
         svc.add_member("m0", "派活者")
         svc.add_member("m1", "执行者", provider_id="local-command", model_id="local-command")
+        svc.store.set_member_token("m0", "secret-m0")
+        svc.store.set_member_token("m1", "secret-m1")
         http_api.ApiHandler.service = svc
         http_api.ApiHandler.experiments = None
         http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
@@ -67,7 +69,7 @@ class TeamGoalHttpTests(unittest.TestCase):
         thread.start()
         base = f"http://127.0.0.1:{server.server_address[1]}"
         def post(path, payload):
-            req = urlrequest.Request(base + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+            req = urlrequest.Request(base + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "m0", "X-Butian-Token": "secret-m0"}, method="POST")
             try:
                 with urlrequest.urlopen(req) as response:
                     return response.status, json.loads(response.read())
@@ -353,6 +355,7 @@ def test_task_heartbeat_and_cancel_http_routes():
     home = Path(tempfile.mkdtemp(prefix="butian_lifecycle_http_"))
     service = ButianService(home)
     service.add_member("worker", "Worker")
+    service.store.set_member_token("worker", "secret-worker")
     session_id = service.store.create_session("solo", None, None, {})
     task_id = service.store.create_task(session_id, "HTTP lifecycle", assignee_id="worker")
     service.store.transition_task(task_id, 1, "ready", "http-ready")
@@ -365,7 +368,7 @@ def test_task_heartbeat_and_cancel_http_routes():
     thread.start()
     base = f"http://127.0.0.1:{server.server_address[1]}"
     def post(path, payload):
-        req = urlrequest.Request(base + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+        req = urlrequest.Request(base + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "worker", "X-Butian-Token": "secret-worker"}, method="POST")
         try:
             with urlrequest.urlopen(req) as response:
                 return response.status, json.loads(response.read())
