@@ -6,6 +6,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from butian.runtime.service import ButianService
@@ -173,3 +175,57 @@ class NaturalLanguageGoalTests(unittest.TestCase):
     def test_submit_goal_rejects_empty_goal(self):
         with self.assertRaisesRegex(ValueError, "goal_required"):
             self.service.submit_goal("  ", member_id="m_goal")
+
+
+def test_window_budget_preserves_instruction_and_reports_exact_characters(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m_window", "窗口成员", role="工程师", responsibilities=["职责" * 200], persona={"persona": "人格" * 1000})
+        task_id = service.store.create_task(service.store.create_session("solo", "m_window", None, {}), "任务", assignee_id="m_window", payload={"blob": "任务" * 1000})
+        instruction = "保持完整指令：" + "重要" * 100
+        composed, report = service.compose_context("m_window", instruction, task_id=task_id, budgets={"WINDOW": 320, "L1": 1200, "L2": 1200, "L3": 1200, "L4": 1200, "TOOLS": 1200})
+        assert "【L0 当前指令】\n" + instruction in composed
+        assert report.budget_chars["total"] == len(composed)
+        assert report.budget_chars["F"] + report.budget_chars["M"] + report.budget_chars["T"] + report.budget_chars["S"] == len(composed)
+        assert len(composed) <= 320
+        assert report.budget_chars["fits_window"] is True
+    finally:
+        service.close()
+
+
+def test_window_too_small_fails_without_truncating_l0(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m_tiny", "小窗口")
+        with pytest.raises(ValueError, match="context_budget_too_small"):
+            service.compose_context("m_tiny", "不可裁剪" * 40, budgets={"WINDOW": 20})
+    finally:
+        service.close()
+
+
+def test_json_sections_remain_valid_with_unicode_truncation(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m_json", "中文" * 60, role="角色" * 60, responsibilities=["职责" * 60], persona={"persona": "人格" * 60})
+        task_id = service.store.create_task(service.store.create_session("solo", "m_json", None, {}), "标题" * 80, assignee_id="m_json", payload={"内容": "值" * 500})
+        composed, report = service.compose_context("m_json", "指令", task_id=task_id, budgets={"L1": 80, "L4": 80})
+        for label in ("【L1 当前任务】", "【L4 身份与职责】"):
+            section = composed.split(label + "\n", 1)[1].split("\n\n", 1)[0]
+            assert json.loads(section)["truncated"] is True
+        assert {"L1", "L4"}.issubset(report.trimmed)
+    finally:
+        service.close()
+
+
+def test_recent_events_are_oldest_to_newest(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m_events", "事件成员")
+        task_id = service.store.create_task(service.store.create_session("solo", "m_events", None, {}), "事件任务", assignee_id="m_events")
+        for value in range(3):
+            service.store.append_event(task_id, "test_event", {"index": value}, f"event-{value}")
+        from butian.runtime.context import ContextComposer
+        events = ContextComposer(service.store, service.tools).recent_events(task_id, limit=3)
+        assert [event["payload"]["index"] for event in events] == [0, 1, 2]
+    finally:
+        service.close()

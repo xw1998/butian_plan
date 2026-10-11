@@ -902,3 +902,51 @@ def test_security_review_rejects_fake_foreign_and_tampered_evidence_and_reopens(
         assert final["status"] == "resolved"
     finally:
         service.close()
+
+
+def test_context_cards_include_only_authorized_current_contracts(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        secret = "SOURCE_SECRET_MUST_NOT_LEAK"
+        manifest = {**MANIFEST, "permissions": ["execute"], "entrypoint": ["python", "tool.py"], "private_key": "MANIFEST_SECRET_MUST_NOT_LEAK", "risk_level": "low"}
+        service.add_tool_version("m1", tool_id, f"print({secret!r})", manifest)
+        for index in range(4):
+            run = service.execute_tool("m1", tool_id, 1, f"recall-{index}", verification_only=True)
+            service.verify_tool("m1", tool_id, 1, "success", independent_key=f"recall-{index}", task_id=f"recall-{index}", environment={"kind": f"env-{index}"}, evidence_ids=[f"recall-e-{index}"], execution_id=run["execution_id"], input_hash=run["input_hash"], expected_output=run["expected_output"])
+        owner_cards = service.tools.context_cards("m1", "通用分析", limit=10)
+        assert [card["tool_id"] for card in owner_cards] == [tool_id]
+        assert all("source" not in card and "entrypoint" not in card for card in owner_cards)
+        readonly = service.share_tool("m1", tool_id, "m2", permission="team_readonly")
+        assert service.tools.context_cards("m2", "分析", limit=10) == []
+        service.accept_tool_share("m2", readonly["share_id"])
+        shared_cards = service.tools.context_cards("m2", "分析", limit=10)
+        assert [card["tool_id"] for card in shared_cards] == [tool_id]
+        assert set(shared_cards[0]) == {"tool_id", "name", "description", "version", "input_contract", "output_contract", "permissions", "failure_conditions"}
+        assert secret not in json.dumps(shared_cards, ensure_ascii=False)
+        assert "MANIFEST_SECRET" not in json.dumps(shared_cards, ensure_ascii=False)
+        assert "entrypoint" not in json.dumps(shared_cards, ensure_ascii=False)
+        service.store.db.execute("UPDATE tool_shares SET expires_at=? WHERE share_id=?", (0, readonly["share_id"]))
+        assert service.tools.context_cards("m2", "分析", limit=10) == []
+        service.store.db.execute("UPDATE tool_shares SET expires_at=NULL, status='revoked' WHERE share_id=?", (readonly["share_id"],))
+        assert service.tools.context_cards("m2", "分析", limit=10) == []
+    finally:
+        service.close()
+
+
+def test_context_cards_filter_version_mismatch_and_execute_shares(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        manifest = {**MANIFEST, "permissions": ["execute"], "risk_level": "low"}
+        service.add_tool_version("m1", tool_id, "print('v1')", manifest)
+        for index in range(4):
+            run = service.execute_tool("m1", tool_id, 1, str(index), verification_only=True)
+            service.verify_tool("m1", tool_id, 1, "success", independent_key=f"exec-recall-{index}", task_id=f"exec-recall-{index}", environment={"kind": f"env-{index}"}, evidence_ids=[f"exec-e-{index}"], execution_id=run["execution_id"], input_hash=run["input_hash"], expected_output=run["expected_output"])
+        share = service.share_tool("m1", tool_id, "m2", permission="team_execute")
+        service.accept_tool_share("m2", share["share_id"])
+        assert [card["tool_id"] for card in service.tools.context_cards("m2", "execute", limit=10)] == [tool_id]
+        service.store.db.execute("UPDATE tool_shares SET version=version+1 WHERE share_id=?", (share["share_id"],))
+        assert service.tools.context_cards("m2", "execute", limit=10) == []
+    finally:
+        service.close()
