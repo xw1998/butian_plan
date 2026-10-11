@@ -79,3 +79,35 @@ def test_maintenance_scans_decay_and_schedules_cold_review(tmp_path):
             os.environ.pop("BUTIAN_MAINTENANCE_ENABLED", None)
         else:
             os.environ["BUTIAN_MAINTENANCE_ENABLED"] = old
+
+
+def test_issue_escalation_creates_dispatcher_work_item_lifecycle(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("owner", "Owner")
+        service.add_member("dispatcher", "Dispatcher")
+        service.set_dispatcher_config("dispatcher")
+        tool_id = service.propose_tool("owner", "tool", "desc", reuse_lower=1, manual_cost_upper=1, call_cost_lower=1, build_cost_upper=1, maintenance_cost_upper=1, risk_cost_upper=1, manifest={"permissions": ["execute"], "entrypoint": ["python", "tool.py"]})["tool_id"]
+        service.add_tool_version("owner", tool_id, "print('ok')", {"input_contract": {"type": "object"}, "output_contract": {"type": "object"}, "permissions": ["execute"], "failure_conditions": ["timeout"], "entrypoint": ["python", "tool.py"]})
+        issue = service.report_tool_issue("owner", tool_id, 1, description="timeout")
+        item = service.expire_tool_issue_escalations("owner", now=issue["due_at"] + 1)[0]
+        assert item["work_item_id"]
+        work_items = service.list_tool_issue_escalations("dispatcher", status="open")
+        assert len(work_items) == 1
+        claimed = service.claim_tool_issue_escalation("dispatcher", item["work_item_id"])
+        assert claimed["status"] == "claimed"
+        completed = service.resolve_tool_issue_escalation("dispatcher", item["work_item_id"], status="completed", resolution="reviewed")
+        assert completed["status"] == "completed"
+        events = service.store.db.execute("SELECT event_type FROM tool_issue_escalation_events WHERE work_item_id=? ORDER BY rowid", (item["work_item_id"],)).fetchall()
+        assert [row["event_type"] for row in events] == ["created", "claimed", "completed"]
+        second = service.tools.escalate_issue("owner", issue["issue_id"], reason="manual-retry", now=issue["due_at"] + 10)
+        service.claim_tool_issue_escalation("dispatcher", second["work_item_id"])
+        rejected = service.resolve_tool_issue_escalation("dispatcher", second["work_item_id"], status="rejected", resolution="outside responsibility")
+        assert rejected["next_work_item_id"]
+        next_item = service.list_tool_issue_escalations("dispatcher", status="open")
+        assert len(next_item) == 1
+        assert next_item[0]["work_item_id"] == rejected["next_work_item_id"]
+        rejection_events = service.store.db.execute("SELECT event_type FROM tool_issue_escalation_events WHERE work_item_id=? ORDER BY rowid", (second["work_item_id"],)).fetchall()
+        assert [row["event_type"] for row in rejection_events] == ["created", "claimed", "rejected", "re-escalated"]
+    finally:
+        service.close()

@@ -996,11 +996,14 @@ def test_issue_triage_timeout_pair_stats_and_breaker_are_explicit(tmp_path):
         assert service.expire_tool_issue_escalations("m1", now=issue2["due_at"] + 2)[0]["escalated_at"] is not None
         before = service.execute_tool("m1", tool_id, 1, "same", verification_only=True)
         after = service.execute_tool("m1", tool_id, 2, "same", verification_only=True)
+        service.verify_tool("m1", tool_id, 1, "success", independent_key="breaker-pair-before", task_id="breaker-pair", environment={"kind": "lab"}, evidence_ids=["before"], execution_id=before["execution_id"], input_hash=before["input_hash"], expected_output=before["expected_output"])
+        service.verify_tool("m1", tool_id, 2, "success", independent_key="breaker-pair-after", task_id="breaker-pair", environment={"kind": "lab"}, evidence_ids=["after"], execution_id=after["execution_id"], input_hash=after["input_hash"], expected_output=after["expected_output"])
         service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "lab"}, input_hash=before["input_hash"], before_outcome="success", after_outcome="success")
         stats = service.tool_issue_statistics("m1", tool_id, version=2, environment={"kind": "lab"})
         assert stats["paired"]["n"] == 1
         assert stats["paired"]["improved"] == 0
-        assert stats["paired"]["improvement_confidence_interval"] == {"status": "unknown", "lower": None, "upper": None}
+        assert stats["paired"]["improvement_confidence_interval"]["metric"] == "paired_success_rate_difference"
+        assert stats["paired"]["improvement_confidence_interval"]["lower"] == 0.0
         duplicate = service.report_tool_issue("m1", tool_id, 1, description="duplicate issue")
         linked = service.link_duplicate_tool_issue("m1", duplicate["issue_id"], issue["issue_id"])
         assert linked["status"] != "resolved"
@@ -1049,10 +1052,54 @@ def test_audit_regressions_pair_requires_issue_environment(tmp_path):
         issue = service.report_tool_issue("m1", tool_id, 1, description="regression", environment={"kind": "lab"})
         before = service.execute_tool("m1", tool_id, 1, "same", verification_only=True)
         after = service.execute_tool("m1", tool_id, 2, "same", verification_only=True)
+        service.verify_tool("m1", tool_id, 1, "success", independent_key="legacy-env-before", task_id="legacy-env", environment={"kind": "lab"}, evidence_ids=["before"], execution_id=before["execution_id"], input_hash=before["input_hash"], expected_output=before["expected_output"])
+        service.verify_tool("m1", tool_id, 2, "success", independent_key="legacy-env-after", task_id="legacy-env", environment={"kind": "lab"}, evidence_ids=["after"], execution_id=after["execution_id"], input_hash=after["input_hash"], expected_output=after["expected_output"])
         with pytest.raises(ValueError, match="tool_pair_environment_mismatch"):
             service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "other"}, input_hash=before["input_hash"], before_outcome="success", after_outcome="success")
         result = service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "lab"}, input_hash=before["input_hash"], before_outcome="success", after_outcome="success")
         assert result["paired"]["n"] == 1
-        assert result["paired"]["improvement_confidence_interval"]["status"] == "unknown"
+        assert result["paired"]["improvement_confidence_interval"]["metric"] == "paired_success_rate_difference"
+        assert result["paired"]["improvement_confidence_interval"]["lower"] == 0.0
+    finally:
+        service.close()
+
+
+def test_circuit_breaker_recovery_requires_verified_clean_run(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        manifest = {**MANIFEST, "permissions": ["execute"], "entrypoint": ["python", "tool.py"]}
+        service.add_tool_version("m1", tool_id, "print('ok')", manifest)
+        with pytest.raises(ValueError, match="tool_circuit_breaker_recovery_not_verified"):
+            service.open_tool_circuit_breaker("m1", tool_id, 1, reason="risk")
+            service.recover_tool_circuit_breaker("m1", tool_id, 1)
+        service.store.db.execute("DELETE FROM tool_circuit_breakers WHERE tool_id=? AND version=1", (tool_id,))
+        service.store.db.commit()
+        execution = service.execute_tool("m1", tool_id, 1, "verified", verification_only=True)
+        service.verify_tool("m1", tool_id, 1, "success", independent_key="breaker-recovery", task_id="breaker-recovery", environment={"kind": "lab"}, evidence_ids=["breaker-log"], execution_id=execution["execution_id"], input_hash=execution["input_hash"], expected_output=execution["expected_output"])
+        service.open_tool_circuit_breaker("m1", tool_id, 1, reason="risk-again")
+        assert service.recover_tool_circuit_breaker("m1", tool_id, 1)["status"] == "recovered"
+    finally:
+        service.close()
+
+
+def test_pair_statistics_report_success_rate_difference_and_require_verified_environment(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        manifest = {**MANIFEST, "permissions": ["execute"], "entrypoint": ["python", "tool.py"]}
+        service.add_tool_version("m1", tool_id, "raise RuntimeError('v1')", manifest)
+        service.add_tool_version("m1", tool_id, "print('v2')", {**manifest, "description": "v2"})
+        issue = service.report_tool_issue("m1", tool_id, 1, description="paired", environment={"kind": "lab"})
+        before = service.execute_tool("m1", tool_id, 1, "same", verification_only=True)
+        after = service.execute_tool("m1", tool_id, 2, "same", verification_only=True)
+        service.verify_tool("m1", tool_id, 1, "failure", independent_key="pair-before", task_id="pair-task", environment={"kind": "lab"}, evidence_ids=["before"], execution_id=before["execution_id"], input_hash=before["input_hash"])
+        service.verify_tool("m1", tool_id, 2, "success", independent_key="pair-after", task_id="pair-task", environment={"kind": "lab"}, evidence_ids=["after"], execution_id=after["execution_id"], input_hash=after["input_hash"], expected_output=after["expected_output"])
+        result = service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "lab"}, input_hash=before["input_hash"], before_outcome="failure", after_outcome="success")
+        interval = result["paired"]["improvement_confidence_interval"]
+        assert interval["metric"] == "paired_success_rate_difference"
+        assert interval["lower"] <= interval["upper"]
+        with pytest.raises(ValueError, match="tool_pair_environment_mismatch"):
+            service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "other"}, input_hash=before["input_hash"], before_outcome="failure", after_outcome="success")
     finally:
         service.close()

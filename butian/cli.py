@@ -58,6 +58,11 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     dispatcher = sub.add_parser("dispatcher").add_subparsers(dest="dispatcher_command", required=True)
     dispatcher.add_parser("get")
     dset = dispatcher.add_parser("set"); dset.add_argument("member_id")
+    issue = sub.add_parser("tool-issue").add_subparsers(dest="issue_command", required=True)
+    escalations = issue.add_parser("escalations"); escalations.add_argument("member_id"); escalations.add_argument("--status")
+    claim_issue = issue.add_parser("claim"); claim_issue.add_argument("member_id"); claim_issue.add_argument("work_item_id")
+    resolve_issue = issue.add_parser("resolve"); resolve_issue.add_argument("member_id"); resolve_issue.add_argument("work_item_id"); resolve_issue.add_argument("status", choices=["completed", "rejected"]); resolve_issue.add_argument("--resolution", default="")
+    expire_issue = issue.add_parser("expire"); expire_issue.add_argument("member_id"); expire_issue.add_argument("--now", type=float)
     migrate = sub.add_parser("migrate").add_subparsers(dest="migrate_command", required=True)
     mpreflight = migrate.add_parser("preflight"); mpreflight.add_argument("source_path"); mpreflight.add_argument("--roles-dir")
     mimport = migrate.add_parser("import"); mimport.add_argument("source_path"); mimport.add_argument("--roles-dir"); mimport.add_argument("--update-existing", action="store_true"); mimport.add_argument("--no-memories", action="store_true")
@@ -72,7 +77,7 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     if args.command == "mcp":
         from .mcp_server import run
         run(home()); return 0
-    if args.command in {"hypothesis", "source", "claim", "evidence", "memory", "experiment", "evolution", "migrate", "session", "task", "dispatcher"}:
+    if args.command in {"hypothesis", "source", "claim", "evidence", "memory", "experiment", "evolution", "migrate", "session", "task", "dispatcher", "tool-issue"}:
         service = ButianService(Path(home_dir) if home_dir else home())
         try:
             if args.command == "session" and args.session_command == "create":
@@ -93,6 +98,15 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
                 emit({"dispatcher_member_id": service.get_dispatcher_config()}); return 0
             if args.command == "dispatcher" and args.dispatcher_command == "set":
                 service.set_dispatcher_config(args.member_id); emit({"dispatcher_member_id": args.member_id}); return 0
+            if args.command == "tool-issue":
+                if args.issue_command == "escalations":
+                    emit({"work_items": service.list_tool_issue_escalations(args.member_id, status=args.status)}); return 0
+                if args.issue_command == "claim":
+                    emit(service.claim_tool_issue_escalation(args.member_id, args.work_item_id)); return 0
+                if args.issue_command == "resolve":
+                    emit(service.resolve_tool_issue_escalation(args.member_id, args.work_item_id, status=args.status, resolution=args.resolution)); return 0
+                if args.issue_command == "expire":
+                    emit({"issues": service.expire_tool_issue_escalations(args.member_id, now=args.now)}); return 0
             if args.command == "migrate" and args.migrate_command == "preflight":
                 raise ValueError("historical_identity_migration_out_of_scope")
             if args.command == "migrate" and args.migrate_command == "import":

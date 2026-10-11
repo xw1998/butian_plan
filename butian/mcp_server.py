@@ -142,6 +142,9 @@ for _action, _fields in {
     "issue_statistics": {"tool_id": "string", "version": "integer", "environment": "object"},
     "circuit_breaker_open": {"tool_id": "string", "version": "integer", "scope": "string", "reason": "string"},
     "circuit_breaker_recover": {"tool_id": "string", "version": "integer", "scope": "string"},
+    "issue_escalations": {"status": "string"},
+    "issue_escalation_claim": {"work_item_id": "string"},
+    "issue_escalation_resolve": {"work_item_id": "string", "status": "string", "resolution": "string"},
     "security_review": {"issue_id": "string", "execution_id": "string", "evidence_ids": "array", "resolved": "boolean"},
 }.items():
     _properties = {key: ({"type": "array", "items": {"type": "string"}} if value == "array" else {"type": value}) for key, value in _fields.items()}
@@ -177,7 +180,7 @@ def call_tool(service, name, args):
         raise ValueError("historical_identity_migration_out_of_scope")
     if name == "butian_status": return {"ok": True, "service": "butian"}
     member_tools = {tool["name"] for tool in TOOLS if tool["name"].startswith(("butian_memory_", "butian_evolution_", "butian_dream_"))}
-    member_tools.update({"butian_tool_issue_report", "butian_tool_issues", "butian_tool_issue_repair", "butian_tool_repair_confirm", "butian_tool_security_review", "butian_tool_issue_triage", "butian_tool_issue_request_information", "butian_tool_issue_provide_information", "butian_tool_issue_link_duplicate", "butian_tool_issue_expire", "butian_tool_issue_pair", "butian_tool_issue_statistics", "butian_tool_circuit_breaker_open", "butian_tool_circuit_breaker_recover"})
+    member_tools.update({"butian_tool_issue_report", "butian_tool_issues", "butian_tool_issue_repair", "butian_tool_repair_confirm", "butian_tool_security_review", "butian_tool_issue_triage", "butian_tool_issue_request_information", "butian_tool_issue_provide_information", "butian_tool_issue_link_duplicate", "butian_tool_issue_expire", "butian_tool_issue_pair", "butian_tool_issue_statistics", "butian_tool_circuit_breaker_open", "butian_tool_circuit_breaker_recover", "butian_tool_issue_escalations", "butian_tool_issue_escalation_claim", "butian_tool_issue_escalation_resolve"})
     member_tools |= {"butian_tool_propose", "butian_tool_version_add", "butian_tool_verify", "butian_tool_share", "butian_tool_execute", "butian_tool_executions", "butian_tool_list", "butian_tool_accept", "butian_tool_trial", "butian_tool_archive", "butian_tool_restore", "butian_provider_start", "butian_provider_consume", "butian_task_list", "butian_task_tree", "butian_task_review", "butian_task_create", "butian_task_transition", "butian_task_claim", "butian_task_release", "butian_task_heartbeat", "butian_strategy_compose", "butian_strategy_assign", "butian_strategy_step", "butian_strategy_steps", "butian_user_question", "butian_user_answer", "butian_evidence_verify", "butian_knowledge_source_add", "butian_knowledge_source_verify", "butian_knowledge_source_capture", "butian_knowledge_claim_add", "butian_hypothesis_from_claim", "butian_hypothesis_action_authorize", "butian_hypothesis_action_grant", "butian_hypothesis_action_start", "butian_hypothesis_get", "butian_hypothesis_observe", "butian_peer_ask", "butian_peer_answer", "butian_peer_verify", "butian_peer_list"}
     admin_tools = {"butian_dispatcher_set", "butian_session_create", "butian_session_switch_mode", "butian_session_list", "butian_strategy_recommend", "butian_experiment_create", "butian_experiment_event", "butian_experiment_batch", "butian_experiment_compare"}
     if name in admin_tools:
@@ -218,6 +221,9 @@ def call_tool(service, name, args):
     if name == "butian_tool_issue_statistics": return service.tool_issue_statistics(args["member_id"], args["tool_id"], version=args.get("version"), environment=args.get("environment"))
     if name == "butian_tool_circuit_breaker_open": return service.open_tool_circuit_breaker(args["member_id"], args["tool_id"], args["version"], scope=args.get("scope", "version"), reason=args.get("reason", "risk"))
     if name == "butian_tool_circuit_breaker_recover": return service.recover_tool_circuit_breaker(args["member_id"], args["tool_id"], args["version"], scope=args.get("scope", "version"))
+    if name == "butian_tool_issue_escalations": return {"work_items": service.list_tool_issue_escalations(args["member_id"], status=args.get("status"))}
+    if name == "butian_tool_issue_escalation_claim": return service.claim_tool_issue_escalation(args["member_id"], args["work_item_id"])
+    if name == "butian_tool_issue_escalation_resolve": return service.resolve_tool_issue_escalation(args["member_id"], args["work_item_id"], status=args["status"], resolution=args.get("resolution", ""))
     if name == "butian_tool_issues": return {"issues": service.list_tool_issues(args["member_id"], args["tool_id"])}
     if name == "butian_tool_issue_repair": return service.repair_tool_issue(args["member_id"], args["issue_id"], repair_version=args["repair_version"], diagnosis=args["diagnosis"])
     if name == "butian_tool_repair_confirm": return service.confirm_tool_repair(args["member_id"], args["issue_id"], execution_id=args["execution_id"], resolved=args["resolved"])

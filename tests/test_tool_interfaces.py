@@ -120,3 +120,41 @@ def test_http_sensitive_gets_require_member_auth(tmp_path, path):
         server.server_close()
         thread.join(timeout=3)
         service.close()
+
+
+def test_mcp_escalation_schemas_only_require_action_fields():
+    schemas = {item["name"]: item["inputSchema"] for item in mcp_server.TOOLS}
+    assert "now" not in schemas["butian_tool_issue_escalations"]["properties"]
+    assert "now" not in schemas["butian_tool_issue_escalation_claim"]["properties"]
+    assert "now" not in schemas["butian_tool_issue_escalation_resolve"]["properties"]
+    assert {"member_id", "actor_member_id", "token"} <= set(schemas["butian_tool_issue_escalations"]["required"])
+
+
+def test_http_issue_escalations_require_auth_and_forward_dispatcher(tmp_path, monkeypatch):
+    service = ButianService(tmp_path)
+    service.add_member("dispatcher", "Dispatcher")
+    service.store.set_member_token("dispatcher", "secret")
+    monkeypatch.setattr(service, "list_tool_issue_escalations", lambda member_id, status=None: [{"work_item_id": "wi-1", "status": status or "open"}])
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    payload = {"member_id": "dispatcher", "status": "open"}
+    try:
+        req = urlrequest.Request(base + "/api/tools/issues/escalations", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+        with pytest.raises(HTTPError) as missing_auth:
+            urlrequest.urlopen(req, timeout=3)
+        assert missing_auth.value.code == 401
+        req = urlrequest.Request(base + "/api/tools/issues/escalations", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "dispatcher", "X-Butian-Token": "secret"}, method="POST")
+        with urlrequest.urlopen(req, timeout=3) as response:
+            result = json.loads(response.read())
+        assert result["status"] == "ok"
+        assert result["data"]["work_items"] == [{"work_item_id": "wi-1", "status": "open"}]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+        service.close()

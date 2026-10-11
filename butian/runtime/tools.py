@@ -409,6 +409,17 @@ class ToolStore:
             UNIQUE(issue_id, repair_version, environment, input_hash)
         );
 
+        CREATE TABLE IF NOT EXISTS tool_issue_escalations (
+            work_item_id TEXT PRIMARY KEY, issue_id TEXT NOT NULL, dispatcher_member_id TEXT NOT NULL,
+            status TEXT NOT NULL, reason TEXT NOT NULL, claimed_by TEXT, resolution TEXT,
+            created_at REAL NOT NULL, claimed_at REAL, completed_at REAL, updated_at REAL NOT NULL,
+            UNIQUE(issue_id, dispatcher_member_id, reason, status)
+        );
+        CREATE TABLE IF NOT EXISTS tool_issue_escalation_events (
+            event_id TEXT PRIMARY KEY, work_item_id TEXT NOT NULL, event_type TEXT NOT NULL,
+            actor_member_id TEXT NOT NULL, payload TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, created_at REAL NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS tool_circuit_breakers (
             tool_id TEXT NOT NULL, version INTEGER NOT NULL, scope TEXT NOT NULL,
             reason TEXT NOT NULL, status TEXT NOT NULL, opened_at REAL NOT NULL,
@@ -965,6 +976,10 @@ class ToolStore:
         status_map = {"success": "success", "failure": "failed", "unknown": "unknown", "cancelled": "cancelled"}
         if any(version not in observed or observed[version] != status_map[outcome] for version, outcome in expected.items()):
             raise ValueError("tool_pair_execution_evidence_required")
+        for version, execution_id in execution_ids.items():
+            evidence = self.store.db.execute("SELECT environment, outcome, execution_id FROM tool_verifications WHERE tool_id=? AND version=? AND execution_id=?", (row["tool_id"], version, execution_id)).fetchall()
+            if not any(json.loads(item["environment"] or "{}") == (environment or {}) and item["outcome"] == expected[version] for item in evidence):
+                raise ValueError("tool_pair_environment_evidence_mismatch")
         self.store.db.execute("INSERT OR IGNORE INTO tool_issue_pairs (pair_id,issue_id,repair_version,environment,input_hash,before_outcome,after_outcome,created_at,before_execution_id,after_execution_id) VALUES (?,?,?,?,?,?,?,?,?,?)",("pair_"+uuid.uuid4().hex,issue_id,repair_version,normalized,input_hash,before_outcome,after_outcome,time.time(),execution_ids[row["version"]],execution_ids[repair_version]))
         return self.issue_statistics(actor_member_id,row["tool_id"],version=repair_version,environment=environment)
 
@@ -988,14 +1003,16 @@ class ToolStore:
         comparable=[r for r in pairs if r["before_outcome"] in {"success","failure"} and r["after_outcome"] in {"success","failure"}]
         wins=sum(r["before_outcome"]=="failure" and r["after_outcome"]=="success" for r in comparable)
         losses=sum(r["before_outcome"]=="success" and r["after_outcome"]=="failure" for r in comparable)
-        discordant=wins + losses
-        if discordant == 0:
+        n=len(comparable)
+        if n == 0:
             improvement_interval={"status":"unknown","lower":None,"upper":None}
         else:
-            z=1.96; p=wins/discordant; denom=1 + z*z/discordant
-            center=(p + z*z/(2*discordant))/denom
-            radius=z*math.sqrt((p*(1-p)/discordant) + z*z/(4*discordant*discordant))/denom
-            improvement_interval={"status":"estimated","metric":"paired_discordant_improvement_rate","confidence":0.95,"lower":max(-1.0, 2.0*(center-radius)-1.0),"upper":min(1.0, 2.0*(center+radius)-1.0)}
+            # Difference of paired success rates: after success minus before success.
+            # Discordant pairs identify the signed point estimate; concordant pairs keep the denominator honest.
+            point=(wins-losses)/n
+            variance=max(0.0, (wins+losses)/n - point*point) / n
+            radius=1.96*math.sqrt(variance)
+            improvement_interval={"status":"estimated","metric":"paired_success_rate_difference","confidence":0.95,"lower":max(-1.0, point-radius),"upper":min(1.0, point+radius)}
         return {"tool_id":tool_id,"version":version,"environment":environment or {},"counts":counts,"reliability_lower":wilson_lower(counts["success"],counts["failure"]),"sample_count":sum(counts.values()),"paired":{"n":len(comparable),"improved":wins,"regressed":losses,"net_improved":wins-losses,"improvement_confidence_interval":improvement_interval}}
 
     def triage_issue(self, actor_member_id, issue_id, *, status="triaged", reason="", due_seconds=86400):
@@ -1072,9 +1089,79 @@ class ToolStore:
         target = self.store.get_setting("dispatcher_member_id")
         if not target:
             raise ValueError("issue_dispatcher_not_configured")
-        self.store.db.execute("UPDATE tool_issues SET escalated_at=?,escalation_to_member_id=?,updated_at=? WHERE issue_id=?",(stamp,target,stamp,issue_id))
-        self._event(row["tool_id"],row["version"],"issue_escalated",{"issue_id":issue_id,"reason":reason},f"issue:{issue_id}:escalate:{int(stamp)}")
-        return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
+        self.store.db.execute("BEGIN IMMEDIATE")
+        try:
+            self.store.db.execute("UPDATE tool_issues SET escalated_at=?,escalation_to_member_id=?,updated_at=? WHERE issue_id=?",(stamp,target,stamp,issue_id))
+            work_item_id = "escalation_" + uuid.uuid4().hex
+            existing = self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE issue_id=? AND dispatcher_member_id=? AND reason=? AND status IN ('open','claimed') ORDER BY created_at DESC LIMIT 1", (issue_id, target, reason)).fetchone()
+            if existing:
+                work_item_id = existing["work_item_id"]
+            else:
+                self.store.db.execute("INSERT INTO tool_issue_escalations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (work_item_id, issue_id, target, "open", reason, None, None, stamp, None, None, stamp))
+                self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "created", actor_member_id, json.dumps({"issue_id": issue_id, "reason": reason}, ensure_ascii=False), f"escalation:{work_item_id}:created", stamp))
+            self._event(row["tool_id"],row["version"],"issue_escalated",{"issue_id":issue_id,"reason":reason,"work_item_id":work_item_id,"dispatcher_member_id":target},f"issue:{issue_id}:escalate:{int(stamp)}")
+            result = {**dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()), "work_item_id": work_item_id}
+            self.store.db.commit()
+            return result
+        except BaseException:
+            self.store.db.rollback()
+            raise
+
+    def list_issue_escalations(self, dispatcher_member_id, *, status=None):
+        args=[dispatcher_member_id]
+        sql="SELECT * FROM tool_issue_escalations WHERE dispatcher_member_id=?"
+        if status is not None:
+            sql += " AND status=?"; args.append(status)
+        sql += " ORDER BY created_at"
+        return [dict(row) for row in self.store.db.execute(sql, args).fetchall()]
+
+    def claim_issue_escalation(self, dispatcher_member_id, work_item_id):
+        now=time.time()
+        row=self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone()
+        if not row: raise ValueError("tool_issue_escalation_not_found")
+        if row["dispatcher_member_id"] != dispatcher_member_id: raise ValueError("tool_issue_escalation_forbidden")
+        if row["status"] != "open": raise ValueError("tool_issue_escalation_not_open")
+        self.store.db.execute("BEGIN IMMEDIATE")
+        try:
+            updated = self.store.db.execute("UPDATE tool_issue_escalations SET status='claimed',claimed_by=?,claimed_at=?,updated_at=? WHERE work_item_id=? AND status='open'", (dispatcher_member_id, now, now, work_item_id)).rowcount
+            if updated != 1:
+                self.store.db.rollback()
+                raise ValueError("tool_issue_escalation_not_open")
+            self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "claimed", dispatcher_member_id, "{}", f"escalation:{work_item_id}:claimed", now))
+            result = dict(self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone())
+            self.store.db.commit()
+            return result
+        except BaseException:
+            self.store.db.rollback()
+            raise
+
+    def resolve_issue_escalation(self, dispatcher_member_id, work_item_id, *, status, resolution=""):
+        if status not in {"completed", "rejected"}: raise ValueError("invalid_tool_issue_escalation_status")
+        now=time.time(); row=self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone()
+        if not row: raise ValueError("tool_issue_escalation_not_found")
+        if row["dispatcher_member_id"] != dispatcher_member_id or row["claimed_by"] != dispatcher_member_id: raise ValueError("tool_issue_escalation_forbidden")
+        if row["status"] != "claimed": raise ValueError("tool_issue_escalation_not_claimed")
+        if status == "rejected" and not resolution.strip(): raise ValueError("tool_issue_escalation_rejection_reason_required")
+        self.store.db.execute("BEGIN IMMEDIATE")
+        try:
+            updated = self.store.db.execute("UPDATE tool_issue_escalations SET status=?,resolution=?,completed_at=?,updated_at=? WHERE work_item_id=? AND status='claimed'", (status, resolution, now, now, work_item_id)).rowcount
+            if updated != 1:
+                self.store.db.rollback()
+                raise ValueError("tool_issue_escalation_not_claimed")
+            self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, status, dispatcher_member_id, json.dumps({"resolution": resolution}, ensure_ascii=False), f"escalation:{work_item_id}:{status}", now))
+            result = dict(self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone())
+            if status == "rejected":
+                next_item_id = "escalation_" + uuid.uuid4().hex
+                self.store.db.execute("INSERT INTO tool_issue_escalations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (next_item_id, row["issue_id"], row["dispatcher_member_id"], "open", "re-escalated", None, None, now, None, None, now))
+                payload = json.dumps({"previous_work_item_id": work_item_id, "reason": resolution}, ensure_ascii=False)
+                self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, next_item_id, "created", dispatcher_member_id, payload, f"escalation:{next_item_id}:created", now))
+                self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "re-escalated", dispatcher_member_id, json.dumps({"next_work_item_id": next_item_id}, ensure_ascii=False), f"escalation:{work_item_id}:re-escalated", now))
+                result["next_work_item_id"] = next_item_id
+            self.store.db.commit()
+            return result
+        except BaseException:
+            self.store.db.rollback()
+            raise
 
     def expire_issue_escalations(self, actor_member_id=None, *, now=None):
         stamp=time.time() if now is None else float(now)
@@ -1091,6 +1178,10 @@ class ToolStore:
 
     def recover_circuit_breaker(self, actor_member_id, tool_id, version, *, scope="version"):
         if actor_member_id != self._tool(tool_id)["owner_member_id"]: raise ValueError("tool_access_denied")
+        verified = self.store.db.execute("SELECT 1 FROM tool_verifications WHERE tool_id=? AND version=? AND outcome='success' AND execution_id IS NOT NULL AND evidence_ids NOT IN ('[]', '') ORDER BY created_at DESC LIMIT 1", (tool_id, version)).fetchone()
+        bad = self.store.db.execute("SELECT 1 FROM tool_verifications WHERE tool_id=? AND version=? AND outcome IN ('failure','unknown','cancelled')", (tool_id, version)).fetchone()
+        if not verified or bad:
+            raise ValueError("tool_circuit_breaker_recovery_not_verified")
         now=time.time(); cur=self.store.db.execute("UPDATE tool_circuit_breakers SET status='recovered',recovered_at=?,recovered_by=? WHERE tool_id=? AND version=? AND scope=? AND status='open'",(now,actor_member_id,tool_id,version,scope))
         if cur.rowcount != 1: raise ValueError("tool_circuit_breaker_not_open")
         self._event(tool_id,version,"circuit_breaker_recovered",{"scope":scope},f"breaker:{tool_id}:{version}:{scope}:recovered:{uuid.uuid4().hex}"); return dict(self.store.db.execute("SELECT * FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND scope=?",(tool_id,version,scope)).fetchone())

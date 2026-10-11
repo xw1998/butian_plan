@@ -776,6 +776,15 @@ class ButianService:
     def expire_tool_issue_escalations(self, member_id, **details):
         return self.tools.expire_issue_escalations(member_id, **details)
 
+    def list_tool_issue_escalations(self, member_id, **details):
+        return self.tools.list_issue_escalations(member_id, **details)
+
+    def claim_tool_issue_escalation(self, member_id, work_item_id):
+        return self.tools.claim_issue_escalation(member_id, work_item_id)
+
+    def resolve_tool_issue_escalation(self, member_id, work_item_id, **details):
+        return self.tools.resolve_issue_escalation(member_id, work_item_id, **details)
+
     def record_tool_issue_pair(self, member_id, issue_id, **details):
         return self.tools.record_issue_pair(member_id, issue_id, **details)
 

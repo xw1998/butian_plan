@@ -156,6 +156,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(200, self.service.link_duplicate_tool_issue(body["member_id"], body["issue_id"], body["duplicate_of"])); return
             if path == "/api/tools/issues/expire":
                 self._send(200, {"issues": self.service.expire_tool_issue_escalations(body["member_id"], now=body.get("now"))}); return
+            if path == "/api/tools/issues/escalations":
+                self._send(200, {"work_items": self.service.list_tool_issue_escalations(body["member_id"], status=body.get("status"))}); return
+            if path == "/api/tools/issues/escalations/claim":
+                self._send(200, self.service.claim_tool_issue_escalation(body["member_id"], body["work_item_id"])); return
+            if path == "/api/tools/issues/escalations/resolve":
+                self._send(200, self.service.resolve_tool_issue_escalation(body["member_id"], body["work_item_id"], status=body["status"], resolution=body.get("resolution", ""))); return
             if path == "/api/tools/issues/pair":
                 self._send(200, self.service.record_tool_issue_pair(body["member_id"], body["issue_id"], repair_version=body["repair_version"], environment=body.get("environment"), input_hash=body["input_hash"], before_outcome=body["before_outcome"], after_outcome=body["after_outcome"])); return
             if path == "/api/tools/issues/statistics":
