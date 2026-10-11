@@ -1002,13 +1002,22 @@ class ToolStore:
         if not row: raise ValueError("tool_issue_not_found")
         if actor_member_id != self._tool(row["tool_id"])["owner_member_id"]: raise ValueError("tool_access_denied")
         if row["status"] in {"resolved","rejected"}: raise ValueError("tool_issue_not_escalatable")
-        stamp=time.time() if now is None else float(now); self.store.db.execute("UPDATE tool_issues SET escalated_at=?,updated_at=? WHERE issue_id=?",(stamp,stamp,issue_id))
+        stamp=time.time() if now is None else float(now)
+        target = self.store.get_setting("dispatcher_member_id")
+        if not target:
+            raise ValueError("issue_dispatcher_not_configured")
+        self.store.db.execute("UPDATE tool_issues SET escalated_at=?,escalation_to_member_id=?,updated_at=? WHERE issue_id=?",(stamp,target,stamp,issue_id))
         self._event(row["tool_id"],row["version"],"issue_escalated",{"issue_id":issue_id,"reason":reason},f"issue:{issue_id}:escalate:{int(stamp)}")
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
-    def expire_issue_escalations(self, actor_member_id, *, now=None):
-        stamp=time.time() if now is None else float(now); due=self.store.db.execute("SELECT issue_id FROM tool_issues WHERE triage_owner_member_id=? AND due_at IS NOT NULL AND due_at<=? AND escalated_at IS NULL AND status NOT IN ('resolved','rejected')",(actor_member_id,stamp)).fetchall()
-        return [self.escalate_issue(actor_member_id,r["issue_id"],reason="timeout",now=stamp) for r in due]
+    def expire_issue_escalations(self, actor_member_id=None, *, now=None):
+        stamp=time.time() if now is None else float(now)
+        sql="SELECT i.issue_id, t.owner_member_id FROM tool_issues i JOIN tool_assets t ON t.tool_id=i.tool_id WHERE i.due_at IS NOT NULL AND i.due_at<=? AND i.escalated_at IS NULL AND i.status NOT IN ('resolved','rejected')"
+        args=[stamp]
+        if actor_member_id is not None:
+            sql += " AND i.triage_owner_member_id=?"; args.append(actor_member_id)
+        due=self.store.db.execute(sql,args).fetchall()
+        return [self.escalate_issue(r["owner_member_id"], r["issue_id"], reason="timeout", now=stamp) for r in due]
 
     def open_circuit_breaker(self, actor_member_id, tool_id, version, *, scope="version", reason="risk"):
         if actor_member_id != self._tool(tool_id)["owner_member_id"]: raise ValueError("tool_access_denied")

@@ -139,13 +139,31 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path.startswith(protected) and not (path == "/api/providers/cancel" and not body.get("provider_session_id")) and not self._require_member(body):
                 return
             if path == "/api/tools/issues/report":
-                result = self.service.report_tool_issue(body["member_id"], body["tool_id"], body["version"], description=body["description"], execution_id=body.get("execution_id"), severity=body.get("severity", "bug")); self._send(201, result); return
+                result = self.service.report_tool_issue(body["member_id"], body["tool_id"], body["version"], description=body["description"], execution_id=body.get("execution_id"), severity=body.get("severity", "bug"), environment=body.get("environment"), input_summary=body.get("input_summary"), expected_output=body.get("expected_output"), actual_output=body.get("actual_output"), reproduction_steps=body.get("reproduction_steps"), impact_scope=body.get("impact_scope")); self._send(201, result); return
             if path == "/api/tools/issues":
                 self._send(200, {"issues": self.service.list_tool_issues(body["member_id"], body["tool_id"])}); return
             if path == "/api/tools/issues/repair":
                 result = self.service.repair_tool_issue(body["member_id"], body["issue_id"], repair_version=body["repair_version"], diagnosis=body["diagnosis"]); self._send(200, result); return
             if path == "/api/tools/issues/confirm":
                 result = self.service.confirm_tool_repair(body["member_id"], body["issue_id"], execution_id=body["execution_id"], resolved=body["resolved"]); self._send(200, result); return
+            if path == "/api/tools/issues/triage":
+                self._send(200, self.service.triage_tool_issue(body["member_id"], body["issue_id"], status=body.get("status", "triaged"), reason=body.get("reason", ""), due_seconds=body.get("due_seconds", 86400))); return
+            if path == "/api/tools/issues/request-information":
+                self._send(200, self.service.request_tool_issue_information(body["member_id"], body["issue_id"], request=body["request"])); return
+            if path == "/api/tools/issues/provide-information":
+                self._send(200, self.service.provide_tool_issue_information(body["member_id"], body["issue_id"], information=body["information"])); return
+            if path == "/api/tools/issues/link-duplicate":
+                self._send(200, self.service.link_duplicate_tool_issue(body["member_id"], body["issue_id"], body["duplicate_of"])); return
+            if path == "/api/tools/issues/expire":
+                self._send(200, {"issues": self.service.expire_tool_issue_escalations(body["member_id"], now=body.get("now"))}); return
+            if path == "/api/tools/issues/pair":
+                self._send(200, self.service.record_tool_issue_pair(body["member_id"], body["issue_id"], repair_version=body["repair_version"], environment=body.get("environment"), input_hash=body["input_hash"], before_outcome=body["before_outcome"], after_outcome=body["after_outcome"])); return
+            if path == "/api/tools/issues/statistics":
+                self._send(200, self.service.tool_issue_statistics(body["member_id"], body["tool_id"], version=body.get("version"), environment=body.get("environment"))); return
+            if path == "/api/tools/circuit-breaker/open":
+                self._send(200, self.service.open_tool_circuit_breaker(body["member_id"], body["tool_id"], body["version"], scope=body.get("scope", "version"), reason=body.get("reason", "risk"))); return
+            if path == "/api/tools/circuit-breaker/recover":
+                self._send(200, self.service.recover_tool_circuit_breaker(body["member_id"], body["tool_id"], body["version"], scope=body.get("scope", "version"))); return
             if path == "/api/tools/execute":
                 result = self.service.execute_tool(body["member_id"], body["tool_id"], body["version"], body.get("input"), dry_run=body.get("dry_run", False), verification_only=body.get("verification_only", False), task_id=body.get("task_id"), share_id=body.get("share_id"), security_review_issue_id=body.get("security_review_issue_id"), timeout_seconds=body.get("timeout_seconds", 10), max_output_bytes=body.get("max_output_bytes", 65536)); self._send(200, result); return
             if path == "/api/tools/executions":

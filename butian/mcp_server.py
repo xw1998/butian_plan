@@ -129,16 +129,27 @@ _MEMBER_TOOL_NAMES |= {
     "butian_peer_verify", "butian_peer_list",
 }
 for _action, _fields in {
-    "issue_report": {"tool_id": "string", "version": "integer", "description": "string"},
+    "issue_report": {"tool_id": "string", "version": "integer", "description": "string", "environment": "object", "input_summary": "string", "expected_output": "object", "actual_output": "object", "reproduction_steps": "string", "impact_scope": "string"},
     "issues": {"tool_id": "string"},
     "issue_repair": {"issue_id": "string", "repair_version": "integer", "diagnosis": "string"},
     "repair_confirm": {"issue_id": "string", "execution_id": "string", "resolved": "boolean"},
+    "issue_triage": {"issue_id": "string", "status": "string", "reason": "string", "due_seconds": "number"},
+    "issue_request_information": {"issue_id": "string", "request": "string"},
+    "issue_provide_information": {"issue_id": "string", "information": "string"},
+    "issue_link_duplicate": {"issue_id": "string", "duplicate_of": "string"},
+    "issue_expire": {},
+    "issue_pair": {"issue_id": "string", "repair_version": "integer", "environment": "object", "input_hash": "string", "before_outcome": "string", "after_outcome": "string"},
+    "issue_statistics": {"tool_id": "string", "version": "integer", "environment": "object"},
+    "circuit_breaker_open": {"tool_id": "string", "version": "integer", "scope": "string", "reason": "string"},
+    "circuit_breaker_recover": {"tool_id": "string", "version": "integer", "scope": "string"},
     "security_review": {"issue_id": "string", "execution_id": "string", "evidence_ids": "array", "resolved": "boolean"},
 }.items():
     _properties = {key: ({"type": "array", "items": {"type": "string"}} if value == "array" else {"type": value}) for key, value in _fields.items()}
     _properties.update({key: {"type": "string"} for key in ("member_id", "actor_member_id", "token")})
     if _action == "issue_report":
         _properties.update({"execution_id": {"type": "string"}, "severity": {"type": "string"}})
+    if _action in {"issue_triage", "issue_request_information", "issue_provide_information", "issue_link_duplicate", "issue_expire", "issue_pair", "issue_statistics", "circuit_breaker_open", "circuit_breaker_recover"}:
+        _properties.update({"now": {"type": "number"}})
     TOOLS.append({"name": "butian_tool_" + _action, "description": "Tool developer feedback: " + _action,
                   "inputSchema": {"type": "object", "properties": _properties,
                                   "required": list(_fields) + ["member_id", "actor_member_id", "token"]}})
@@ -166,7 +177,7 @@ def call_tool(service, name, args):
         raise ValueError("historical_identity_migration_out_of_scope")
     if name == "butian_status": return {"ok": True, "service": "butian"}
     member_tools = {tool["name"] for tool in TOOLS if tool["name"].startswith(("butian_memory_", "butian_evolution_", "butian_dream_"))}
-    member_tools.update({"butian_tool_issue_report", "butian_tool_issues", "butian_tool_issue_repair", "butian_tool_repair_confirm", "butian_tool_security_review"})
+    member_tools.update({"butian_tool_issue_report", "butian_tool_issues", "butian_tool_issue_repair", "butian_tool_repair_confirm", "butian_tool_security_review", "butian_tool_issue_triage", "butian_tool_issue_request_information", "butian_tool_issue_provide_information", "butian_tool_issue_link_duplicate", "butian_tool_issue_expire", "butian_tool_issue_pair", "butian_tool_issue_statistics", "butian_tool_circuit_breaker_open", "butian_tool_circuit_breaker_recover"})
     member_tools |= {"butian_tool_propose", "butian_tool_version_add", "butian_tool_verify", "butian_tool_share", "butian_tool_execute", "butian_tool_executions", "butian_tool_list", "butian_tool_accept", "butian_tool_trial", "butian_tool_archive", "butian_tool_restore", "butian_provider_start", "butian_provider_consume", "butian_task_list", "butian_task_tree", "butian_task_review", "butian_task_create", "butian_task_transition", "butian_task_claim", "butian_task_release", "butian_task_heartbeat", "butian_strategy_compose", "butian_strategy_assign", "butian_strategy_step", "butian_strategy_steps", "butian_user_question", "butian_user_answer", "butian_evidence_verify", "butian_knowledge_source_add", "butian_knowledge_source_verify", "butian_knowledge_source_capture", "butian_knowledge_claim_add", "butian_hypothesis_from_claim", "butian_hypothesis_action_authorize", "butian_hypothesis_action_grant", "butian_hypothesis_action_start", "butian_hypothesis_get", "butian_hypothesis_observe", "butian_peer_ask", "butian_peer_answer", "butian_peer_verify", "butian_peer_list"}
     admin_tools = {"butian_dispatcher_set", "butian_session_create", "butian_session_switch_mode", "butian_session_list", "butian_strategy_recommend", "butian_experiment_create", "butian_experiment_event", "butian_experiment_batch", "butian_experiment_compare"}
     if name in admin_tools:
@@ -197,7 +208,16 @@ def call_tool(service, name, args):
         if not resource_member:
             raise ValueError("member_id_required")
         _require_member_arg(service, args, member_id=resource_member)
-    if name == "butian_tool_issue_report": return service.report_tool_issue(args["member_id"], args["tool_id"], args["version"], description=args["description"], execution_id=args.get("execution_id"), severity=args.get("severity", "bug"))
+    if name == "butian_tool_issue_report": return service.report_tool_issue(args["member_id"], args["tool_id"], args["version"], description=args["description"], execution_id=args.get("execution_id"), severity=args.get("severity", "bug"), environment=args.get("environment"), input_summary=args.get("input_summary"), expected_output=args.get("expected_output"), actual_output=args.get("actual_output"), reproduction_steps=args.get("reproduction_steps"), impact_scope=args.get("impact_scope"))
+    if name == "butian_tool_issue_triage": return service.triage_tool_issue(args["member_id"], args["issue_id"], status=args.get("status", "triaged"), reason=args.get("reason", ""), due_seconds=args.get("due_seconds", 86400))
+    if name == "butian_tool_issue_request_information": return service.request_tool_issue_information(args["member_id"], args["issue_id"], request=args["request"])
+    if name == "butian_tool_issue_provide_information": return service.provide_tool_issue_information(args["member_id"], args["issue_id"], information=args["information"])
+    if name == "butian_tool_issue_link_duplicate": return service.link_duplicate_tool_issue(args["member_id"], args["issue_id"], args["duplicate_of"])
+    if name == "butian_tool_issue_expire": return {"issues": service.expire_tool_issue_escalations(args["member_id"], now=args.get("now"))}
+    if name == "butian_tool_issue_pair": return service.record_tool_issue_pair(args["member_id"], args["issue_id"], repair_version=args["repair_version"], environment=args.get("environment"), input_hash=args["input_hash"], before_outcome=args["before_outcome"], after_outcome=args["after_outcome"])
+    if name == "butian_tool_issue_statistics": return service.tool_issue_statistics(args["member_id"], args["tool_id"], version=args.get("version"), environment=args.get("environment"))
+    if name == "butian_tool_circuit_breaker_open": return service.open_tool_circuit_breaker(args["member_id"], args["tool_id"], args["version"], scope=args.get("scope", "version"), reason=args.get("reason", "risk"))
+    if name == "butian_tool_circuit_breaker_recover": return service.recover_tool_circuit_breaker(args["member_id"], args["tool_id"], args["version"], scope=args.get("scope", "version"))
     if name == "butian_tool_issues": return {"issues": service.list_tool_issues(args["member_id"], args["tool_id"])}
     if name == "butian_tool_issue_repair": return service.repair_tool_issue(args["member_id"], args["issue_id"], repair_version=args["repair_version"], diagnosis=args["diagnosis"])
     if name == "butian_tool_repair_confirm": return service.confirm_tool_repair(args["member_id"], args["issue_id"], execution_id=args["execution_id"], resolved=args["resolved"])
