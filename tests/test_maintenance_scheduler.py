@@ -11,7 +11,9 @@ def test_maintenance_tick_audits_skipped_dream_gate(tmp_path):
         service.add_member("m", "Member")
         result = service.maintenance_tick()
         assert result["status"] == "completed"
-        assert result["external_learning"] == "not_implemented"
+        assert result["external_learning"] == "authorized_url_queue"
+        assert result["external_learning_result"]["claims_created"] == 0
+        assert result["external_learning_result"]["memories_created"] == 0
         assert result["members"][0]["status"] == "skipped"
         assert result["members"][0]["reason"] == "insufficient_fragments"
         event = service.store.db.execute("SELECT event_type FROM events WHERE event_type='maintenance_tick'").fetchone()

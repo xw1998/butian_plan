@@ -14,6 +14,7 @@ from .learning import LearningStore
 from .provider_runtime import ProviderRuntime
 from ..adapters.config import load_registry_from_env
 from .dream import DreamRunner
+from .tools import ToolStore
 
 class ButianService:
     def __init__(self, home: str | Path | None = None):
@@ -27,6 +28,7 @@ class ButianService:
         }
         self.hypotheses = HypothesisStore(self.store.db)
         self.learning = LearningStore(self.store.db)
+        self.tools = ToolStore(self.store, self.home)
         # Provider 从 BUTIAN_PROVIDERS_FILE 或 <home>/providers.json 加载；无效条目记录错误、不静默丢弃
         self.providers, self.provider_config_errors, self.provider_config_path = load_registry_from_env(self.home)
         self.provider_runtime = ProviderRuntime(self.store, self.providers)
@@ -70,7 +72,8 @@ class ButianService:
                 result = {"member_id": member_id, "status": "failed", "reason": type(exc).__name__ + ":" + str(exc)}
                 results.append(result)
                 self.store.append_event(member_id, "maintenance_failed", result, "maintenance_" + uuid.uuid4().hex)
-        return {"status": "completed", "members": results, "external_learning": "not_implemented"}
+        external_learning = self.learning.process_learning_queue(limit=1)
+        return {"status": "completed", "members": results, "external_learning": "authorized_url_queue", "external_learning_result": external_learning}
 
     def _maintain_member_memories(self, member_id: str) -> dict[str, Any]:
         """Assess active memories and schedule review for cold ones without inventing evidence."""
@@ -103,7 +106,7 @@ class ButianService:
         member = self.store.db.execute("SELECT provider_id, model_id FROM members WHERE member_id=?", (member_id,)).fetchone()
         if not member:
             raise ValueError("member_not_found")
-        composed, report = self.compose_context(member_id, prompt, task_id=task_id, environment=environment)
+        composed, report = self.compose_context(member_id, prompt, task_id=task_id, environment=environment, include_tools=True)
         operation_key = f"ctx_{report.decision_id}"
         if task_id:
             self.store.append_event(task_id, "provider_context_composed", report.as_dict(), operation_key)
@@ -112,24 +115,66 @@ class ButianService:
             result["context_report"] = report.as_dict()
         return result
 
-    def compose_context(self, member_id: str, instruction: str, *, task_id: str | None = None, environment=None, budgets: dict | None = None) -> tuple[str, Any]:
+    def compose_context(self, member_id: str, instruction: str, *, task_id: str | None = None, environment=None, budgets: dict | None = None, include_tools: bool = False) -> tuple[str, Any]:
         from .context import ContextComposer
-        composer = ContextComposer(self.store)
+        composer = ContextComposer(self.store, self.tools)
         try:
             memory = self.memory(member_id)
         except ValueError:
             memory = None
         try:
-            return composer.compose(member_id, instruction, task_id=task_id, memory=memory, environment=environment, budgets=budgets)
+            return composer.compose(member_id, instruction, task_id=task_id, memory=memory, environment=environment, budgets=budgets, include_tools=include_tools)
         finally:
             if memory is not None:
                 memory.close()
 
     def consume_provider_task(self, provider_session_id: str, prompt: str | None = None):
-        """Consume a provider session; reuses the persisted composed prompt by default."""
+        """Consume a Provider session and move its running task to review when complete."""
         session = self.store.provider_session(provider_session_id)
         provider = self.providers.get(session["provider_id"])
-        return self.provider_runtime.consume(provider_session_id, provider, prompt)
+        result = self.provider_runtime.consume(provider_session_id, provider, prompt)
+        if result.get("status") == "completed" and result.get("text", "").strip() and session.get("task_id"):
+            task = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
+            if task and task["status"] == "running" and not task["parent_id"]:
+                artifact_dir = self.home / "artifacts" / "solo" / task["task_id"]
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                artifact_path = artifact_dir / "result.txt"
+                artifact_path.write_text(result["text"], encoding="utf-8")
+                evidence_id = self.record_evidence(artifact_path, root=artifact_dir, owner_member_id=task["assignee_id"], actor_member_id=task["assignee_id"])
+                self.store.transition_task(task["task_id"], task["revision"], "review", f"solo:{task['task_id']}:review:{task['revision']}", payload={"provider_status": "completed", "provider_output": result["text"], "provider_session_id": provider_session_id, "artifact_path": str(artifact_path), "evidence_id": evidence_id})
+                revision = task["revision"] + 1
+                self.submit_handoff({"task_id": task["task_id"], "task_revision": revision, "member_id": task["assignee_id"], "status": "done", "summary": result["text"][:2000], "evidence_ids": [evidence_id], "next_action": "审核任务结果", "confidence": 0.7})
+                result.update({"task_status": "review", "evidence_id": evidence_id})
+            elif task:
+                result["task_status"] = task["status"]
+        return result
+
+    def cancel_provider_task(self, provider_session_id: str) -> dict[str, Any]:
+        session = self.store.provider_session(provider_session_id)
+        terminal = {"completed", "cancelled", "provider_lost", "unknown"}
+        if session["status"] in terminal:
+            return {"provider_session_id": provider_session_id, "status": session["status"], "reason": session.get("reason")}
+        provider = self.providers.get(session["provider_id"])
+        result = provider.cancel(session.get("remote_session_id") or provider_session_id)
+        if result.status in {"cancelled", "provider_lost", "unknown", "cancelling"}:
+            self.store.finish_provider_session(provider_session_id, result.status, result.reason)
+        return {"provider_session_id": provider_session_id, "status": result.status, "reason": result.reason}
+
+    def cancel_task(self, task_id: str, revision: int, operation_key: str | None = None) -> dict[str, Any]:
+        key = operation_key or f"cancel:{task_id}:{revision}"
+        self.store.cancel_task(task_id, revision, key)
+        task_state = self.store.db.execute("SELECT status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        row = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? AND status IN ('running','cancelling') ORDER BY created_at DESC LIMIT 1", (task_id,)).fetchone() if task_state and task_state["status"] == "cancelling" else None
+        provider_result = self.cancel_provider_task(row["provider_session_id"]) if row else None
+        current = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if current and current["status"] == "cancelling" and not row:
+            self.store.transition_task(task_id, current["revision"], "cancelled", f"cancel-no-provider:{task_id}:{current['revision']}")
+            current = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if current and current["status"] == "cancelling" and provider_result and provider_result["status"] in {"cancelled", "provider_lost", "unknown"}:
+            target = "cancelled" if provider_result["status"] == "cancelled" else provider_result["status"]
+            self.store.transition_task(task_id, current["revision"], target, f"cancel-final:{task_id}:{current['revision']}")
+            current = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        return {"task_id": task_id, "status": current["status"], "revision": current["revision"], "provider": provider_result}
 
     def record_evidence(self, path, *, owner_member_id=None, expires_at=None, actor_member_id=None, token=None, root=None):
         return self.store.record_evidence(path, root, owner_member_id=owner_member_id, expires_at=expires_at, actor_member_id=actor_member_id, token=token)
@@ -157,7 +202,7 @@ class ButianService:
 
     def promote_claim_to_prior(self, claim_id: str, **kwargs):
         payload = self.learning.claim_as_prior(claim_id, **kwargs)
-        prior_id = self.hypotheses.add_prior(**payload)
+        prior_id = self.hypotheses.add_prior(**{key: payload[key] for key in ("source_kind", "title", "claim", "environment", "source_refs", "reliability")})
         return {"prior_id": prior_id, "claim_id": claim_id, "status": "candidate"}
 
     def authorize_hypothesis(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float):
@@ -195,16 +240,13 @@ class ButianService:
         if outbox is not None:
             memory_id = outbox["memory_id"]
             result.update({"candidate_memory_id": memory_id, "memory_status": "pending"})
-            self.drain_member_memory_outbox()
-            row = next(item for item in self.store.list_member_memory_outbox() if item["observation_id"] == observation_id)
-            result["memory_status"] = row["status"]
-            if row["status"] == "committed":
-                memory = self.memory(member_id)
-                try:
-                    version = memory.list_versions(memory_id)[-1]
-                finally:
-                    memory.close()
-                result["memory_version_id"] = version["version_id"]
+            memory = self.memory(member_id)
+            try:
+                if memory.get(memory_id) is None:
+                    memory.put(memory_id, outbox["kind"], outbox["content"], confidence=0.2, weight=0.2, environment=environment or {}, source_event_ids=[observation_id], status="candidate", knowledge_source="verified_hypothesis")
+            finally:
+                memory.close()
+            result["memory_status"] = "candidate"
         return result
 
     def drain_member_memory_outbox(self, *, fail_after_write: bool = False) -> list[dict[str, Any]]:
@@ -223,7 +265,10 @@ class ButianService:
                 self.store.mark_member_memory_outbox(item["outbox_id"], "committed")
                 results.append({"outbox_id": item["outbox_id"], "status": "committed", "version_id": version_id})
             except Exception as exc:
-                self.store.mark_member_memory_outbox(item["outbox_id"], "processing", error=type(exc).__name__ + ":" + str(exc))
+                if fail_after_write:
+                    self.store.db.execute("UPDATE member_memory_outbox SET last_error=?,updated_at=? WHERE outbox_id=?", (type(exc).__name__ + ":" + str(exc), time.time(), item["outbox_id"]))
+                else:
+                    self.store.mark_member_memory_outbox(item["outbox_id"], "processing", error=type(exc).__name__ + ":" + str(exc))
                 results.append({"outbox_id": item["outbox_id"], "status": "processing", "error": str(exc)})
             finally:
                 if memory:
@@ -234,7 +279,16 @@ class ButianService:
         self.store.add_member(member_id, name, role, responsibilities, provider_id, model_id, default_strategy_id, strategy_version, strategy_stages)
         MemoryStore(self.home / "members" / member_id / "memory.db").close()
 
-    def import_members(self, source_path: str, *, roles_dir: str | Path | None = None, update_existing: bool = False, import_memories: bool = True) -> dict:
+    def bootstrap_personas(self) -> list[str]:
+        """Create the six built-in Butian identities with fresh empty memories."""
+        from .personas import seed_default_personas
+        return seed_default_personas(self)
+
+    def preflight_members(self, source_path: str, *, roles_dir: str | Path | None = None) -> dict:
+        from .migration import MemberAssetMigrator
+        return MemberAssetMigrator(self).preflight(source_path, roles_dir=roles_dir)
+
+    def import_members(self, source_path: str, *, roles_dir: str | Path | None = None, update_existing: bool = False, import_memories: bool = False) -> dict:
         from .migration import MemberAssetMigrator
         return MemberAssetMigrator(self).import_agents(source_path, roles_dir=roles_dir, update_existing=update_existing, import_memories=import_memories)
 
@@ -243,6 +297,15 @@ class ButianService:
         MemberAssetMigrator(self)  # 幂等建表
         rows = self.store.db.execute("SELECT * FROM migration_runs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         return [{**dict(row), "details": json.loads(row["details"])} for row in rows]
+
+    def require_member_access(self, member_id: str, *, actor_member_id: str | None, token: str | None = None) -> None:
+        """Enforce an explicit actor boundary for external member-scoped calls."""
+        if not actor_member_id:
+            raise ValueError("actor_member_id_required")
+        if actor_member_id != member_id:
+            raise ValueError("member_memory_access_denied")
+        if not self.store.authenticate_member(actor_member_id, token):
+            raise ValueError("member_authentication_failed")
 
     def memory(self, member_id: str, *, actor_member_id: str | None = None) -> MemoryStore:
         if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
@@ -369,6 +432,166 @@ class ButianService:
         session_id = self.store.create_session(mode, resolved, requested_model, caps)
         return {"session_id": session_id, "mode": mode, "dispatcher_member_id": resolved, "requested_model": requested_model, "effective_model": None, "selection_status": "unknown", "capabilities": caps}
 
+    def _preflight_provider(self, member_id: str, requested_model: str | None = None) -> tuple[str, str | None]:
+        member = self.store.db.execute("SELECT provider_id,model_id FROM members WHERE member_id=?", (member_id,)).fetchone()
+        if not member:
+            raise ValueError(f"member_not_found:{member_id}")
+        provider_id = member["provider_id"]
+        provider = self.providers.get(provider_id)
+        selection = provider.select_model(requested_model or member["model_id"])
+        if selection.selection_status in {"unsupported", "unknown"}:
+            raise ValueError(f"provider_unavailable:{member_id}:{provider_id or 'unbound'}:{selection.fallback_reason or selection.selection_status}")
+        return provider_id, selection.effective_model
+
+    def submit_goal(self, goal: str, *, mode: str = "solo", member_id: str | None = None, dispatcher_member_id: str | None = None, requested_model: str | None = None, capabilities=None, environment=None, member_ids: list[str] | None = None, subtasks: list[str] | None = None) -> dict[str, Any]:
+        """把自然语言目标接入执行主链；所有输入及Provider绑定先验验证后再创建任务。"""
+        if not isinstance(goal, str) or not goal.strip():
+            raise ValueError("goal_required")
+        if mode not in {"solo", "team"}:
+            raise ValueError("invalid_session_mode")
+        if member_id and not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
+            raise ValueError("member_not_found")
+        resolved_dispatcher = self._resolve_dispatcher(mode, dispatcher_member_id, member_id)
+        assignee = member_id or resolved_dispatcher
+        if not assignee:
+            raise ValueError("member_required")
+        workers: list[str] = []
+        plans: list[str] = []
+        if mode == "team":
+            workers = self._team_workers(assignee, member_ids)
+            plans = self._team_subtask_plan(goal.strip(), subtasks, len(workers))
+            for worker in workers:
+                self._preflight_provider(worker)
+        else:
+            self._preflight_provider(assignee, requested_model)
+        session = self.create_session(mode, dispatcher_member_id=resolved_dispatcher, requested_model=requested_model, capabilities=capabilities, current_member_id=member_id)
+        payload = {"goal": goal.strip(), "mode": mode, "environment": environment or {}}
+        root_id = self.store.create_task(session["session_id"], goal.strip(), assignee_id=assignee, payload=payload)
+        if mode == "solo":
+            self.store.transition_task(root_id, 1, "ready", f"goal:{root_id}:ready")
+            lease = self.store.claim_task(root_id, assignee, lease_seconds=300)
+            self.store.transition_task(root_id, lease["revision"], "running", f"goal:{root_id}:running")
+            execution = self.start_provider_task(assignee, goal.strip(), task_id=root_id, environment=environment, model=requested_model)
+            return {"session": session, "task_id": root_id, "assignee_id": assignee, "execution": execution}
+        children = []
+        for worker, instruction in zip(workers, plans):
+            child_id = self.store.create_task(session["session_id"], instruction, assignee_id=worker, parent_id=root_id, payload={"goal": goal.strip(), "instruction": instruction, "mode": "team", "environment": environment or {}})
+            self.store.transition_task(child_id, 1, "ready", f"goal:{root_id}:ready:{child_id}")
+            lease = self.store.claim_task(child_id, worker, lease_seconds=300)
+            self.store.transition_task(child_id, lease["revision"], "running", f"goal:{root_id}:running:{child_id}")
+            execution = self.start_provider_task(worker, instruction, task_id=child_id, environment=environment)
+            children.append({"task_id": child_id, "member_id": worker, "instruction": instruction, "execution": execution})
+        self.store.append_event(root_id, "team_goal_dispatched", {"worker_count": len(children), "child_task_ids": [x["task_id"] for x in children]}, f"goal:{root_id}:dispatched")
+        return {"session": session, "task_id": root_id, "assignee_id": assignee, "mode": "team", "children": children, "status": "dispatched"}
+
+    def run_team_goal(self, task_id: str) -> dict[str, Any]:
+        root = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if not root:
+            raise ValueError("task_not_found")
+        session = self.store.session(root["session_id"])
+        if session["mode"] != "team":
+            raise ValueError("team_session_required")
+        children = self.store.db.execute("SELECT * FROM tasks WHERE parent_id=? ORDER BY rowid", (task_id,)).fetchall()
+        if not children:
+            raise ValueError("team_subtasks_required")
+        results = []
+        for child in children:
+            if child["status"] in {"review", "done"}:
+                child_payload = json.loads(child["payload"] or "{}")
+                results.append({"task_id": child["task_id"], "status": child["status"], "text": child_payload.get("provider_output", ""), "evidence_ids": [child_payload["evidence_id"]] if child_payload.get("evidence_id") else []})
+                continue
+            provider_row = self.store.db.execute("SELECT provider_session_id,status FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (child["task_id"],)).fetchone()
+            if not provider_row:
+                results.append({"task_id": child["task_id"], "status": "missing_provider_session"})
+                continue
+            if provider_row["status"] == "running":
+                consumed = self.consume_provider_task(provider_row["provider_session_id"])
+                status = consumed["status"]
+                text = consumed.get("text", "")
+            else:
+                consumed = {"status": provider_row["status"], "text": ""}
+                status = provider_row["status"]
+                output_rows = self.store.db.execute("SELECT text FROM provider_outputs WHERE provider_session_id=? ORDER BY created_at, provider_event_id", (provider_row["provider_session_id"],)).fetchall()
+                text = "".join(row["text"] for row in output_rows)
+            current = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (child["task_id"],)).fetchone()
+            if status == "completed" and text.strip():
+                artifact_dir = self.home / "artifacts" / "team" / task_id
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                artifact_path = artifact_dir / f"{child['task_id']}.txt"
+                artifact_path.write_text(text, encoding="utf-8")
+                evidence_id = self.record_evidence(artifact_path, root=artifact_dir, owner_member_id=child["assignee_id"], actor_member_id=child["assignee_id"])
+                self.store.transition_task(child["task_id"], current["revision"], "review", f"team:{task_id}:review:{child['task_id']}:{current['revision']}", payload={"provider_status": status, "provider_output": text, "provider_session_id": provider_row["provider_session_id"], "artifact_path": str(artifact_path), "evidence_id": evidence_id})
+                latest_child = self.store.db.execute("SELECT lease_id FROM tasks WHERE task_id=?", (child["task_id"],)).fetchone()
+                if latest_child and latest_child["lease_id"]:
+                    self.store.release_lease(child["task_id"], latest_child["lease_id"])
+                child_revision = current["revision"] + 1
+                self.submit_handoff({"task_id": child["task_id"], "task_revision": child_revision, "member_id": child["assignee_id"], "status": "done", "summary": text[:2000], "evidence_ids": [evidence_id], "next_action": "派活者审核子任务结果", "confidence": 0.7})
+                results.append({"task_id": child["task_id"], "status": "review", "text": text, "provider_session_id": provider_row["provider_session_id"], "evidence_ids": [evidence_id]})
+            else:
+                target = "failed" if status in {"cancelled", "provider_lost"} else "unknown"
+                if current["status"] == "cancelling" and status == "completed":
+                    target = "unknown"
+                if current["status"] == "running":
+
+                    self.store.transition_task(child["task_id"], current["revision"], target, f"team:{task_id}:{target}:{child['task_id']}:{current['revision']}", payload={"provider_status": status, "reason": consumed.get("reason")})
+                results.append({"task_id": child["task_id"], "status": target, "reason": consumed.get("reason")})
+        refreshed = self.store.db.execute("SELECT task_id,status,revision,assignee_id,payload FROM tasks WHERE parent_id=? ORDER BY rowid", (task_id,)).fetchall()
+        if refreshed and all(row["status"] == "done" for row in refreshed):
+            root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if root_now["status"] == "todo":
+                self.store.transition_task(task_id, root_now["revision"], "ready", f"team:{task_id}:ready")
+                root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if root_now["status"] == "ready":
+                self.store.transition_task(task_id, root_now["revision"], "claimed", f"team:{task_id}:claimed")
+                root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if root_now["status"] == "claimed":
+                self.store.transition_task(task_id, root_now["revision"], "running", f"team:{task_id}:running")
+                root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if root_now["status"] == "running":
+                outputs = [{"task_id": row["task_id"], "member_id": row["assignee_id"], "output": json.loads(row["payload"]).get("provider_output", ""), "evidence_id": json.loads(row["payload"]).get("evidence_id")} for row in refreshed]
+                aggregate = {"goal": root["title"], "results": outputs}
+                artifact_dir = self.home / "artifacts" / "team" / task_id
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+                aggregate_path = artifact_dir / "aggregate.json"
+                aggregate_path.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2), encoding="utf-8")
+                root_owner = root["assignee_id"] or session.get("dispatcher_member_id")
+                aggregate_evidence = self.record_evidence(aggregate_path, root=artifact_dir, owner_member_id=root_owner, actor_member_id=root_owner)
+                self.store.transition_task(task_id, root_now["revision"], "review", f"team:{task_id}:aggregate", payload={**aggregate, "artifact_path": str(aggregate_path), "evidence_id": aggregate_evidence})
+                root_revision = root_now["revision"] + 1
+                self.submit_handoff({"task_id": task_id, "task_revision": root_revision, "member_id": root_owner, "status": "done", "summary": f"已汇总 {len(outputs)} 个子任务结果", "evidence_ids": [aggregate_evidence] + [item["evidence_id"] for item in outputs if item.get("evidence_id")], "next_action": "最终审核并交付", "confidence": 0.7})
+                results.append({"task_id": task_id, "status": "review", "aggregate": outputs, "evidence_ids": [aggregate_evidence]})
+        current_root = self.store.db.execute("SELECT status,payload FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if current_root["status"] == "review":
+            aggregate = json.loads(current_root["payload"] or "{}").get("results", [])
+            return {"task_id": task_id, "status": "review", "children": results, "aggregate": aggregate}
+        child_states = [row["status"] for row in self.store.db.execute("SELECT status FROM tasks WHERE parent_id=?", (task_id,)).fetchall()]
+        return {"task_id": task_id, "status": "awaiting_child_reviews" if any(state == "review" for state in child_states) else current_root["status"], "children": results}
+
+    def _team_workers(self, dispatcher: str, member_ids: list[str] | None) -> list[str]:
+        if member_ids is not None and (not isinstance(member_ids, list) or not member_ids or any(not isinstance(mid, str) or not mid.strip() for mid in member_ids)):
+            raise ValueError("invalid_member_ids")
+        requested = member_ids or []
+        if requested:
+            workers = list(dict.fromkeys(mid.strip() for mid in requested))
+            missing = [mid for mid in workers if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (mid,)).fetchone()]
+            if missing:
+                raise ValueError(f"member_not_found:{missing[0]}")
+            return workers
+        rows = self.store.db.execute("SELECT member_id FROM members ORDER BY member_id").fetchall()
+        workers = [row["member_id"] for row in rows if row["member_id"] != dispatcher]
+        return workers or [dispatcher]
+
+    @staticmethod
+    def _team_subtask_plan(goal: str, subtasks: list[str] | None, count: int) -> list[str]:
+        if not isinstance(subtasks, list) or not subtasks:
+            raise ValueError("team_plan_required")
+        if any(not isinstance(item, str) or not item.strip() for item in subtasks):
+            raise ValueError("invalid_subtask")
+        plans = [item.strip() for item in subtasks]
+        if len(plans) != count:
+            raise ValueError("subtasks_member_count_mismatch")
+        return plans
+
     def switch_session_mode(self, session_id: str, mode: str, *, current_member_id: str | None = None) -> dict[str, Any]:
         """模式切换：不丢任务/记忆，只影响后续编排；团队→单人不动运行中任务。"""
         if mode not in {"solo", "team"}:
@@ -411,8 +634,15 @@ class ButianService:
             return {"task_id": task_id, "verdict": "approve", "status": "done", "learning": learning}
         rework_count = self.store.record_rework(task_id, revision, reviewer_member_id=reviewer_member_id or "", notes=notes, rework_limit=rework_limit)
         self.store.transition_task(task_id, revision, "ready", f"review_rework_{task_id}_{revision}_{rework_count}", payload={**self._task_payload(task), "review_verdict": "rework", "reviewer_member_id": reviewer_member_id, "review_notes": notes, "rework_count": rework_count})
+        refreshed = next(item for item in self.store.list_tasks() if item["task_id"] == task_id)
+        next_revision = refreshed["revision"]
+        instruction = self._task_payload(refreshed).get("instruction") or refreshed.get("title") or "请根据审核意见重新执行任务"
+        self.store.transition_task(task_id, next_revision, "claimed", f"review_rework_claim_{task_id}_{next_revision}")
+        claimed = next(item for item in self.store.list_tasks() if item["task_id"] == task_id)
+        self.store.transition_task(task_id, claimed["revision"], "running", f"review_rework_run_{task_id}_{claimed['revision']}")
+        execution = self.start_provider_task(refreshed["assignee_id"], instruction, task_id=task_id, environment=self._task_payload(refreshed).get("environment"))
         learning = self._record_review_learning(task, revision, "rework", notes, handoff)
-        return {"task_id": task_id, "verdict": "rework", "status": "ready", "rework_count": rework_count, "rework_limit": rework_limit, "learning": learning}
+        return {"task_id": task_id, "verdict": "rework", "status": "running", "rework_count": rework_count, "rework_limit": rework_limit, "execution": execution, "learning": learning}
 
     def _record_review_learning(self, task: dict[str, Any], revision: int, verdict: str, notes: str, handoff_row) -> dict[str, Any]:
         """Turn an audited review into a deduplicated candidate; never promotes it."""
@@ -470,6 +700,57 @@ class ButianService:
             self.store.db.execute("UPDATE questions SET answer=?, status='answered' WHERE question_id=?", (answer, question_id))
             self.store.db.execute("UPDATE tasks SET status='ready', revision=revision+1, payload=? WHERE task_id=? AND revision=?", (json.dumps({"answer": answer}), row["task_id"], task["revision"]))
         return row["task_id"]
+
+    def report_tool_issue(self, member_id, tool_id, version, **details):
+        return self.tools.report_issue(member_id, tool_id, version, **details)
+
+    def list_tool_issues(self, member_id, tool_id):
+        return self.tools.list_issues(member_id, tool_id)
+
+    def repair_tool_issue(self, member_id, issue_id, **details):
+        return self.tools.repair_issue(member_id, issue_id, **details)
+
+    def confirm_tool_repair(self, member_id, issue_id, **details):
+        return self.tools.confirm_repair(member_id, issue_id, **details)
+
+    def propose_tool(self, owner_member_id: str, name: str, description: str, **costs):
+        return self.tools.propose(owner_member_id, name, description, **costs)
+
+    def add_tool_version(self, owner_member_id: str, tool_id: str, content: bytes | str, manifest: dict[str, Any]):
+        return self.tools.add_version(owner_member_id, tool_id, content, manifest)
+
+    def verify_tool(self, owner_member_id: str, tool_id: str, version: int, outcome: str, **details):
+        return self.tools.verify(owner_member_id, tool_id, version, outcome, **details)
+
+    def list_tools(self, owner_member_id: str, *, status: str | None = None):
+        return self.tools.list(owner_member_id, status=status)
+
+    def tool_stats(self, tool_id: str, version: int):
+        return self.tools.stats(tool_id, version)
+
+    def execute_tool(self, actor_member_id: str, tool_id: str, version: int, input_data=None, **options):
+        return self.tools.execute(actor_member_id, tool_id, version, input_data, **options)
+
+    def list_tool_executions(self, actor_member_id: str, *, tool_id: str | None = None, limit: int = 50):
+        return self.tools.list_executions(actor_member_id, tool_id=tool_id, limit=limit)
+
+    def share_tool(self, owner_member_id: str, tool_id: str, recipient_member_id: str, *, permission: str = "team_readonly"):
+        return self.tools.share(owner_member_id, tool_id, recipient_member_id, permission=permission)
+
+    def list_tool_shares(self, member_id: str, *, status: str | None = None):
+        return self.tools.shares_for(member_id, status=status)
+
+    def accept_tool_share(self, recipient_member_id: str, share_id: str):
+        return self.tools.accept_share(recipient_member_id, share_id)
+
+    def trial_tool(self, recipient_member_id: str, share_id: str, outcome: str, **details):
+        return self.tools.trial(recipient_member_id, share_id, outcome, **details)
+
+    def archive_tool(self, owner_member_id: str, tool_id: str, *, reason: str = "maintenance"):
+        return self.tools.archive(owner_member_id, tool_id, reason=reason)
+
+    def restore_tool(self, owner_member_id: str, tool_id: str):
+        return self.tools.restore(owner_member_id, tool_id)
 
     def ask_peer(self, asker_id: str, expert_id: str, question: str, *, task_id: str | None = None, comparison: dict[str, Any] | None = None):
         if asker_id == expert_id:

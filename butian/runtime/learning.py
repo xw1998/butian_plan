@@ -47,6 +47,15 @@ class LearningStore:
             started_at REAL NOT NULL, finished_at REAL
         )
         """)
+        self.db.execute("""
+        CREATE TABLE IF NOT EXISTS learning_queue (
+            queue_id TEXT PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT,
+            source_type TEXT NOT NULL DEFAULT 'web', timeout REAL NOT NULL DEFAULT 10,
+            max_bytes INTEGER NOT NULL DEFAULT 1000000, status TEXT NOT NULL DEFAULT 'pending',
+            attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, source_id TEXT,
+            created_at REAL NOT NULL, updated_at REAL NOT NULL
+        )
+        """)
 
     def _run(self, mode: str, locator: str) -> tuple[str, float]:
         run_id = f"learnrun_{uuid.uuid4().hex}"
@@ -123,6 +132,39 @@ class LearningStore:
 
     def list_learning_runs(self, limit: int = 50) -> list[dict[str, Any]]:
         return [dict(row) for row in self.db.execute("SELECT * FROM learning_runs ORDER BY started_at DESC LIMIT ?", (max(1, min(int(limit), 500)),))]
+
+    def enqueue_url(self, url: str, *, title: str | None = None, source_type: str = "web", timeout: float = 10.0, max_bytes: int = 1_000_000) -> str:
+        """Queue an explicitly authorized public URL; enqueue is idempotent."""
+        if not isinstance(url, str) or not url.strip() or source_type not in {"web", "paper", "standard", "manual", "user"}:
+            raise ValueError("invalid_learning_queue_item")
+        if not 0 < float(timeout) <= 60 or not 0 < int(max_bytes) <= 10_000_000:
+            raise ValueError("invalid_learning_fetch_limits")
+        now = time.time()
+        queue_id = f"learnq_{uuid.uuid4().hex}"
+        self.db.execute("INSERT OR IGNORE INTO learning_queue(queue_id,url,title,source_type,timeout,max_bytes,status,attempts,last_error,source_id,created_at,updated_at) VALUES (?,?,?,?,?,?,\'pending\',0,NULL,NULL,?,?)", (queue_id, url.strip(), title, source_type, float(timeout), int(max_bytes), now, now))
+        row = self.db.execute("SELECT queue_id FROM learning_queue WHERE url=?", (url.strip(),)).fetchone()
+        return str(row["queue_id"])
+
+    def list_learning_queue(self, limit: int = 50) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.db.execute("SELECT * FROM learning_queue ORDER BY created_at LIMIT ?", (max(1, min(int(limit), 500)),))]
+
+    def process_learning_queue(self, *, limit: int = 1) -> dict[str, Any]:
+        """Process a bounded set of authorized URLs; never creates claims or memories."""
+        if not 0 < int(limit) <= 20:
+            raise ValueError("invalid_learning_queue_limit")
+        rows = self.db.execute("SELECT * FROM learning_queue WHERE status IN ('pending','failed') ORDER BY created_at LIMIT ?", (int(limit),)).fetchall()
+        processed = []
+        for row in rows:
+            queue_id = row["queue_id"]
+            self.db.execute("UPDATE learning_queue SET status='running', attempts=attempts+1, updated_at=? WHERE queue_id=?", (time.time(), queue_id))
+            try:
+                result = self.capture_url(row["url"], title=row["title"], source_type=row["source_type"], timeout=row["timeout"], max_bytes=row["max_bytes"])
+                self.db.execute("UPDATE learning_queue SET status='completed', source_id=?, last_error=NULL, updated_at=? WHERE queue_id=?", (result["source_id"], time.time(), queue_id))
+                processed.append({"queue_id": queue_id, "status": "completed", "source_id": result["source_id"], "run_id": result["run_id"]})
+            except Exception as exc:
+                self.db.execute("UPDATE learning_queue SET status='failed', last_error=?, updated_at=? WHERE queue_id=?", (type(exc).__name__ + ":" + str(exc), time.time(), queue_id))
+                processed.append({"queue_id": queue_id, "status": "failed", "error": type(exc).__name__ + ":" + str(exc)})
+        return {"status": "completed", "processed": processed, "remaining": self.db.execute("SELECT COUNT(*) FROM learning_queue WHERE status='pending'").fetchone()[0], "claims_created": 0, "memories_created": 0}
 
     def add_source(self, source_type: str, locator: str, title: str, content_hash: str, *, metadata: dict[str, Any] | None = None) -> str:
         if source_type not in {"paper", "standard", "manual", "web", "user"} or not locator.strip() or not title.strip() or not content_hash.strip():

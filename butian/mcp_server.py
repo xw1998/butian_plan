@@ -4,16 +4,17 @@ import sys
 from .runtime.service import ButianService
 
 TOOLS = [
-    {"name": "butian_provider_start", "description": "Start a member-bound Provider execution", "inputSchema": {"type": "object", "required": ["member_id", "prompt"], "properties": {"member_id": {"type": "string"}, "prompt": {"type": "string"}, "task_id": {"type": "string"}, "provider_id": {"type": "string"}, "model": {"type": "string"}}}},
+    {"name": "butian_provider_start", "description": "Start a member-bound Provider execution", "inputSchema": {"type": "object", "required": ["member_id", "prompt"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "prompt": {"type": "string"}, "task_id": {"type": "string"}, "provider_id": {"type": "string"}, "model": {"type": "string"}}}},
     {"name": "butian_provider_consume", "description": "Consume Provider output and persist its terminal status", "inputSchema": {"type": "object", "required": ["provider_session_id", "prompt"], "properties": {"provider_session_id": {"type": "string"}, "prompt": {"type": "string"}}}},
     {"name": "butian_status", "description": "Return Butian runtime status", "inputSchema": {"type": "object", "properties": {}}},
+    {"name": "butian_member_preflight", "description": "Read-only preflight of a Nuwa-style member database; reports schema gaps and identity conflicts", "inputSchema": {"type": "object", "required": ["source_path"], "properties": {"source_path": {"type": "string"}, "roles_dir": {"type": "string"}}}},
     {"name": "butian_member_import", "description": "Import digital members (agents) from a Nuwa-style memory.db read-only", "inputSchema": {"type": "object", "required": ["source_path"], "properties": {"source_path": {"type": "string"}, "roles_dir": {"type": "string"}, "update_existing": {"type": "boolean"}, "import_memories": {"type": "boolean"}}}},
     {"name": "butian_migration_runs", "description": "List member import (migration) runs", "inputSchema": {"type": "object", "properties": {"limit": {"type": "integer"}}}},
-    {"name": "butian_memory_search", "description": "Search a member's isolated memory", "inputSchema": {"type": "object", "required": ["member_id", "query"], "properties": {"member_id": {"type": "string"}, "query": {"type": "string"}, "kind": {"type": "string"}}}},
-    {"name": "butian_memory_recall", "description": "Recall relevant experience and lessons before a task decision", "inputSchema": {"type": "object", "required": ["member_id", "query", "decision_id"], "properties": {"member_id": {"type": "string"}, "query": {"type": "string"}, "decision_id": {"type": "string"}, "environment": {"type": "object"}, "limit": {"type": "integer"}}}},
-    {"name": "butian_memory_recall_outcome", "description": "Record whether recalled memories were used and whether recall missed relevant lessons", "inputSchema": {"type": "object", "required": ["member_id", "recall_id", "used_memory_ids", "missed"], "properties": {"member_id": {"type": "string"}, "recall_id": {"type": "string"}, "used_memory_ids": {"type": "array", "items": {"type": "string"}}, "missed": {"type": "boolean"}, "useful_memory_ids": {"type": "array", "items": {"type": "string"}}, "harmful_memory_ids": {"type": "array", "items": {"type": "string"}}, "evidence_ref": {"type": "string"}}}},
-    {"name": "butian_memory_recall_audit", "description": "Inspect recall outcomes and missed-memory audits", "inputSchema": {"type": "object", "required": ["member_id"], "properties": {"member_id": {"type": "string"}}}},
-    {"name": "butian_memory_practice", "description": "Record an evidence-backed practice outcome; repeated independent success can warm a candidate memory", "inputSchema": {"type": "object", "required": ["member_id", "memory_id", "kind", "content", "outcome", "independent_key"], "properties": {"member_id": {"type": "string"}, "memory_id": {"type": "string"}, "kind": {"type": "string"}, "content": {"type": "string"}, "outcome": {"type": "string", "enum": ["success", "failure", "unknown"]}, "independent_key": {"type": "string"}, "evidence_ref": {"type": "string"}, "environment": {"type": "object"}, "source_event_ids": {"type": "array"}}}},
+    {"name": "butian_memory_search", "description": "Search a member's isolated memory", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "query"], "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}, "member_id": {"type": "string"}, "query": {"type": "string"}, "kind": {"type": "string"}}}},
+    {"name": "butian_memory_recall", "description": "Recall relevant experience and lessons before a task decision", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "query", "decision_id"], "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}, "member_id": {"type": "string"}, "query": {"type": "string"}, "decision_id": {"type": "string"}, "environment": {"type": "object"}, "limit": {"type": "integer"}}}},
+    {"name": "butian_memory_recall_outcome", "description": "Record whether recalled memories were used and whether recall missed relevant lessons", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "recall_id", "used_memory_ids", "missed"], "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}, "member_id": {"type": "string"}, "recall_id": {"type": "string"}, "used_memory_ids": {"type": "array", "items": {"type": "string"}}, "missed": {"type": "boolean"}, "useful_memory_ids": {"type": "array", "items": {"type": "string"}}, "harmful_memory_ids": {"type": "array", "items": {"type": "string"}}, "evidence_ref": {"type": "string"}}}},
+    {"name": "butian_memory_recall_audit", "description": "Inspect recall outcomes and missed-memory audits", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id"], "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}, "member_id": {"type": "string"}}}},
+    {"name": "butian_memory_practice", "description": "Record an evidence-backed practice outcome; repeated independent success can warm a candidate memory", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "memory_id", "kind", "content", "outcome", "independent_key"], "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}, "member_id": {"type": "string"}, "memory_id": {"type": "string"}, "kind": {"type": "string"}, "content": {"type": "string"}, "outcome": {"type": "string", "enum": ["success", "failure", "unknown"]}, "independent_key": {"type": "string"}, "evidence_ref": {"type": "string"}, "environment": {"type": "object"}, "source_event_ids": {"type": "array"}}}},
     {"name": "butian_task_list", "description": "List orchestration tasks", "inputSchema": {"type": "object", "properties": {"status": {"type": "string"}}}},
     {"name": "butian_session_create", "description": "Create solo or team session; team dispatcher defaults to backend config then current conversing member", "inputSchema": {"type": "object", "required": ["mode"], "properties": {"mode": {"type": "string", "enum": ["solo", "team"]}, "dispatcher_member_id": {"type": "string"}, "requested_model": {"type": "string"}, "capabilities": {"type": "object"}, "current_member_id": {"type": "string"}}}},
     {"name": "butian_session_switch_mode", "description": "Switch a session between solo/team; running tasks are preserved, never silently cancelled", "inputSchema": {"type": "object", "required": ["session_id", "mode"], "properties": {"session_id": {"type": "string"}, "mode": {"type": "string", "enum": ["solo", "team"]}, "current_member_id": {"type": "string"}}}},
@@ -86,6 +87,21 @@ TOOLS = [
 ]
 
 
+TOOLS.extend([
+    {"name": "butian_tool_propose", "description": "Propose a reusable owned tool", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "name", "description", "reuse_lower", "manual_cost_upper", "call_cost_lower", "build_cost_upper", "maintenance_cost_upper", "risk_cost_upper"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "name": {"type": "string"}, "description": {"type": "string"}, "reuse_lower": {"type": "number"}, "manual_cost_upper": {"type": "number"}, "call_cost_lower": {"type": "number"}, "build_cost_upper": {"type": "number"}, "maintenance_cost_upper": {"type": "number"}, "risk_cost_upper": {"type": "number"}, "manifest": {"type": "object"}}}},
+    {"name": "butian_tool_version_add", "description": "Add an owned tool version", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "tool_id", "content", "manifest"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "tool_id": {"type": "string"}, "content": {"type": "string"}, "manifest": {"type": "object"}}}},
+    {"name": "butian_tool_verify", "description": "Verify an owned tool", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "tool_id", "version", "outcome", "independent_key"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "tool_id": {"type": "string"}, "version": {"type": "integer"}, "outcome": {"type": "string"}, "independent_key": {"type": "string"}}}},
+    {"name": "butian_tool_share", "description": "Share an active tool", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "tool_id", "recipient_member_id"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "tool_id": {"type": "string"}, "recipient_member_id": {"type": "string"}, "permission": {"type": "string"}}}},
+    {"name": "butian_tool_list", "description": "List owned tools and incoming shares", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "status": {"type": "string"}}}},
+    {"name": "butian_tool_accept", "description": "Accept a shared tool for trial", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "share_id"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "share_id": {"type": "string"}}}},
+    {"name": "butian_tool_trial", "description": "Record a controlled shared-tool trial", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "share_id", "outcome", "independent_key"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "share_id": {"type": "string"}, "outcome": {"type": "string"}, "independent_key": {"type": "string"}}}},
+    {"name": "butian_tool_archive", "description": "Archive an owned tool", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "tool_id"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "tool_id": {"type": "string"}, "reason": {"type": "string"}}}},
+    {"name": "butian_tool_restore", "description": "Restore an archived tool", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "tool_id"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "tool_id": {"type": "string"}}}},
+    {"name": "butian_tool_execute", "description": "Execute one fixed active tool version with audit and optional dry-run", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token", "tool_id", "version"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "tool_id": {"type": "string"}, "version": {"type": "integer"}, "input": {}, "dry_run": {"type": "boolean"}, "task_id": {"type": "string"}, "share_id": {"type": "string"}}}},
+    {"name": "butian_tool_executions", "description": "List a member's tool execution audit records", "inputSchema": {"type": "object", "required": ["member_id", "actor_member_id", "token"], "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}, "tool_id": {"type": "string"}, "limit": {"type": "integer"}}}},
+])
+
+
 def run(home=None):
     service = ButianService(home)
     for line in sys.stdin:
@@ -101,10 +117,104 @@ def run(home=None):
             print(json.dumps({"jsonrpc": "2.0", "id": req.get("id"), "error": {"code": -32000, "message": str(exc)}}, ensure_ascii=False), flush=True)
     service.close()
 
+# Keep the public MCP contract aligned with the member boundary enforced below.
+_MEMBER_TOOL_PREFIXES = ("butian_memory_", "butian_evolution_", "butian_dream_")
+_MEMBER_TOOL_NAMES = {tool["name"] for tool in TOOLS if tool["name"].startswith(_MEMBER_TOOL_PREFIXES)}
+_MEMBER_TOOL_NAMES |= {
+    "butian_provider_start", "butian_provider_consume", "butian_task_list", "butian_task_tree",
+    "butian_task_review", "butian_task_create", "butian_task_transition", "butian_task_claim",
+    "butian_task_release", "butian_task_heartbeat", "butian_strategy_compose", "butian_strategy_assign",
+    "butian_strategy_step", "butian_strategy_steps", "butian_user_question", "butian_user_answer",
+    "butian_evidence_verify", "butian_knowledge_source_add", "butian_knowledge_source_verify",
+    "butian_knowledge_source_capture", "butian_knowledge_claim_add", "butian_hypothesis_from_claim",
+    "butian_hypothesis_action_authorize", "butian_hypothesis_action_grant", "butian_hypothesis_action_start", "butian_tool_propose", "butian_tool_version_add", "butian_tool_verify", "butian_tool_share",
+    "butian_hypothesis_get", "butian_hypothesis_observe", "butian_peer_ask", "butian_peer_answer",
+    "butian_peer_verify", "butian_peer_list",
+}
+for _action, _fields in {
+    "issue_report": {"tool_id": "string", "version": "integer", "description": "string"},
+    "issues": {"tool_id": "string"},
+    "issue_repair": {"issue_id": "string", "repair_version": "integer", "diagnosis": "string"},
+    "repair_confirm": {"issue_id": "string", "execution_id": "string", "resolved": "boolean"},
+}.items():
+    _properties = {key: {"type": value} for key, value in _fields.items()}
+    _properties.update({key: {"type": "string"} for key in ("member_id", "actor_member_id", "token")})
+    if _action == "issue_report":
+        _properties.update({"execution_id": {"type": "string"}, "severity": {"type": "string"}})
+    TOOLS.append({"name": "butian_tool_" + _action, "description": "Tool developer feedback: " + _action,
+                  "inputSchema": {"type": "object", "properties": _properties,
+                                  "required": list(_fields) + ["member_id", "actor_member_id", "token"]}})
+
+for _tool in TOOLS:
+    if _tool["name"] in _MEMBER_TOOL_NAMES:
+        _props = _tool["inputSchema"].setdefault("properties", {})
+        _props.setdefault("actor_member_id", {"type": "string"})
+        _props.setdefault("token", {"type": "string"})
+        _required = _tool["inputSchema"].setdefault("required", [])
+        for _field in ("actor_member_id", "token"):
+            if _field not in _required:
+                _required.append(_field)
+
+def _require_member_arg(service, args, member_id=None):
+    target = member_id or args.get("member_id")
+    if not target:
+        raise ValueError("member_id_required")
+    service.require_member_access(target, actor_member_id=args.get("actor_member_id"), token=args.get("token"))
+    return target
+
+
 def call_tool(service, name, args):
     if name == "butian_status": return {"ok": True, "service": "butian"}
-    if name == "butian_member_import": return service.import_members(args["source_path"], roles_dir=args.get("roles_dir"), update_existing=args.get("update_existing", False), import_memories=args.get("import_memories", True))
+    member_tools = {tool["name"] for tool in TOOLS if tool["name"].startswith(("butian_memory_", "butian_evolution_", "butian_dream_"))}
+    member_tools.update({"butian_tool_issue_report", "butian_tool_issues", "butian_tool_issue_repair", "butian_tool_repair_confirm"})
+    member_tools |= {"butian_tool_propose", "butian_tool_version_add", "butian_tool_verify", "butian_tool_share", "butian_tool_execute", "butian_tool_executions", "butian_tool_list", "butian_tool_accept", "butian_tool_trial", "butian_tool_archive", "butian_tool_restore", "butian_provider_start", "butian_provider_consume", "butian_task_list", "butian_task_tree", "butian_task_review", "butian_task_create", "butian_task_transition", "butian_task_claim", "butian_task_release", "butian_task_heartbeat", "butian_strategy_compose", "butian_strategy_assign", "butian_strategy_step", "butian_strategy_steps", "butian_user_question", "butian_user_answer", "butian_evidence_verify", "butian_knowledge_source_add", "butian_knowledge_source_verify", "butian_knowledge_source_capture", "butian_knowledge_claim_add", "butian_hypothesis_from_claim", "butian_hypothesis_action_authorize", "butian_hypothesis_action_grant", "butian_hypothesis_action_start", "butian_hypothesis_get", "butian_hypothesis_observe", "butian_peer_ask", "butian_peer_answer", "butian_peer_verify", "butian_peer_list"}
+    admin_tools = {"butian_member_preflight", "butian_member_import", "butian_migration_runs", "butian_dispatcher_set", "butian_session_create", "butian_session_switch_mode", "butian_session_list", "butian_strategy_recommend", "butian_experiment_create", "butian_experiment_event", "butian_experiment_batch", "butian_experiment_compare", "butian_knowledge_source_add", "butian_knowledge_source_verify", "butian_knowledge_source_capture", "butian_knowledge_claim_add", "butian_hypothesis_from_claim", "butian_hypothesis_action_authorize", "butian_hypothesis_action_grant", "butian_hypothesis_action_start", "butian_hypothesis_get", "butian_hypothesis_observe", "butian_peer_ask", "butian_peer_answer", "butian_peer_verify", "butian_peer_list", "butian_evidence_verify"}
+    if name in admin_tools:
+        if name in {"butian_session_create", "butian_session_switch_mode"}:
+            actor = args.get("current_member_id") or args.get("dispatcher_member_id")
+            if actor:
+                _require_member_arg(service, args, member_id=actor)
+                admin_tools.remove(name)
+            else:
+                raise ValueError("admin_authorization_required")
+        if name in admin_tools:
+            raise ValueError("admin_authorization_required")
+    if name in member_tools:
+        resource_member = args.get("member_id") or args.get("actor_member_id") or args.get("dispatcher_member_id") or args.get("current_member_id") or args.get("reviewer_member_id") or args.get("asker_id")
+        if name == "butian_provider_consume":
+            row = service.store.db.execute("SELECT member_id FROM provider_sessions WHERE provider_session_id=?", (args.get("provider_session_id"),)).fetchone()
+            resource_member = row["member_id"] if row else None
+        elif name.startswith(("butian_task_", "butian_strategy_")) or name in {"butian_user_question", "butian_user_answer"}:
+            task_id = args.get("task_id")
+            if not task_id and args.get("question_id"):
+                question = service.store.db.execute("SELECT task_id,member_id FROM questions WHERE question_id=?", (args["question_id"],)).fetchone()
+                task_id = question["task_id"] if question else None
+                resource_member = resource_member or (question["member_id"] if question else None)
+            row = service.store.db.execute("SELECT assignee_id,session_id FROM tasks WHERE task_id=?", (task_id,)).fetchone() if task_id else None
+            if row:
+                session = service.store.session(row["session_id"])
+                resource_member = resource_member or row["assignee_id"] or session.get("dispatcher_member_id")
+        if not resource_member:
+            raise ValueError("member_id_required")
+        _require_member_arg(service, args, member_id=resource_member)
+    if name == "butian_member_preflight": return service.preflight_members(args["source_path"], roles_dir=args.get("roles_dir"))
+    if name == "butian_member_import": return service.import_members(args["source_path"], roles_dir=args.get("roles_dir"), update_existing=args.get("update_existing", False), import_memories=args.get("import_memories", False))
     if name == "butian_migration_runs": return {"runs": service.list_migration_runs(limit=args.get("limit", 50))}
+    if name == "butian_tool_issue_report": return service.report_tool_issue(args["member_id"], args["tool_id"], args["version"], description=args["description"], execution_id=args.get("execution_id"), severity=args.get("severity", "bug"))
+    if name == "butian_tool_issues": return {"issues": service.list_tool_issues(args["member_id"], args["tool_id"])}
+    if name == "butian_tool_issue_repair": return service.repair_tool_issue(args["member_id"], args["issue_id"], repair_version=args["repair_version"], diagnosis=args["diagnosis"])
+    if name == "butian_tool_repair_confirm": return service.confirm_tool_repair(args["member_id"], args["issue_id"], execution_id=args["execution_id"], resolved=args["resolved"])
+    if name == "butian_tool_execute": return service.execute_tool(args["member_id"], args["tool_id"], args["version"], args.get("input"), dry_run=args.get("dry_run", False), task_id=args.get("task_id"), share_id=args.get("share_id"))
+    if name == "butian_tool_executions": return {"executions": service.list_tool_executions(args["member_id"], tool_id=args.get("tool_id"), limit=args.get("limit", 50))}
+    if name == "butian_tool_propose": return service.propose_tool(args["member_id"], args["name"], args["description"], reuse_lower=args["reuse_lower"], manual_cost_upper=args["manual_cost_upper"], call_cost_lower=args["call_cost_lower"], build_cost_upper=args["build_cost_upper"], maintenance_cost_upper=args["maintenance_cost_upper"], risk_cost_upper=args["risk_cost_upper"], manifest=args.get("manifest"))
+    if name == "butian_tool_version_add": return service.add_tool_version(args["member_id"], args["tool_id"], args["content"].encode("utf-8"), args["manifest"])
+    if name == "butian_tool_verify": return service.verify_tool(args["member_id"], args["tool_id"], args["version"], args["outcome"], independent_key=args["independent_key"], task_id=args.get("task_id"), evidence_ids=args.get("evidence_ids"), environment=args.get("environment"))
+    if name == "butian_tool_share": return service.share_tool(args["member_id"], args["tool_id"], args["recipient_member_id"], permission=args.get("permission", "team_readonly"))
+    if name == "butian_tool_list": return {"tools": service.list_tools(args["member_id"], status=args.get("status")), "shares": service.list_tool_shares(args["member_id"], status=args.get("status"))}
+    if name == "butian_tool_accept": return service.accept_tool_share(args["member_id"], args["share_id"])
+    if name == "butian_tool_trial": return service.trial_tool(args["member_id"], args["share_id"], args["outcome"], independent_key=args["independent_key"], task_id=args.get("task_id"), environment=args.get("environment"))
+    if name == "butian_tool_archive": return service.archive_tool(args["member_id"], args["tool_id"], reason=args.get("reason", "maintenance"))
+    if name == "butian_tool_restore": return service.restore_tool(args["member_id"], args["tool_id"])
     if name == "butian_provider_start": return service.start_provider_task(args["member_id"], args["prompt"], task_id=args.get("task_id"), provider_id=args.get("provider_id"), model=args.get("model"))
     if name == "butian_provider_consume": return service.consume_provider_task(args["provider_session_id"], args["prompt"])
     if name == "butian_task_list": return {"tasks": service.store.list_tasks(args.get("status"))}
@@ -174,16 +284,21 @@ def call_tool(service, name, args):
     if name == "butian_peer_verify": return service.verify_peer_learning(args["learning_id"], success=args["success"], evidence_ids=args.get("evidence_ids"), notes=args.get("notes", ""))
     if name == "butian_peer_list": return {"learning": service.list_peer_learning(status=args.get("status"), member_id=args.get("member_id"))}
     if name == "butian_memory_search":
-        memory = service.memory(args["member_id"])
+        service.require_member_access(args["member_id"], actor_member_id=args.get("actor_member_id"), token=args.get("token"))
+        memory = service.memory(args["member_id"], actor_member_id=args["member_id"])
         try: return {"memories": memory.search(args["query"], kind=args.get("kind"))}
         finally: memory.close()
     if name == "butian_memory_recall":
+        service.require_member_access(args["member_id"], actor_member_id=args.get("actor_member_id"), token=args.get("token"))
         return service.recall_for_decision(args["member_id"], args["query"], decision_id=args["decision_id"], environment=args.get("environment"), limit=args.get("limit", 20))
     if name == "butian_memory_recall_outcome":
+        service.require_member_access(args["member_id"], actor_member_id=args.get("actor_member_id"), token=args.get("token"))
         return {"ok": service.record_recall_outcome(args["member_id"], args["recall_id"], used_memory_ids=args["used_memory_ids"], missed=args["missed"], useful_memory_ids=args.get("useful_memory_ids"), harmful_memory_ids=args.get("harmful_memory_ids"), evidence_ref=args.get("evidence_ref"))}
     if name == "butian_memory_recall_audit":
+        service.require_member_access(args["member_id"], actor_member_id=args.get("actor_member_id"), token=args.get("token"))
         return {"decisions": service.recall_audit(args["member_id"])}
     if name == "butian_memory_practice":
+        service.require_member_access(args["member_id"], actor_member_id=args.get("actor_member_id"), token=args.get("token"))
         return service.record_practice_outcome(args["member_id"], memory_id=args["memory_id"], kind=args["kind"], content=args["content"], outcome=args["outcome"], independent_key=args["independent_key"], evidence_ref=args.get("evidence_ref"), environment=args.get("environment"), source_event_ids=args.get("source_event_ids"))
     if name == "butian_evolution_compose":
         return service.compose_memories(args["member_id"], args["result_memory_id"], args["component_memory_ids"], content=args["content"], kind=args.get("kind", "compound"), environment=args.get("environment"), composition_bonus=args.get("composition_bonus", 0.0), redundancy_penalty=args.get("redundancy_penalty", 0.0), conflict_penalty=args.get("conflict_penalty", 0.0))

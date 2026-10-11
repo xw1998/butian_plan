@@ -22,6 +22,39 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_response(code); self.send_header("Content-Type", "application/json; charset=utf-8"); self.send_header("Content-Length", str(len(raw))); self.end_headers(); self.wfile.write(raw)
     def _body(self):
         return json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+    def _member_credentials(self, body=None):
+        body = body or {}
+        member_id = (self.headers.get("X-Butian-Member") or body.get("actor_member_id")
+                     or body.get("current_member_id") or body.get("member_id")
+                     or body.get("reviewer_member_id"))
+        token = self.headers.get("X-Butian-Token") or body.get("token")
+        return member_id, token
+
+    def _require_member(self, body=None, target_member_id=None):
+        actor, token = self._member_credentials(body)
+        task_id = (body or {}).get("task_id")
+        if not task_id and self.path.startswith("/api/tasks/"):
+            task_id = self.path.split("/")[3]
+        if not actor and task_id:
+            row = self.service.store.db.execute("SELECT assignee_id, session_id FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if row:
+                actor = row["assignee_id"] or (self.service.store.db.execute("SELECT dispatcher_member_id FROM sessions WHERE session_id=?", (row["session_id"],)).fetchone() or {"dispatcher_member_id": None})["dispatcher_member_id"]
+        if not actor and body and body.get("provider_session_id"):
+            row = self.service.store.db.execute("SELECT member_id FROM provider_sessions WHERE provider_session_id=?", (body["provider_session_id"],)).fetchone()
+            if row:
+                actor = row["member_id"]
+        target = target_member_id or (body or {}).get("member_id") or actor
+        if not actor:
+            self._send(401, {"error": "actor_member_id_required"})
+            return False
+        if target and target != actor:
+            self._send(403, {"error": "member_access_denied"})
+            return False
+        if not self.service.store.authenticate_member(actor, token):
+            self._send(401, {"error": "member_authentication_failed"})
+            return False
+        return True
+
     def do_GET(self):
         if not self.path.startswith("/api/"):
             relative = "index.html" if self.path == "/" else self.path.lstrip("/")
@@ -46,9 +79,16 @@ class ApiHandler(BaseHTTPRequestHandler):
             latest_maintenance = None
             if latest:
                 latest_maintenance = {"event_type": latest["event_type"], "payload": json.loads(latest["payload"]), "created_at": latest["created_at"]}
-            self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "url_capture_with_audit_ledger", "rewarm_policy": "evidence_required"}}); return
+            self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "authorized_url_queue", "rewarm_policy": "evidence_required"}}); return
         if self.path == "/api/tasks":
             self._send(200, {"tasks": self.service.store.list_tasks()}); return
+        if urlparse(self.path).path == "/api/tools":
+            q = parse_qs(urlparse(self.path).query)
+            member_id = (q.get("member_id") or [""])[0]
+            if not member_id or not self._require_member({"member_id": member_id}, target_member_id=member_id):
+                return
+            status = (q.get("status") or [None])[0]
+            self._send(200, {"tools": self.service.list_tools(member_id, status=status), "shares": self.service.list_tool_shares(member_id, status=status)}); return
         if self.path == "/api/questions":
             rows = [dict(row) for row in self.service.store.db.execute("SELECT * FROM questions ORDER BY created_at DESC")]
             self._send(200, {"questions": rows}); return
@@ -74,6 +114,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             member_id = (q.get("member_id") or [""])[0]
             if not member_id:
                 self._send(400, {"status": "error", "error": "missing_field", "field": "member_id"}); return
+            if not self._require_member({"member_id": member_id}, target_member_id=member_id):
+                return
             self._send(200, {
                 "skills": self.service.list_skills(member_id),
                 "skill_events": self.service.list_skill_events(member_id),
@@ -88,6 +130,40 @@ class ApiHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             body = self._body(); path = urlparse(self.path).path
+            protected = ("/api/memory/", "/api/providers/", "/api/evolution/",
+                         "/api/tools", "/api/tasks/", "/api/goals/", "/api/sessions/",
+                         "/api/evidence", "/api/hypotheses/",
+                         "/api/knowledge/", "/api/questions", "/api/strategies/")
+            if path.startswith(protected) and not (path == "/api/providers/cancel" and not body.get("provider_session_id")) and not self._require_member(body):
+                return
+            if path == "/api/tools/issues/report":
+                result = self.service.report_tool_issue(body["member_id"], body["tool_id"], body["version"], description=body["description"], execution_id=body.get("execution_id"), severity=body.get("severity", "bug")); self._send(201, result); return
+            if path == "/api/tools/issues":
+                self._send(200, {"issues": self.service.list_tool_issues(body["member_id"], body["tool_id"])}); return
+            if path == "/api/tools/issues/repair":
+                result = self.service.repair_tool_issue(body["member_id"], body["issue_id"], repair_version=body["repair_version"], diagnosis=body["diagnosis"]); self._send(200, result); return
+            if path == "/api/tools/issues/confirm":
+                result = self.service.confirm_tool_repair(body["member_id"], body["issue_id"], execution_id=body["execution_id"], resolved=body["resolved"]); self._send(200, result); return
+            if path == "/api/tools/execute":
+                result = self.service.execute_tool(body["member_id"], body["tool_id"], body["version"], body.get("input"), dry_run=body.get("dry_run", False), task_id=body.get("task_id"), share_id=body.get("share_id"), timeout_seconds=body.get("timeout_seconds", 10), max_output_bytes=body.get("max_output_bytes", 65536)); self._send(200, result); return
+            if path == "/api/tools/executions":
+                self._send(200, {"executions": self.service.list_tool_executions(body["member_id"], tool_id=body.get("tool_id"), limit=body.get("limit", 50))}); return
+            if path == "/api/tools/propose":
+                result = self.service.propose_tool(body["member_id"], body["name"], body["description"], reuse_lower=body["reuse_lower"], manual_cost_upper=body["manual_cost_upper"], call_cost_lower=body["call_cost_lower"], build_cost_upper=body["build_cost_upper"], maintenance_cost_upper=body["maintenance_cost_upper"], risk_cost_upper=body["risk_cost_upper"], manifest=body.get("manifest")); self._send(201, result); return
+            if path == "/api/tools/version":
+                result = self.service.add_tool_version(body["member_id"], body["tool_id"], body["content"], body["manifest"]); self._send(201, result); return
+            if path == "/api/tools/verify":
+                result = self.service.verify_tool(body["member_id"], body["tool_id"], body["version"], body["outcome"], independent_key=body["independent_key"], task_id=body.get("task_id"), evidence_ids=body.get("evidence_ids"), environment=body.get("environment")); self._send(200, result); return
+            if path == "/api/tools/share":
+                result = self.service.share_tool(body["member_id"], body["tool_id"], body["recipient_member_id"], permission=body.get("permission", "team_readonly")); self._send(201, result); return
+            if path == "/api/tools/accept":
+                self._send(200, self.service.accept_tool_share(body["member_id"], body["share_id"])); return
+            if path == "/api/tools/trial":
+                self._send(200, self.service.trial_tool(body["member_id"], body["share_id"], body["outcome"], independent_key=body["independent_key"], task_id=body.get("task_id"), environment=body.get("environment"))); return
+            if path == "/api/tools/archive":
+                self._send(200, self.service.archive_tool(body["member_id"], body["tool_id"], reason=body.get("reason", "maintenance"))); return
+            if path == "/api/tools/restore":
+                self._send(200, self.service.restore_tool(body["member_id"], body["tool_id"])); return
             if path == "/api/memory/recall":
                 result = self.service.recall_for_decision(body["member_id"], body["query"], decision_id=body["decision_id"], environment=body.get("environment"), limit=body.get("limit", 20))
                 self._send(200, result); return
@@ -143,8 +219,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(200, self.service.observe_hypothesis(body["action_id"], body["outcome"], body.get("evidence_ids", []), independent_key=body["independent_key"], notes=body.get("notes", ""), environment=body.get("environment"), actor_member_id=body.get("actor_member_id"), member_id=body.get("member_id"))); return
             if path == "/api/members":
                 self.service.add_member(body["member_id"], body["name"], body.get("role", "member"), body.get("responsibilities"), body.get("provider_id"), body.get("model_id")); self._send(201, {"member_id": body["member_id"]}); return
+            if path == "/api/migration/preflight":
+                self._send(200, self.service.preflight_members(body["source_path"], roles_dir=body.get("roles_dir"))); return
             if path == "/api/migration/import":
-                result = self.service.import_members(body["source_path"], roles_dir=body.get("roles_dir"), update_existing=body.get("update_existing", False), import_memories=body.get("import_memories", True)); self._send(201, result); return
+                result = self.service.import_members(body["source_path"], roles_dir=body.get("roles_dir"), update_existing=body.get("update_existing", False), import_memories=body.get("import_memories", False)); self._send(201, result); return
+            if path == "/api/goals/submit":
+                self._send(201, self.service.submit_goal(body["goal"], mode=body.get("mode", "solo"), member_id=body.get("member_id"), dispatcher_member_id=body.get("dispatcher_member_id"), requested_model=body.get("requested_model"), capabilities=body.get("capabilities"), environment=body.get("environment"), member_ids=body.get("member_ids"), subtasks=body.get("subtasks"))); return
+            if path == "/api/goals/run-team":
+                self._send(200, self.service.run_team_goal(body["task_id"])); return
             if path == "/api/providers/start":
                 self._send(201, self.service.start_provider_task(body["member_id"], body["prompt"], task_id=body.get("task_id"), provider_id=body.get("provider_id"), model=body.get("model"))); return
             if path == "/api/providers/consume":
@@ -193,6 +275,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 task_id = path.split("/")[3]; self._send(200, self.service.store.claim_task(task_id, body["member_id"], body.get("lease_seconds", 300), body.get("token"))); return
             if path.startswith("/api/tasks/") and path.endswith("/release"):
                 task_id = path.split("/")[3]; self.service.store.release_lease(task_id, body["lease_id"]); self._send(200, {"ok": True}); return
+            if path.startswith("/api/tasks/") and path.endswith("/heartbeat"):
+                task_id = path.split("/")[3]; self.service.store.heartbeat(task_id, body["lease_id"], body.get("lease_seconds", 300)); self._send(200, {"ok": True}); return
+            if path.startswith("/api/tasks/") and path.endswith("/cancel"):
+                task_id = path.split("/")[3]; self._send(200, self.service.cancel_task(task_id, body["revision"], body.get("operation_key"))); return
+            if path == "/api/providers/cancel":
+                self._send(200, self.service.cancel_provider_task(body["provider_session_id"])); return
             if path == "/api/questions":
                 qid = self.service.ask_user(body["task_id"], body["revision"], body["member_id"], body["question"]); self._send(201, {"question_id": qid}); return
             if path == "/api/strategies/recommend":

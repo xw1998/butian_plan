@@ -5,8 +5,10 @@ from pathlib import Path
 from .memory import MemoryStore
 
 class DreamRunner:
-    def __init__(self, memory: MemoryStore):
+    def __init__(self, memory: MemoryStore, *, team_store=None, actor_member_id: str | None = None):
         self.memory = memory
+        self.team_store = team_store
+        self.actor_member_id = actor_member_id
         self.memory.db.executescript('''
         CREATE TABLE IF NOT EXISTS dream_runs (run_id TEXT PRIMARY KEY, started_at REAL NOT NULL, status TEXT NOT NULL, gate_snapshot TEXT NOT NULL, candidate_count INTEGER NOT NULL DEFAULT 0, reason TEXT);
         CREATE TABLE IF NOT EXISTS hypotheses (hypothesis_id TEXT PRIMARY KEY, candidate_id TEXT, statement TEXT NOT NULL, prior_reliability REAL NOT NULL, argument TEXT NOT NULL, status TEXT NOT NULL, evidence_refs TEXT NOT NULL DEFAULT '[]', created_at REAL NOT NULL, updated_at REAL NOT NULL);
@@ -147,6 +149,13 @@ class DreamRunner:
         refs = list(evidence_refs or [])
         if outcome in {"supported", "rejected"} and not refs:
             raise ValueError("verification_evidence_required")
+        if outcome in {"supported", "rejected"} and self.team_store is not None:
+            if not all(isinstance(ref, str) and ref.startswith("ev_") for ref in refs):
+                raise ValueError("team_evidence_id_required")
+            for evidence_id in refs:
+                verified = self.team_store.verify_evidence(evidence_id, actor_member_id=self.actor_member_id)
+                if verified["status"] != "valid":
+                    raise ValueError("verification_evidence_not_valid")
         if not self.memory.db.execute("SELECT 1 FROM hypotheses WHERE hypothesis_id=?", (hypothesis_id,)).fetchone():
             raise ValueError("hypothesis_not_found")
         status = "supported" if outcome == "supported" else ("rejected" if outcome == "rejected" else "unknown")

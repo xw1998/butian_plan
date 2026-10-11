@@ -18,14 +18,19 @@ def test_evidence_becomes_stale(tmp_path):
 
 def test_mcp_tools_cover_minimum_runtime(tmp_path):
     service = ButianService(tmp_path)
-    assert {"name": "butian_task_create", "description": "Create a task", "inputSchema": {"type": "object", "required": ["session_id", "title"], "properties": {"session_id": {"type": "string"}, "title": {"type": "string"}, "assignee_id": {"type": "string"}}}} in TOOLS
-    session = call_tool(service, "butian_session_create", {"mode": "solo"})
-    task = call_tool(service, "butian_task_create", {"session_id": session["session_id"], "title": "验证"})
-    assert task["task_id"].startswith("task_")
-    call_tool(service, "butian_task_transition", {"task_id": task["task_id"], "expected_revision": 1, "target": "ready", "operation_key": "mcp-1"})
-    assert call_tool(service, "butian_task_list", {"status": "ready"})["tasks"][0]["status"] == "ready"
-    service.close()
-
+    try:
+        with pytest.raises(ValueError, match="admin_authorization_required"):
+            call_tool(service, "butian_session_create", {"mode": "solo"})
+        service.add_member("m1", "member")
+        service.store.set_member_token("m1", "secret")
+        session_id = service.store.create_session("solo", "m1", None, {})
+        task_id = service.store.create_task(session_id, "verify", "m1")
+        auth = {"member_id": "m1", "actor_member_id": "m1", "token": "secret"}
+        assert call_tool(service, "butian_task_list", {**auth, "status": "todo"})["tasks"][0]["task_id"] == task_id
+        call_tool(service, "butian_task_transition", {**auth, "task_id": task_id, "expected_revision": 1, "target": "ready", "operation_key": "mcp-1"})
+        assert call_tool(service, "butian_task_list", {**auth, "status": "ready"})["tasks"][0]["status"] == "ready"
+    finally:
+        service.close()
 
 def test_transition_idempotency_does_not_reapply_revision(tmp_path):
     from butian.runtime.store import Store

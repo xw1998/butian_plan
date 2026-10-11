@@ -35,7 +35,9 @@ def test_strategy_override_is_auditable(tmp_path):
 
 def test_mcp_strategy_recommendation(tmp_path):
     service = ButianService(tmp_path)
-    result = call_tool(service, "butian_strategy_recommend", {"task_features": {"task_types": ["security"], "risk": "critical"}})
+    with pytest.raises(ValueError, match="admin_authorization_required"):
+        call_tool(service, "butian_strategy_recommend", {"task_features": {"task_types": ["security"], "risk": "critical"}})
+    result = {"recommendations": service.recommend_strategies({"task_types": ["security"], "risk": "critical"})}
     assert result["recommendations"][0]["strategy_id"] == "risk_first"
     service.close()
 

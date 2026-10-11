@@ -59,6 +59,7 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     dispatcher.add_parser("get")
     dset = dispatcher.add_parser("set"); dset.add_argument("member_id")
     migrate = sub.add_parser("migrate").add_subparsers(dest="migrate_command", required=True)
+    mpreflight = migrate.add_parser("preflight"); mpreflight.add_argument("source_path"); mpreflight.add_argument("--roles-dir")
     mimport = migrate.add_parser("import"); mimport.add_argument("source_path"); mimport.add_argument("--roles-dir"); mimport.add_argument("--update-existing", action="store_true"); mimport.add_argument("--no-memories", action="store_true")
     migrate.add_parser("runs")
     args = parser.parse_args(argv)
@@ -92,6 +93,8 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
                 emit({"dispatcher_member_id": service.get_dispatcher_config()}); return 0
             if args.command == "dispatcher" and args.dispatcher_command == "set":
                 service.set_dispatcher_config(args.member_id); emit({"dispatcher_member_id": args.member_id}); return 0
+            if args.command == "migrate" and args.migrate_command == "preflight":
+                emit(service.preflight_members(args.source_path, roles_dir=args.roles_dir)); return 0
             if args.command == "migrate" and args.migrate_command == "import":
                 emit(service.import_members(args.source_path, roles_dir=args.roles_dir, update_existing=args.update_existing, import_memories=not args.no_memories)); return 0
             if args.command == "migrate" and args.migrate_command == "runs":

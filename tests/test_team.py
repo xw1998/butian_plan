@@ -1,0 +1,390 @@
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import unittest
+import threading
+from urllib import request as urlrequest, error as urlerror
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from butian.runtime.service import ButianService
+
+
+def _svc():
+    home = Path(tempfile.mkdtemp(prefix="butian_team_"))
+    return ButianService(home), home
+
+
+def _make_task_ready(svc, session_id, title="t"):
+    task_id = svc.store.create_task(session_id, title)
+    svc.store.transition_task(task_id, 1, "ready", f"op_ready_{task_id}")
+    svc.store.transition_task(task_id, 2, "claimed", f"op_claim_{task_id}")
+    svc.store.transition_task(task_id, 3, "running", f"op_run_{task_id}")
+    svc.store.transition_task(task_id, 4, "review", f"op_review_{task_id}")
+    return task_id
+
+
+_EVIDENCE_SEQ = [0]
+
+def _add_evidence(svc, member_id, task_id, revision):
+    _EVIDENCE_SEQ[0] += 1
+    path = svc.home / f"ev_{task_id}_{_EVIDENCE_SEQ[0]}.txt"
+    path.write_text(f"evidence {task_id} #{_EVIDENCE_SEQ[0]}", encoding="utf-8")
+    evidence_id = svc.record_evidence(str(path), owner_member_id=member_id, actor_member_id=member_id)
+    svc.submit_handoff({"task_id": task_id, "task_revision": revision, "member_id": member_id,
+                        "status": "done", "summary": "s", "next_action": "n",
+                        "evidence_ids": [evidence_id], "confidence": 0.9})
+    return evidence_id
+
+
+class TeamOrchestrationTests(unittest.TestCase):
+    def test_invalid_mode_rejected(self):
+        svc, _ = _svc()
+        try:
+            with self.assertRaises(ValueError) as ctx:
+                svc.create_session("group")
+            self.assertIn("invalid_session_mode", str(ctx.exception))
+        finally:
+            svc.close()
+
+class TeamGoalHttpTests(unittest.TestCase):
+    def test_submit_and_run_team_routes_with_validation_error(self):
+        from butian.runtime import http_api
+        home = Path(tempfile.mkdtemp(prefix="butian_team_http_"))
+        command = [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"]
+        (home / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
+        svc = ButianService(home)
+        svc.add_member("m0", "派活者")
+        svc.add_member("m1", "执行者", provider_id="local-command", model_id="local-command")
+        http_api.ApiHandler.service = svc
+        http_api.ApiHandler.experiments = None
+        http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+        server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        def post(path, payload):
+            req = urlrequest.Request(base + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+            try:
+                with urlrequest.urlopen(req) as response:
+                    return response.status, json.loads(response.read())
+            except urlerror.HTTPError as exc:
+                return exc.code, json.loads(exc.read())
+        try:
+            status, invalid = post("/api/goals/submit", {"goal": "目标", "mode": "team", "member_id": "m0", "member_ids": ["m1"]})
+            self.assertEqual(status, 400)
+            self.assertIn("team_plan_required", invalid["error"])
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+            status, created = post("/api/goals/submit", {"goal": "联合评估", "mode": "team", "member_id": "m0", "member_ids": ["m1"], "subtasks": ["验证数据"]})
+            self.assertEqual(status, 201)
+            task_id = created["data"]["task_id"]
+            status, result = post("/api/goals/run-team", {"task_id": task_id})
+            self.assertEqual(status, 200)
+            self.assertEqual(result["data"]["status"], "awaiting_child_reviews")
+        finally:
+            server.shutdown()
+            server.server_close()
+            svc.close()
+
+if __name__ == "__main__":
+    unittest.main()
+
+    def test_team_session_requires_dispatcher(self):
+        svc, _ = _svc()
+        try:
+            with self.assertRaises(ValueError) as ctx:
+                svc.create_session("team")
+            self.assertIn("dispatcher_required", str(ctx.exception))
+        finally:
+            svc.close()
+
+    def test_team_dispatcher_default_from_current_member(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "成员一")
+            result = svc.create_session("team", current_member_id="m1")
+            self.assertEqual(result["dispatcher_member_id"], "m1")
+        finally:
+            svc.close()
+
+    def test_team_dispatcher_config_wins_but_explicit_overrides(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一"); svc.add_member("m2", "二")
+            svc.set_dispatcher_config("m2")
+            # 未显式指定时用后台配置
+            self.assertEqual(svc.create_session("team", current_member_id="m1")["dispatcher_member_id"], "m2")
+            # 显式指定优先于后台配置
+            self.assertEqual(svc.create_session("team", "m1")["dispatcher_member_id"], "m1")
+            # 配置指向不存在的成员要报错，不静默回退
+            svc.store.set_setting("dispatcher_member_id", "ghost")
+            with self.assertRaises(ValueError) as ctx:
+                svc.create_session("team")
+            self.assertIn("dispatcher_member_not_found:ghost", str(ctx.exception))
+        finally:
+            svc.close()
+
+    def test_solo_to_team_switch_keeps_tasks(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一")
+            s = svc.create_session("solo", current_member_id="m1")
+            sid = s["session_id"]
+            task_id = svc.store.create_task(sid, "任务")
+            svc.store.transition_task(task_id, 1, "ready", "sw_r")
+            result = svc.switch_session_mode(sid, "team", current_member_id="m1")
+            self.assertTrue(result["changed"])
+            self.assertEqual(result["running_tasks_preserved"], 1)
+            session = svc.store.session(sid)
+            self.assertEqual(session["mode"], "team")
+            self.assertEqual(session["dispatcher_member_id"], "m1")
+            # 任务还在
+            tasks = svc.store.list_tasks()
+            self.assertEqual(len(tasks), 1)
+        finally:
+            svc.close()
+
+    def test_team_to_solo_running_tasks_not_cancelled(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一")
+            sid = svc.create_session("team", current_member_id="m1")["session_id"]
+            task_id = _make_task_ready(svc, sid)
+            result = svc.switch_session_mode(sid, "solo")
+            self.assertEqual(result["running_tasks_preserved"], 1)
+            self.assertEqual(svc.store.session(sid)["mode"], "solo")
+            # 运行中任务原状态保留（review），未被取消
+            task = next(t for t in svc.store.list_tasks() if t["task_id"] == task_id)
+            self.assertEqual(task["status"], "review")
+        finally:
+            svc.close()
+
+    def test_task_tree_structure(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一")
+            sid = svc.create_session("team", current_member_id="m1")["session_id"]
+            parent = svc.store.create_task(sid, "父")
+            c1 = svc.store.create_task(sid, "子1", parent_id=parent)
+            c2 = svc.store.create_task(sid, "子2", parent_id=parent)
+            tree = svc.task_tree(sid)
+            self.assertEqual(len(tree), 1)
+            self.assertEqual(tree[0]["task_id"], parent)
+            self.assertEqual({c["task_id"] for c in tree[0]["children"]}, {c1, c2})
+        finally:
+            svc.close()
+
+    def test_parent_done_blocked_by_open_children(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一")
+            sid = svc.create_session("team", current_member_id="m1")["session_id"]
+            parent = _make_task_ready(svc, sid, "父")
+            child = svc.store.create_task(sid, "子", parent_id=parent)
+            _add_evidence(svc, "m1", parent, 5)
+            with self.assertRaises(ValueError) as ctx:
+                svc.review_task(parent, 5, "approve", reviewer_member_id="m1")
+            self.assertIn(f"children_not_done:{child}", str(ctx.exception))
+        finally:
+            svc.close()
+
+    def test_review_approve_and_rework_flow(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一")
+            sid = svc.create_session("team", current_member_id="m1")["session_id"]
+            task_id = _make_task_ready(svc, sid)
+            _add_evidence(svc, "m1", task_id, 5)
+            # 返工：review→ready
+            r = svc.review_task(task_id, 5, "rework", reviewer_member_id="m1", notes="不合格")
+            self.assertEqual(r["status"], "ready"); self.assertEqual(r["rework_count"], 1)
+            # 重新走完到 review
+            for rev, target in ((6, "claimed"), (7, "running"), (8, "review")):
+                svc.store.transition_task(task_id, rev, target, f"op_{task_id}_{rev}")
+            _add_evidence(svc, "m1", task_id, 9)
+            r = svc.review_task(task_id, 9, "approve", reviewer_member_id="m1")
+            self.assertEqual(r["status"], "done")
+        finally:
+            svc.close()
+
+    def test_rework_limit_enforced(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一")
+            sid = svc.create_session("team", current_member_id="m1")["session_id"]
+            task_id = _make_task_ready(svc, sid)
+            rev = 5
+            for i in range(3):  # rework_limit=3
+                svc.review_task(task_id, rev, "rework", reviewer_member_id="m1")
+                rev += 1
+                for target in ("claimed", "running", "review"):
+                    svc.store.transition_task(task_id, rev, target, f"op_{task_id}_{rev}_{target}")
+                    rev += 1
+            with self.assertRaises(ValueError) as ctx:
+                svc.review_task(task_id, rev, "rework", reviewer_member_id="m1")
+            self.assertIn("rework_limit_exceeded", str(ctx.exception))
+        finally:
+            svc.close()
+
+    def test_review_verdict_invalid(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m1", "一")
+            sid = svc.create_session("team", current_member_id="m1")["session_id"]
+            task_id = _make_task_ready(svc, sid)
+            with self.assertRaises(ValueError) as ctx:
+                svc.review_task(task_id, 5, "maybe")
+            self.assertIn("invalid_review_verdict", str(ctx.exception))
+        finally:
+            svc.close()
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class NaturalLanguageTeamGoalTests(unittest.TestCase):
+    def test_team_goal_dispatches_children_to_requested_members(self):
+        home = Path(tempfile.mkdtemp(prefix="butian_team_goal_"))
+        (home / "providers.json").write_text('{"providers":[{"type":"local-command","command":["python","-c","import sys; sys.stdout.write(sys.stdin.read())"]}]}', encoding="utf-8")
+        svc = ButianService(home)
+        try:
+            svc.add_member("m0", "派活者", provider_id="local-command", model_id="local-command")
+            svc.add_member("m1", "执行一", provider_id="local-command", model_id="local-command")
+            svc.add_member("m2", "执行二", provider_id="local-command", model_id="local-command")
+            result = svc.submit_goal("完成联合评估", mode="team", member_id="m0", member_ids=["m1", "m2"], subtasks=["分析信号", "审核边界"])
+            self.assertEqual(result["status"], "dispatched")
+            self.assertEqual([x["member_id"] for x in result["children"]], ["m1", "m2"])
+            tasks = {x["task_id"]: x for x in svc.store.list_tasks()}
+            self.assertEqual(tasks[result["task_id"]]["status"], "todo")
+            self.assertEqual([tasks[x["task_id"]]["status"] for x in result["children"]], ["running", "running"])
+            events = svc.store.db.execute("SELECT event_type FROM events WHERE aggregate_id=?", (result["task_id"],)).fetchall()
+            self.assertIn("team_goal_dispatched", [x["event_type"] for x in events])
+        finally:
+            svc.close()
+
+    def test_team_goal_rejects_mismatched_explicit_plan(self):
+        home = Path(tempfile.mkdtemp(prefix="butian_team_goal_bad_"))
+        svc = ButianService(home)
+        try:
+            svc.add_member("m0", "派活者")
+            svc.add_member("m1", "执行一", provider_id="local-command", model_id="local-command")
+            (home / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": [sys.executable, "-c", "pass"]}]}), encoding="utf-8")
+            svc.close()
+            svc = ButianService(home)
+            with self.assertRaisesRegex(ValueError, "subtasks_member_count_mismatch"):
+                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["一", "二"])
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 0)
+        finally:
+            svc.close()
+
+    def test_team_goal_requires_explicit_nonempty_plan_before_writing(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m0", "派活者")
+            svc.add_member("m1", "执行一")
+            with self.assertRaisesRegex(ValueError, "team_plan_required"):
+                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"])
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 0)
+        finally:
+            svc.close()
+
+    def test_team_goal_rejects_unavailable_provider_before_writing(self):
+        svc, _ = _svc()
+        try:
+            svc.add_member("m0", "派活者")
+            svc.add_member("m1", "执行一")
+            with self.assertRaisesRegex(ValueError, "provider_unavailable"):
+                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["具体工作"])
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 0)
+        finally:
+            svc.close()
+
+
+class TeamGoalExecutionTests(unittest.TestCase):
+    def test_run_team_goal_consumes_outputs_and_moves_root_to_review(self):
+        home = Path(tempfile.mkdtemp(prefix="butian_team_run_"))
+        command = [sys.executable, "-c", "import sys; sys.stdout.write('RESULT:' + sys.stdin.read())"]
+        (home / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
+        svc = ButianService(home)
+        try:
+            svc.add_member("m0", "派活者")
+            svc.add_member("m1", "执行一", provider_id="local-command", model_id="local-command")
+            result = svc.submit_goal("联合目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["子目标甲"])
+            run = svc.run_team_goal(result["task_id"])
+            self.assertEqual(run["children"][0]["status"], "review")
+            child_id = run["children"][0]["task_id"]
+            child = next(t for t in svc.store.list_tasks() if t["task_id"] == child_id)
+            child_payload = json.loads(child["payload"])
+            self.assertTrue(Path(child_payload["artifact_path"]).is_file())
+            self.assertEqual(svc.store.verify_evidence(child_payload["evidence_id"], actor_member_id="m1")["status"], "valid")
+            self.assertEqual(child["status"], "review")
+            # 子任务必须经派活者审核后，父任务才能进入最终审核。
+            svc.review_task(child_id, child["revision"], "approve", reviewer_member_id="m0")
+            run = svc.run_team_goal(result["task_id"])
+            self.assertEqual(run["status"], "review")
+            root = next(t for t in svc.store.list_tasks() if t["task_id"] == result["task_id"])
+            self.assertEqual(root["status"], "review")
+            root_payload = json.loads(root["payload"])
+            self.assertIn("子目标甲", root_payload["results"][0]["output"])
+            self.assertTrue(root_payload["evidence_id"])
+            self.assertTrue(svc.store.db.execute("SELECT 1 FROM handoffs WHERE task_id=? AND revision=?", (result["task_id"], root["revision"])).fetchone())
+            done = svc.review_task(result["task_id"], root["revision"], "approve", reviewer_member_id="m0")
+            self.assertEqual(done["status"], "done")
+            self.assertEqual(svc.run_team_goal(result["task_id"])["status"], "done")
+        finally:
+            svc.close()
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+def test_task_heartbeat_and_cancel_http_routes():
+    from butian.runtime import http_api
+    home = Path(tempfile.mkdtemp(prefix="butian_lifecycle_http_"))
+    service = ButianService(home)
+    service.add_member("worker", "Worker")
+    session_id = service.store.create_session("solo", None, None, {})
+    task_id = service.store.create_task(session_id, "HTTP lifecycle", assignee_id="worker")
+    service.store.transition_task(task_id, 1, "ready", "http-ready")
+    lease = service.store.claim_task(task_id, "worker", lease_seconds=1)
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    def post(path, payload):
+        req = urlrequest.Request(base + path, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urlrequest.urlopen(req) as response:
+                return response.status, json.loads(response.read())
+        except urlerror.HTTPError as exc:
+            return exc.code, json.loads(exc.read())
+    try:
+        status, heartbeat = post(f"/api/tasks/{task_id}/heartbeat", {"lease_id": lease["lease_id"], "lease_seconds": 300})
+        assert status == 200 and heartbeat["data"]["ok"] is True
+        status, missing = post(f"/api/tasks/{task_id}/heartbeat", {})
+        assert status == 400 and missing["error"] == "missing_field"
+        current_revision = service.store.db.execute("SELECT revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()["revision"]
+        status, cancelled = post(f"/api/tasks/{task_id}/cancel", {"revision": current_revision})
+        assert status == 200, cancelled
+        assert cancelled["data"]["status"] == "cancelled"
+        status, invalid_revision = post(f"/api/tasks/{task_id}/cancel", {"revision": current_revision})
+        assert status == 400 and invalid_revision["error"] == "revision_conflict"
+        provider_session_id = service.store.create_provider_session("worker", "manual")
+        status, provider_cancel = post("/api/providers/cancel", {"provider_session_id": provider_session_id})
+        assert status == 200 and provider_cancel["data"]["status"] == "cancelled"
+        status, missing_provider = post("/api/providers/cancel", {})
+        assert status == 400 and missing_provider["error"] == "missing_field"
+    finally:
+        server.shutdown()
+        server.server_close()
+        service.close()

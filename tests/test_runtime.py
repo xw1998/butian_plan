@@ -25,5 +25,12 @@ def test_question_and_handoff_require_structure(tmp_path):
     question_id = service.ask_user(task, 4, "m1", "请选择范围")
     assert service.store.db.execute("select status from tasks where task_id=?", (task,)).fetchone()[0] == "waiting_user"
     assert service.answer_user(question_id, "全部") == task
+    # 新校验：旧 revision 交接被拒
+    try:
+        service.submit_handoff({"task_id": task, "task_revision": 5, "member_id": "m1", "status": "done", "summary": "旧交接", "evidence_ids": [], "next_action": "review", "confidence": 0.8})
+        raise AssertionError("stale handoff should be rejected")
+    except ValueError as exc:
+        assert "stale" in str(exc)
+    # 空证据交接可以入账（供审核参考），但不能让任务进入 done
     service.submit_handoff({"task_id": task, "task_revision": 6, "member_id": "m1", "status": "done", "summary": "已确认", "evidence_ids": [], "next_action": "review", "confidence": 0.8})
     service.close()

@@ -44,7 +44,7 @@ def test_mcp_practice_tool_is_registered_and_callable(tmp_path):
         service.add_member("m", "Member")
         assert any(tool["name"] == "butian_memory_practice" for tool in TOOLS)
         json.dumps(TOOLS)
-        result = call_tool(service, "butian_memory_practice", {"member_id": "m", "memory_id": "lesson-3", "kind": "lesson", "content": "x", "outcome": "failure", "independent_key": "run-a"})
+        result = call_tool(service, "butian_memory_practice", {"member_id": "m", "memory_id": "lesson-3", "kind": "lesson", "content": "x", "outcome": "failure", "independent_key": "run-a", "actor_member_id": "m"})
         assert result["status"] == "candidate"
     finally:
         service.close()

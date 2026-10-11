@@ -86,9 +86,60 @@
 
 核心接口保持平台无关；外部 Agent 工具只实现通用 Provider 能力协议，能力不支持时明确返回 `unsupported` 或 `unknown`。
 
+## 快速开始
+
+### 环境要求
+
+- Python 3.11+（仅使用标准库，无第三方依赖）
+- SQLite（Python 内置）
+
+### 安装与运行
+
+```bash
+# 1) 初始化运行时（默认目录 ~/.butian，可用 BUTIAN_HOME 指定）
+python -m butian.cli init
+
+# 2) 添加一个数字人成员
+python -m butian.cli member add m1 Alice
+
+# 2b) 从女娲计划只读导入已有数字人（源库不被修改，同名自动跳过）
+python -m butian.cli migrate import "C:/Users/14905/.dsh/team-memory/memory.db"
+python -m butian.cli migrate runs   # 查看导入台账
+#   也可在控制台「成员」视图用「导入女娲数字人」表单完成同样的事
+
+# 3) 启动团队工作台（本地 HTTP API + Web 控制台）
+python -m butian.cli serve --host 127.0.0.1 --port 8765
+#   浏览器打开 http://127.0.0.1:8765
+
+# 4) 以 MCP 服务方式接入（JSON-RPC over stdin/stdout）
+python -m butian.cli mcp
+```
+
+### 控制台视图
+
+总览、任务、验证、记忆、进化、成员六个工作区。「成员」视图可只读导入女娲计划的数字人资产（含特质与专长），并展示导入台账。其中「进化」是数字人自由进化的操作台：技能阶段、记忆合成、记忆维护（退化评估/降温/复温/版本链）、梦境自省（运行/蒸馏/抽象/提出假设/安排验证/记录结果）、验证批次、以及假设与验证队列。
+
+### 常用 CLI
+
+```bash
+python -m butian.cli evolution skills m1
+python -m butian.cli evolution dream-run m1 --min-fragments 1
+python -m butian.cli evolution history m1
+```
+
+### 运行测试
+
+```bash
+# 标准库定向测试（无需 pytest）
+python tests/test_evolution.py
+python tests/test_provider_runtime.py
+```
+
+> 论文实验模块（`butian/runtime/experiments.py`、`/api/experiments*`、`python -m butian.cli experiment`）属于内部研究工具，不属于面向用户的产品功能。
+
 ## 项目状态
 
-当前仓库包含可运行的 SQLite 运行时、HTTP API、MCP 工具、记忆版本链和数学审计测试；详见 [`docs/需求计划.md`](docs/需求计划.md) 与项目测试。
+当前仓库包含可运行的 SQLite 运行时、HTTP API、20+ MCP 工具、CLI 命令组（含 `evolution`、`migrate`）、六视图 Web 控制台，数字人自由进化闭环（记忆合成/技能演化/退化维护/版本链/梦境自省/假设验证队列），以及女娲数字人资产的只读迁移通道。测试见项目 `tests/`；详见 [`docs/需求计划.md`](docs/需求计划.md)。
 
 ## 仓库
 
