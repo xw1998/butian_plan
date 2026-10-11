@@ -143,6 +143,8 @@ class ButianService:
         return result
 
     def compose_context(self, member_id: str, instruction: str, *, task_id: str | None = None, environment=None, budgets: dict | None = None, include_tools: bool = False) -> tuple[str, Any]:
+        if task_id and not self.store.task_access(task_id, member_id):
+            raise ValueError("member_task_access_denied")
         from .context import ContextComposer
         composer = ContextComposer(self.store, self.tools)
         try:
@@ -174,7 +176,7 @@ class ButianService:
                 artifact_dir.mkdir(parents=True, exist_ok=True)
                 artifact_path = artifact_dir / "result.txt"
                 artifact_path.write_text(result["text"], encoding="utf-8")
-                evidence_id = self.record_evidence(artifact_path, root=artifact_dir, owner_member_id=task["assignee_id"], actor_member_id=task["assignee_id"])
+                evidence_id = self.store.record_evidence(artifact_path, artifact_dir, owner_member_id=task["assignee_id"], actor_member_id=task["assignee_id"], internal=True)
                 self.store.transition_task(task["task_id"], task["revision"], "review", f"solo:{task['task_id']}:review:{task['revision']}", payload={"provider_status": "completed", "provider_output": result["text"], "provider_session_id": provider_session_id, "artifact_path": str(artifact_path), "evidence_id": evidence_id})
                 revision = task["revision"] + 1
                 self.submit_handoff({"task_id": task["task_id"], "task_revision": revision, "member_id": task["assignee_id"], "status": "done", "summary": result["text"][:2000], "evidence_ids": [evidence_id], "next_action": "审核任务结果", "confidence": 0.7})
@@ -498,7 +500,7 @@ class ButianService:
         root_id = self.store.create_task(session["session_id"], goal.strip(), assignee_id=assignee, payload=payload)
         if mode == "solo":
             self.store.transition_task(root_id, 1, "ready", f"goal:{root_id}:ready")
-            lease = self.store.claim_task(root_id, assignee, lease_seconds=300)
+            lease = self.store.claim_task(root_id, assignee, lease_seconds=300, internal=True)
             self.store.transition_task(root_id, lease["revision"], "running", f"goal:{root_id}:running")
             execution = self.start_provider_task(assignee, goal.strip(), task_id=root_id, environment=environment, model=requested_model)
             return {"session": session, "task_id": root_id, "assignee_id": assignee, "execution": execution}
@@ -506,7 +508,7 @@ class ButianService:
         for worker, instruction in zip(workers, plans):
             child_id = self.store.create_task(session["session_id"], instruction, assignee_id=worker, parent_id=root_id, payload={"goal": goal.strip(), "instruction": instruction, "mode": "team", "environment": environment or {}})
             self.store.transition_task(child_id, 1, "ready", f"goal:{root_id}:ready:{child_id}")
-            lease = self.store.claim_task(child_id, worker, lease_seconds=300)
+            lease = self.store.claim_task(child_id, worker, lease_seconds=300, internal=True)
             self.store.transition_task(child_id, lease["revision"], "running", f"goal:{root_id}:running:{child_id}")
             execution = self.start_provider_task(worker, instruction, task_id=child_id, environment=environment)
             children.append({"task_id": child_id, "member_id": worker, "instruction": instruction, "execution": execution})
@@ -551,7 +553,7 @@ class ButianService:
                 evidence_id = self.record_evidence(artifact_path, root=artifact_dir, owner_member_id=child["assignee_id"], actor_member_id=child["assignee_id"])
                 dispatcher = session.get("dispatcher_member_id") or root.get("assignee_id")
                 if dispatcher and dispatcher != child["assignee_id"]:
-                    self.store.grant_evidence_access(evidence_id, dispatcher, actor_member_id=child["assignee_id"])
+                    self.store.grant_evidence_access(evidence_id, dispatcher, actor_member_id=child["assignee_id"], internal=True)
                 self.store.transition_task(child["task_id"], current["revision"], "review", f"team:{task_id}:review:{child['task_id']}:{current['revision']}", payload={"provider_status": status, "provider_output": text, "provider_session_id": provider_row["provider_session_id"], "artifact_path": str(artifact_path), "evidence_id": evidence_id})
                 latest_child = self.store.db.execute("SELECT lease_id FROM tasks WHERE task_id=?", (child["task_id"],)).fetchone()
                 if latest_child and latest_child["lease_id"]:

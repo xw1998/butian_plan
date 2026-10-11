@@ -138,13 +138,18 @@ class ApiHandler(BaseHTTPRequestHandler):
         if self.path == "/api/migration/runs":
             self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
         if self.path == "/api/hypotheses":
-            self._send(200, {"hypotheses": [dict(row) for row in self.service.store.db.execute("SELECT * FROM practice_hypotheses ORDER BY updated_at DESC")]}); return
+            actor = self._visible_member_id()
+            # These legacy ledgers have no owner column; fail closed rather than leak team data.
+            self._send(200, {"hypotheses": []}); return
         if self.path == "/api/knowledge/claims":
-            self._send(200, {"claims": [dict(row) for row in self.service.store.db.execute("SELECT * FROM source_claims ORDER BY created_at DESC")]}); return
+            actor = self._visible_member_id()
+            # Source claims inherit no member ownership in the current schema.
+            self._send(200, {"claims": []}); return
         if self.path == "/api/knowledge/runs":
             self._send(200, {"runs": self.service.learning.list_learning_runs()}); return
         if self.path == "/api/events":
-            self._send(200, {"events": [dict(row) for row in self.service.store.db.execute("SELECT * FROM events ORDER BY created_at DESC LIMIT 50")]}); return
+            actor = self._visible_member_id()
+            self._send(200, {"events": [dict(row) for row in self.service.store.db.execute("SELECT e.* FROM events e WHERE e.aggregate_id IN (SELECT t.task_id FROM tasks t JOIN sessions s ON s.session_id=t.session_id WHERE s.dispatcher_member_id=? OR t.assignee_id=?) OR e.aggregate_id IN (SELECT provider_session_id FROM provider_sessions WHERE member_id=?) ORDER BY e.created_at DESC LIMIT 50", (actor, actor, actor))]}); return
         if urlparse(self.path).path == "/api/evolution":
             q = parse_qs(urlparse(self.path).query)
             member_id = (q.get("member_id") or [""])[0]

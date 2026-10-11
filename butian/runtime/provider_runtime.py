@@ -36,8 +36,12 @@ class ProviderRuntime:
             raise ValueError("invalid_tool_round_limit")
         seen_calls: set[str] = set()
         tool_rounds = 0
+        message_history = [{"role": "user", "content": prompt}]
         try:
             while final_status is None:
+                round_had_tool_call = False
+                pending_calls = []
+                terminal_event = None
                 for event in provider.stream(remote_session_id, prompt):
                     if event.kind == "output":
                         if self.store.record_provider_output(provider_session_id, event.event_id, event.text, event.model):
@@ -59,36 +63,50 @@ class ProviderRuntime:
                             final_status, reason = "unknown", "provider_tool_round_limit_exceeded"
                             break
                         seen_calls.add(call_id)
-                        tool_rounds += 1
-                        self.store.append_event(
-                            provider_session_id,
-                            "provider_tool_call",
-                            {"call_id": call_id, "tool_id": tool_id, "version": version, "input": input_data, "round": tool_rounds},
-                            f"provider-tool-call:{provider_session_id}:{call_id}",
-                        )
-                        try:
-                            result = tool_executor(session["member_id"], tool_id, version, input_data)
-                        except Exception as exc:
+                        pending_calls.append((call_id, tool_id, version, input_data))
+                        round_had_tool_call = True
+                        continue
+                    elif event.kind == "status":
+                        terminal_event = event
+                if pending_calls:
+                    if tool_rounds + len(pending_calls) > max_tool_rounds:
+                        final_status, reason = "unknown", "provider_tool_round_limit_exceeded"
+                    else:
+                        assistant_calls = [{"id": call_id, "type": "function", "function": {"name": tool_id, "arguments": json.dumps(input_data, ensure_ascii=False)}} for call_id, tool_id, version, input_data in pending_calls]
+                        message_history.append({"role": "assistant", "tool_calls": assistant_calls})
+                        for call_id, tool_id, version, input_data in pending_calls:
+                            tool_rounds += 1
+                            self.store.append_event(
+                                provider_session_id,
+                                "provider_tool_call",
+                                {"call_id": call_id, "tool_id": tool_id, "version": version, "input": input_data, "round": tool_rounds},
+                                f"provider-tool-call:{provider_session_id}:{call_id}",
+                            )
+                            try:
+                                result = tool_executor(session["member_id"], tool_id, version, input_data)
+                            except Exception as exc:
+                                self.store.append_event(
+                                    provider_session_id,
+                                    "provider_tool_result",
+                                    {"call_id": call_id, "tool_id": tool_id, "status": "error", "error": type(exc).__name__},
+                                    f"provider-tool-result:{provider_session_id}:{call_id}",
+                                )
+                                final_status, reason = "unknown", f"provider_tool_execution_error:{type(exc).__name__}"
+                                break
                             self.store.append_event(
                                 provider_session_id,
                                 "provider_tool_result",
-                                {"call_id": call_id, "tool_id": tool_id, "status": "error", "error": type(exc).__name__},
+                                {"call_id": call_id, "tool_id": tool_id, "status": "ok", "result": result},
                                 f"provider-tool-result:{provider_session_id}:{call_id}",
                             )
-                            final_status, reason = "unknown", f"provider_tool_execution_error:{type(exc).__name__}"
-                            break
-                        self.store.append_event(
-                            provider_session_id,
-                            "provider_tool_result",
-                            {"call_id": call_id, "tool_id": tool_id, "status": "ok", "result": result},
-                            f"provider-tool-result:{provider_session_id}:{call_id}",
-                        )
-                        prompt = json.dumps({"tool_call_id": call_id, "tool_result": result}, ensure_ascii=False)
-                        break
-                    elif event.kind == "status":
-                        final_status, reason = self._map_status(event.status, event.reason)
+                            message_history.append({"role": "tool", "tool_call_id": call_id, "tool_result": result, "content": json.dumps(result, ensure_ascii=False)})
+                        prompt = json.dumps(message_history, ensure_ascii=False)
+                    if terminal_event is not None and final_status is None:
+                        final_status, reason = self._map_status(terminal_event.status, terminal_event.reason)
+                elif terminal_event is not None and final_status is None:
+                        final_status, reason = self._map_status(terminal_event.status, terminal_event.reason)
                 else:
-                    if final_status is None:
+                    if final_status is None and not round_had_tool_call:
                         final_status, reason = "unknown", "provider_stream_ended_without_terminal_status"
                 if final_status is None and tool_rounds == 0:
                     final_status, reason = "unknown", "provider_stream_ended_without_terminal_status"

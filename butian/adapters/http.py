@@ -19,6 +19,7 @@ class OpenAICompatibleProvider:
         self.context_window = context_window
         # 每个 provider 会话实际使用的模型（create_child_session 传入，stream 真正使用）
         self._session_models: dict[str, str | None] = {}
+        self._session_messages: dict[str, list[dict]] = {}
 
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(can_create_child_session=True, can_stream_output=False, can_cancel_output=False, context_window=self.context_window)
@@ -36,6 +37,7 @@ class OpenAICompatibleProvider:
         effective = model if model else (None if self.default_model == "unknown" else self.default_model)
         session_id = f"http_{uuid.uuid4().hex}"
         self._session_models[session_id] = effective
+        self._session_messages[session_id] = [{"role": "user", "content": prompt}]
         return ProviderResult("accepted", provider_event_id=session_id, model=effective)
 
     def stream(self, provider_session_id: str, prompt: str) -> Iterable[ProviderEvent]:
@@ -45,7 +47,15 @@ class OpenAICompatibleProvider:
         if request_model is None:
             yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_no_model_selected")
             return
-        payload = json.dumps({"model": request_model, "messages": [{"role": "user", "content": prompt}], "stream": False}).encode()
+        terminal_reached = False
+        try:
+            messages = json.loads(prompt) if prompt.lstrip().startswith("[") else [{"role": "user", "content": prompt}]
+        except json.JSONDecodeError:
+            messages = [{"role": "user", "content": prompt}]
+        if not isinstance(messages, list):
+            messages = [{"role": "user", "content": prompt}]
+        self._session_messages[provider_session_id] = messages
+        payload = json.dumps({"model": request_model, "messages": messages, "tools": [], "stream": False}).encode()
         request = urllib.request.Request(self.base_url + "/chat/completions", data=payload, headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {self.api_key}"} if self.api_key else {})}, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
@@ -88,7 +98,7 @@ class OpenAICompatibleProvider:
                         f"{provider_session_id}:tool_call:{index}",
                         "tool_call",
                         model=model,
-                        metadata={"call_id": call_id, "tool_id": tool_id, "version": 1, "input": input_data},
+                        metadata={"call_id": call_id, "tool_id": tool_id, "version": int(function.get("version", 1)), "input": input_data},
                     )
                 return
             text = message.get("content")
@@ -96,11 +106,14 @@ class OpenAICompatibleProvider:
                 yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_response_missing_text")
                 return
             yield ProviderEvent(f"{provider_session_id}:output", "output", text=text, model=model)
+            terminal_reached = True
             yield ProviderEvent(f"{provider_session_id}:completed", "status", status="completed", model=model)
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
             yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason=f"provider_transport_error:{type(exc).__name__}")
         finally:
-            self._session_models.pop(provider_session_id, None)
+            # Direct adapter consumers expect terminal streams to release state.
+            if terminal_reached:
+                self._session_models.pop(provider_session_id, None)
 
     def cancel(self, provider_session_id):
         return ProviderResult("unsupported", reason="endpoint does not expose cancellation")

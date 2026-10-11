@@ -254,18 +254,31 @@ def call_tool(service, name, args):
     if name == "butian_tool_restore": return service.restore_tool(args["member_id"], args["tool_id"])
     if name == "butian_provider_start": return service.start_provider_task(args["member_id"], args["prompt"], task_id=args.get("task_id"), provider_id=args.get("provider_id"), model=args.get("model"))
     if name == "butian_provider_consume": return service.consume_provider_task(args["provider_session_id"], args["prompt"])
-    if name == "butian_task_list": return {"tasks": service.store.list_tasks(args.get("status"))}
+    if name == "butian_task_list":
+        actor = args.get("actor_member_id")
+        tasks = [task for task in service.store.list_tasks(args.get("status")) if service.store.task_access(task["task_id"], actor)]
+        return {"tasks": tasks}
     if name == "butian_session_create": return service.create_session(args.get("mode", "solo"), args.get("dispatcher_member_id"), args.get("requested_model"), args.get("capabilities"), current_member_id=args.get("current_member_id"))
     if name == "butian_session_switch_mode": return service.switch_session_mode(args["session_id"], args["mode"], current_member_id=args.get("current_member_id"))
     if name == "butian_session_list": return {"sessions": [dict(r) for r in service.store.db.execute("SELECT * FROM sessions ORDER BY created_at")], "dispatcher_config": service.get_dispatcher_config()}
     if name == "butian_dispatcher_set": service.set_dispatcher_config(args["member_id"]); return {"dispatcher_member_id": args["member_id"]}
-    if name == "butian_task_tree": return {"tree": service.task_tree(args.get("session_id"))}
+    if name == "butian_task_tree":
+        actor = args.get("actor_member_id")
+        session_id = args.get("session_id")
+        if session_id:
+            session = service.store.session(session_id)
+            if not session or session.get("dispatcher_member_id") != actor:
+                raise ValueError("member_task_access_denied")
+        return {"tree": service.task_tree(session_id)}
     if name == "butian_task_review": return service.review_task(args["task_id"], args["revision"], args["verdict"], reviewer_member_id=args.get("reviewer_member_id"), notes=args.get("notes", ""), rework_limit=args.get("rework_limit", 3))
     if name == "butian_task_create": return {"task_id": service.store.create_task(args["session_id"], args["title"], args.get("assignee_id"), args.get("parent_id"), args.get("payload"))}
     if name == "butian_task_transition":
         service.store.transition_task(args["task_id"], args["expected_revision"], args["target"], args["operation_key"]); return {"ok": True}
     if name == "butian_task_claim":
-        return service.store.claim_task(args["task_id"], args["member_id"], args.get("lease_seconds", 300), args.get("token"))
+        actor = args.get("actor_member_id")
+        if args["member_id"] != actor or not service.store.task_access(args["task_id"], actor):
+            raise ValueError("member_task_access_denied")
+        return service.store.claim_task(args["task_id"], actor, args.get("lease_seconds", 300), args.get("token"))
     if name == "butian_task_release":
         service.store.release_lease(args["task_id"], args["lease_id"]); return {"ok": True}
     if name == "butian_task_heartbeat":
