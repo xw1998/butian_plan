@@ -412,8 +412,7 @@ class ToolStore:
         CREATE TABLE IF NOT EXISTS tool_issue_escalations (
             work_item_id TEXT PRIMARY KEY, issue_id TEXT NOT NULL, dispatcher_member_id TEXT NOT NULL,
             status TEXT NOT NULL, reason TEXT NOT NULL, claimed_by TEXT, resolution TEXT,
-            created_at REAL NOT NULL, claimed_at REAL, completed_at REAL, updated_at REAL NOT NULL,
-            UNIQUE(issue_id, dispatcher_member_id, reason, status)
+            created_at REAL NOT NULL, claimed_at REAL, completed_at REAL, updated_at REAL NOT NULL
         );
         CREATE TABLE IF NOT EXISTS tool_issue_escalation_events (
             event_id TEXT PRIMARY KEY, work_item_id TEXT NOT NULL, event_type TEXT NOT NULL,
@@ -447,6 +446,26 @@ class ToolStore:
         );
 
         """)
+        # Older databases had a UNIQUE constraint over status, which rejects a
+        # legitimate rejection chain after the same reason is reused. Rebuild
+        # only that legacy table and preserve every row and audit event.
+        escalation_indexes = self.store.db.execute("PRAGMA index_list(tool_issue_escalations)").fetchall()
+        legacy_unique = any(index[2] and [item[2] for item in self.store.db.execute(f"PRAGMA index_info({index[1]})").fetchall()] == ["issue_id", "dispatcher_member_id", "reason", "status"] for index in escalation_indexes)
+        if legacy_unique:
+            self.store.db.execute("ALTER TABLE tool_issue_escalations RENAME TO tool_issue_escalations_legacy")
+            self.store.db.execute("""CREATE TABLE tool_issue_escalations (
+                work_item_id TEXT PRIMARY KEY, issue_id TEXT NOT NULL, dispatcher_member_id TEXT NOT NULL,
+                status TEXT NOT NULL, reason TEXT NOT NULL, claimed_by TEXT, resolution TEXT,
+                created_at REAL NOT NULL, claimed_at REAL, completed_at REAL, updated_at REAL NOT NULL
+            )""")
+            self.store.db.execute("""INSERT INTO tool_issue_escalations
+                (work_item_id, issue_id, dispatcher_member_id, status, reason, claimed_by, resolution,
+                 created_at, claimed_at, completed_at, updated_at)
+                SELECT work_item_id, issue_id, dispatcher_member_id, status, reason, claimed_by, resolution,
+                       created_at, claimed_at, completed_at, updated_at
+                FROM tool_issue_escalations_legacy""")
+            self.store.db.execute("DROP TABLE tool_issue_escalations_legacy")
+        self.store.db.execute("CREATE INDEX IF NOT EXISTS idx_tool_issue_escalations_dispatcher_status ON tool_issue_escalations(dispatcher_member_id, status)")
         share_columns = {row[1] for row in self.store.db.execute("PRAGMA table_info(tool_shares)")}
         for name, definition in (("issue_id", "TEXT"), ("max_uses", "INTEGER"), ("used_count", "INTEGER NOT NULL DEFAULT 0"), ("expires_at", "REAL")):
             if name not in share_columns:
@@ -1004,8 +1023,8 @@ class ToolStore:
         wins=sum(r["before_outcome"]=="failure" and r["after_outcome"]=="success" for r in comparable)
         losses=sum(r["before_outcome"]=="success" and r["after_outcome"]=="failure" for r in comparable)
         n=len(comparable)
-        if n == 0:
-            improvement_interval={"status":"unknown","lower":None,"upper":None}
+        if n < 3:
+            improvement_interval={"status":"unknown","metric":"paired_success_rate_difference","method":"insufficient_paired_samples","lower":None,"upper":None}
         else:
             # Difference of paired success rates: after success minus before success.
             # Discordant pairs identify the signed point estimate; concordant pairs keep the denominator honest.
@@ -1150,6 +1169,10 @@ class ToolStore:
                 raise ValueError("tool_issue_escalation_not_claimed")
             self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, status, dispatcher_member_id, json.dumps({"resolution": resolution}, ensure_ascii=False), f"escalation:{work_item_id}:{status}", now))
             result = dict(self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone())
+            issue = self.store.db.execute("SELECT status FROM tool_issues WHERE issue_id=?", (row["issue_id"],)).fetchone()
+            # Dispatcher completion records handling of the work item; only the reporter's verified repair confirmation resolves the issue.
+            result["issue_status"] = issue["status"] if issue else None
+            result["issue_resolution_required"] = True
             if status == "rejected":
                 next_item_id = "escalation_" + uuid.uuid4().hex
                 self.store.db.execute("INSERT INTO tool_issue_escalations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (next_item_id, row["issue_id"], row["dispatcher_member_id"], "open", "re-escalated", None, None, now, None, None, now))
@@ -1516,40 +1539,60 @@ class ToolStore:
             })
         return cards
 
-    def context_cards(self, member_id: str, instruction: str, *, limit: int = 20) -> list[dict[str, Any]]:
-        """Return deterministic, contract-only cards visible to a member."""
+    def context_recall_report(self, member_id: str, instruction: str, *, limit: int = 20) -> dict[str, Any]:
+        """Run candidate recall, then apply access/version/reliability admission."""
         if limit < 0:
             raise ValueError("invalid_tool_limit")
         terms = {part.casefold() for part in instruction.split() if part.strip()}
         rows = self.store.db.execute(
-            "SELECT * FROM tool_assets WHERE status='active' AND (owner_member_id=? OR tool_id IN (SELECT tool_id FROM tool_shares WHERE recipient_member_id=?))",
+            "SELECT * FROM tool_assets WHERE (owner_member_id=? OR tool_id IN (SELECT tool_id FROM tool_shares WHERE recipient_member_id=?))",
             (member_id, member_id),
         ).fetchall()
-        candidates = []
+        candidates, accepted, rejected = [], [], []
         now = time.time()
         for row in rows:
             own = row["owner_member_id"] == member_id
+            reject_reason = None
+            if row["status"] != "active":
+                reject_reason = "tool_not_active"
             if not own:
                 share = self.store.db.execute(
                     "SELECT * FROM tool_shares WHERE tool_id=? AND version=? AND recipient_member_id=?",
                     (row["tool_id"], row["current_version"], member_id),
                 ).fetchone()
                 if not share or share["status"] not in {"trial", "active"}:
-                    continue
-                if share["permission"] not in {"team_readonly", "team_execute"}:
-                    continue
-                if share["expires_at"] is not None and share["expires_at"] <= now:
-                    continue
+                    reject_reason = "share_not_active"
+                elif share["permission"] not in {"team_readonly", "team_execute"}:
+                    reject_reason = "share_permission_denied"
+                elif share["expires_at"] is not None and share["expires_at"] <= now:
+                    reject_reason = "share_expired"
             manifest = json.loads(row["manifest"] or "{}")
             contract = {key: manifest.get(key) for key in ("input_contract", "output_contract", "permissions", "failure_conditions")}
             text = " ".join((row["name"], row["description"], json.dumps(contract, ensure_ascii=False))).casefold()
-            score = sum(term in text for term in terms)
-            candidates.append((score, 0 if own else 1, row["tool_id"], {
-                "tool_id": row["tool_id"], "name": row["name"], "description": row["description"],
-                "version": row["current_version"], **contract,
-            }))
-        candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
-        return [item[3] for item in candidates[:limit]]
+            matched_by = [term for term in sorted(terms) if term in text]
+            score = len(matched_by)
+            card = {"tool_id": row["tool_id"], "name": row["name"], "description": row["description"], "version": row["current_version"], **contract, "matched_by": matched_by, "confidence": min(1.0, score / max(1, len(terms)))}
+            candidate = {"card": card, "score": score, "owner": own}
+            candidates.append(candidate)
+            if reject_reason is None:
+                breaker = self.store.db.execute("SELECT 1 FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND status='open'", (row["tool_id"], row["current_version"])).fetchone()
+                if breaker:
+                    reject_reason = "circuit_breaker_open"
+                else:
+                    stats = self.stats(row["tool_id"], row["current_version"])
+                    if sum(stats[key] for key in ("failures", "unknown", "cancelled")) > 0:
+                        reject_reason = "reliability_not_clean"
+            if reject_reason:
+                rejected.append({"tool_id": row["tool_id"], "version": row["current_version"], "reason": reject_reason, "matched_by": matched_by})
+            else:
+                accepted.append(candidate)
+        accepted.sort(key=lambda item: (-item["score"], 0 if item["owner"] else 1, item["card"]["tool_id"]))
+        return {"candidates": candidates, "accepted": [item["card"] for item in accepted[:limit]], "rejected": rejected}
+
+    def context_cards(self, member_id: str, instruction: str, *, limit: int = 20) -> list[dict[str, Any]]:
+        """Return deterministic, contract-only cards visible after two-stage admission."""
+        cards = self.context_recall_report(member_id, instruction, limit=limit)["accepted"]
+        return [{key: value for key, value in card.items() if key not in {"matched_by", "confidence"}} for card in cards]
 
     def stats(self, tool_id: str, version: int):
         rows = self.store.db.execute("SELECT outcome, task_id, environment, execution_id, evidence_ids FROM tool_verifications WHERE tool_id=? AND version=?", (tool_id, version)).fetchall()

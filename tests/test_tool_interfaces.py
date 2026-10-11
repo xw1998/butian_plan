@@ -158,3 +158,42 @@ def test_http_issue_escalations_require_auth_and_forward_dispatcher(tmp_path, mo
         server.server_close()
         thread.join(timeout=3)
         service.close()
+
+
+def test_http_member_cannot_read_another_members_tasks_questions_or_sessions(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "Member 1")
+    service.add_member("m2", "Member 2")
+    service.store.set_member_token("m1", "secret-1")
+    service.store.set_member_token("m2", "secret-2")
+    own_session = service.create_session("solo", current_member_id="m1")["session_id"]
+    other_session = service.create_session("solo", current_member_id="m2")["session_id"]
+    other_task = service.store.create_task(other_session, "private task")
+    service.store.db.execute(
+        "INSERT INTO questions(question_id, task_id, revision, member_id, question, answer, status, created_at) VALUES (?,?,?,?,?,?,?,?)",
+        ("q-private", other_task, 1, "m2", "private question", None, "open", 1.0),
+    )
+    service.store.db.commit()
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    headers = {"X-Butian-Member": "m1", "X-Butian-Token": "secret-1"}
+    try:
+        for path, key, private_id in [
+            ("/api/tasks", "tasks", other_task),
+            ("/api/questions", "questions", "q-private"),
+            ("/api/sessions", "sessions", other_session),
+        ]:
+            req = urlrequest.Request(base + path, headers=headers)
+            with urlrequest.urlopen(req, timeout=3) as response:
+                payload = json.loads(response.read())
+            assert private_id not in {row.get("task_id", row.get("session_id", row.get("question_id"))) for row in payload["data"][key]}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+        service.close()

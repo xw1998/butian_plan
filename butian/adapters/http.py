@@ -11,16 +11,17 @@ from .base import ProviderEvent, ProviderResult
 
 class OpenAICompatibleProvider:
     """Small dependency-free adapter for OpenAI-compatible chat endpoints."""
-    def __init__(self, base_url: str, *, api_key: str | None = None, provider_id: str = "openai-compatible", model: str = "unknown"):
+    def __init__(self, base_url: str, *, api_key: str | None = None, provider_id: str = "openai-compatible", model: str = "unknown", context_window: int | None = None):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.provider_id = provider_id
         self.default_model = model
+        self.context_window = context_window
         # 每个 provider 会话实际使用的模型（create_child_session 传入，stream 真正使用）
         self._session_models: dict[str, str | None] = {}
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(can_create_child_session=True, can_stream_output=False, can_cancel_output=False)
+        return ProviderCapabilities(can_create_child_session=True, can_stream_output=False, can_cancel_output=False, context_window=self.context_window)
 
     def models(self) -> list[str]:
         return [] if self.default_model == "unknown" else [self.default_model]
@@ -55,8 +56,42 @@ class OpenAICompatibleProvider:
                 return
             choice = choices[0]
             message = choice.get("message")
-            text = message.get("content") if isinstance(message, dict) else None
             model = body.get("model") or self.default_model
+            if not isinstance(message, dict):
+                yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_response_missing_message")
+                return
+            tool_calls = message.get("tool_calls")
+            if tool_calls is not None:
+                if not isinstance(tool_calls, list) or not tool_calls:
+                    yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid")
+                    return
+                for index, tool_call in enumerate(tool_calls):
+                    if not isinstance(tool_call, dict):
+                        yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid")
+                        return
+                    call_id = tool_call.get("id")
+                    function = tool_call.get("function")
+                    if not isinstance(call_id, str) or not isinstance(function, dict) or function.get("type") not in {None, "function"}:
+                        yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid")
+                        return
+                    tool_id = function.get("name")
+                    arguments = function.get("arguments")
+                    if not isinstance(tool_id, str) or not isinstance(arguments, str):
+                        yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid")
+                        return
+                    try:
+                        input_data = json.loads(arguments)
+                    except (TypeError, json.JSONDecodeError):
+                        yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid_arguments")
+                        return
+                    yield ProviderEvent(
+                        f"{provider_session_id}:tool_call:{index}",
+                        "tool_call",
+                        model=model,
+                        metadata={"call_id": call_id, "tool_id": tool_id, "version": 1, "input": input_data},
+                    )
+                return
+            text = message.get("content")
             if not isinstance(text, str):
                 yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_response_missing_text")
                 return
@@ -72,5 +107,5 @@ class OpenAICompatibleProvider:
 
 
 class OllamaProvider(OpenAICompatibleProvider):
-    def __init__(self, base_url: str = "http://127.0.0.1:11434/v1", *, model: str = "unknown"):
-        super().__init__(base_url, provider_id="ollama", model=model)
+    def __init__(self, base_url: str = "http://127.0.0.1:11434/v1", *, model: str = "unknown", context_window: int | None = None):
+        super().__init__(base_url, provider_id="ollama", model=model, context_window=context_window)

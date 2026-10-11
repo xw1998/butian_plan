@@ -50,6 +50,17 @@ class ApiHandler(BaseHTTPRequestHandler):
             return False
         return True
 
+    def _visible_member_id(self):
+        actor, _ = self._member_credentials()
+        return actor
+
+    def _visible_tasks(self, actor):
+        return [dict(row) for row in self.service.store.db.execute(
+            "SELECT t.* FROM tasks t JOIN sessions s ON s.session_id=t.session_id "
+            "WHERE s.dispatcher_member_id=? OR t.assignee_id=? ORDER BY t.rowid",
+            (actor, actor),
+        )]
+
     def do_GET(self):
         if not self.path.startswith("/api/"):
             relative = "index.html" if self.path == "/" else self.path.lstrip("/")
@@ -83,7 +94,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 latest_maintenance = {"event_type": latest["event_type"], "payload": json.loads(latest["payload"]), "created_at": latest["created_at"]}
             self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "authorized_url_queue", "rewarm_policy": "evidence_required"}}); return
         if self.path == "/api/tasks":
-            self._send(200, {"tasks": self.service.store.list_tasks()}); return
+            self._send(200, {"tasks": self._visible_tasks(self._visible_member_id())}); return
         if urlparse(self.path).path == "/api/tools":
             q = parse_qs(urlparse(self.path).query)
             member_id = (q.get("member_id") or [""])[0]
@@ -92,13 +103,36 @@ class ApiHandler(BaseHTTPRequestHandler):
             status = (q.get("status") or [None])[0]
             self._send(200, {"tools": self.service.list_tools(member_id, status=status), "shares": self.service.list_tool_shares(member_id, status=status)}); return
         if self.path == "/api/questions":
-            rows = [dict(row) for row in self.service.store.db.execute("SELECT * FROM questions ORDER BY created_at DESC")]
+            actor = self._visible_member_id()
+            rows = [dict(row) for row in self.service.store.db.execute(
+                "SELECT q.* FROM questions q JOIN tasks t ON t.task_id=q.task_id "
+                "JOIN sessions s ON s.session_id=t.session_id "
+                "WHERE s.dispatcher_member_id=? OR t.assignee_id=? ORDER BY q.created_at DESC",
+                (actor, actor),
+            )]
             self._send(200, {"questions": rows}); return
         if urlparse(self.path).path == "/api/tasks/tree":
             q = parse_qs(urlparse(self.path).query)
-            self._send(200, {"tree": self.service.task_tree(q["session_id"][0] if "session_id" in q else None)}); return
+            actor = self._visible_member_id()
+            session_id = q["session_id"][0] if "session_id" in q else None
+            visible_session_ids = {
+                row["session_id"] for row in self.service.store.db.execute(
+                    "SELECT session_id FROM sessions WHERE dispatcher_member_id=?", (actor,)
+                )
+            }
+            if session_id and session_id not in visible_session_ids:
+                self._send(403, {"error": "session_access_denied"}); return
+            if session_id:
+                tree = self.service.task_tree(session_id)
+            else:
+                tree = [task for task in self._visible_tasks(actor)]
+            self._send(200, {"tree": tree}); return
         if self.path == "/api/sessions":
-            self._send(200, {"sessions": [dict(r) for r in self.service.store.db.execute("SELECT * FROM sessions ORDER BY created_at")], "dispatcher_config": self.service.get_dispatcher_config()}); return
+            actor = self._visible_member_id()
+            sessions = [dict(r) for r in self.service.store.db.execute(
+                "SELECT * FROM sessions WHERE dispatcher_member_id=? ORDER BY created_at", (actor,)
+            )]
+            self._send(200, {"sessions": sessions, "dispatcher_config": self.service.get_dispatcher_config()}); return
         if self.path == "/api/members":
             self._send(200, {"members": [dict(row) for row in self.service.store.db.execute("SELECT * FROM members ORDER BY member_id")]}); return
         if self.path == "/api/migration/runs":

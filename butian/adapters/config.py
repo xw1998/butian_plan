@@ -30,6 +30,14 @@ class ProviderConfigError:
     reason: str
 
 
+def _context_window(entry: dict[str, Any]) -> int | None:
+    value = entry.get("context_window")
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError("context_window_invalid")
+    return value
+
 def _resolve_api_key(entry: dict[str, Any]) -> str | None:
     if "api_key" in entry and entry["api_key"]:
         return str(entry["api_key"])
@@ -57,10 +65,11 @@ def _build_provider(entry: dict[str, Any]) -> Any:
             api_key=_resolve_api_key(entry),
             provider_id=str(entry.get("provider_id") or "openai-compatible"),
             model=str(entry.get("model") or "unknown"),
+            context_window=_context_window(entry),
         )
     if ptype == "ollama":
         base_url = entry.get("base_url") or "http://127.0.0.1:11434/v1"
-        return OllamaProvider(str(base_url), model=str(entry.get("model") or "unknown"))
+        return OllamaProvider(str(base_url), model=str(entry.get("model") or "unknown"), context_window=_context_window(entry))
     if ptype == "local-command":
         command = entry.get("command")
         if not isinstance(command, list) or not command:

@@ -57,6 +57,7 @@ class ProviderCapabilities:
     can_cancel_output: bool = False
     can_receive_user_reply: bool = False
     can_open_subagent_conversation: bool = False
+    context_window: int | None = 8192
 
 @dataclass(frozen=True)
 class ModelSelection:

@@ -98,6 +98,9 @@ def test_issue_escalation_creates_dispatcher_work_item_lifecycle(tmp_path):
         assert claimed["status"] == "claimed"
         completed = service.resolve_tool_issue_escalation("dispatcher", item["work_item_id"], status="completed", resolution="reviewed")
         assert completed["status"] == "completed"
+        assert completed["issue_status"] == "open"
+        assert completed["issue_resolution_required"] is True
+        assert service.store.db.execute("SELECT status FROM tool_issues WHERE issue_id=?", (issue["issue_id"],)).fetchone()["status"] == "open"
         events = service.store.db.execute("SELECT event_type FROM tool_issue_escalation_events WHERE work_item_id=? ORDER BY rowid", (item["work_item_id"],)).fetchall()
         assert [row["event_type"] for row in events] == ["created", "claimed", "completed"]
         second = service.tools.escalate_issue("owner", issue["issue_id"], reason="manual-retry", now=issue["due_at"] + 10)
@@ -109,5 +112,29 @@ def test_issue_escalation_creates_dispatcher_work_item_lifecycle(tmp_path):
         assert next_item[0]["work_item_id"] == rejected["next_work_item_id"]
         rejection_events = service.store.db.execute("SELECT event_type FROM tool_issue_escalation_events WHERE work_item_id=? ORDER BY rowid", (second["work_item_id"],)).fetchall()
         assert [row["event_type"] for row in rejection_events] == ["created", "claimed", "rejected", "re-escalated"]
+    finally:
+        service.close()
+
+def test_issue_escalation_rejection_chain_creates_distinct_work_items(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("owner", "Owner")
+        service.add_member("dispatcher", "Dispatcher")
+        service.set_dispatcher_config("dispatcher")
+        tool_id = service.propose_tool("owner", "tool", "desc", reuse_lower=1, manual_cost_upper=1, call_cost_lower=1, build_cost_upper=1, maintenance_cost_upper=1, risk_cost_upper=1, manifest={"permissions": ["execute"], "entrypoint": ["python", "tool.py"]})["tool_id"]
+        service.add_tool_version("owner", tool_id, "print('ok')", {"input_contract": {"type": "object"}, "output_contract": {"type": "object"}, "permissions": ["execute"], "failure_conditions": ["timeout"], "entrypoint": ["python", "tool.py"]})
+        issue = service.report_tool_issue("owner", tool_id, 1, description="timeout")
+        item = service.tools.escalate_issue("owner", issue["issue_id"], reason="manual", now=100.0)
+        work_ids = []
+        for index in range(5):
+            work_id = item["work_item_id"]
+            work_ids.append(work_id)
+            service.claim_tool_issue_escalation("dispatcher", work_id)
+            rejected = service.resolve_tool_issue_escalation("dispatcher", work_id, status="rejected", resolution=f"reject-{index}")
+            item = {"work_item_id": rejected["next_work_item_id"]}
+        assert len(set(work_ids)) == 5
+        rows = service.list_tool_issue_escalations("dispatcher")
+        assert len(rows) == 6
+        assert [row["status"] for row in rows] == ["rejected"] * 5 + ["open"]
     finally:
         service.close()

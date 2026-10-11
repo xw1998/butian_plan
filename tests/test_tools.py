@@ -485,7 +485,13 @@ def test_business_assertion_failure_is_audited(tmp_path):
         audit = service.list_tool_executions("m1", tool_id=tool_id)[0]
         assert audit["runtime_backend"] == "python_host"
         assert audit["isolation_level"] == "host_process"
-        assert json.loads(audit["isolation_capabilities"])["network_isolation"] is False
+        capabilities = json.loads(audit["isolation_capabilities"])
+        assert capabilities["network_isolation"] is False
+        for name in ("filesystem_isolation", "subprocess_isolation", "memory_limit", "file_size_limit", "process_tree_control", "active_cancellation"):
+            assert capabilities[name] is False
+        assert capabilities["working_directory"] == "temporary_only_not_a_security_boundary"
+        assert audit["runtime_backend"] == "python_host"
+        assert audit["isolation_level"] == "host_process"
     finally:
         service.close()
 
@@ -1003,7 +1009,7 @@ def test_issue_triage_timeout_pair_stats_and_breaker_are_explicit(tmp_path):
         assert stats["paired"]["n"] == 1
         assert stats["paired"]["improved"] == 0
         assert stats["paired"]["improvement_confidence_interval"]["metric"] == "paired_success_rate_difference"
-        assert stats["paired"]["improvement_confidence_interval"]["lower"] == 0.0
+        assert stats["paired"]["improvement_confidence_interval"]["status"] == "unknown"
         duplicate = service.report_tool_issue("m1", tool_id, 1, description="duplicate issue")
         linked = service.link_duplicate_tool_issue("m1", duplicate["issue_id"], issue["issue_id"])
         assert linked["status"] != "resolved"
@@ -1059,7 +1065,7 @@ def test_audit_regressions_pair_requires_issue_environment(tmp_path):
         result = service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "lab"}, input_hash=before["input_hash"], before_outcome="success", after_outcome="success")
         assert result["paired"]["n"] == 1
         assert result["paired"]["improvement_confidence_interval"]["metric"] == "paired_success_rate_difference"
-        assert result["paired"]["improvement_confidence_interval"]["lower"] == 0.0
+        assert result["paired"]["improvement_confidence_interval"]["status"] == "unknown"
     finally:
         service.close()
 
@@ -1098,8 +1104,38 @@ def test_pair_statistics_report_success_rate_difference_and_require_verified_env
         result = service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "lab"}, input_hash=before["input_hash"], before_outcome="failure", after_outcome="success")
         interval = result["paired"]["improvement_confidence_interval"]
         assert interval["metric"] == "paired_success_rate_difference"
-        assert interval["lower"] <= interval["upper"]
+        assert interval["status"] == "unknown"
+        assert interval["lower"] is None and interval["upper"] is None
         with pytest.raises(ValueError, match="tool_pair_environment_mismatch"):
             service.record_tool_issue_pair("m1", issue["issue_id"], repair_version=2, environment={"kind": "other"}, input_hash=before["input_hash"], before_outcome="failure", after_outcome="success")
+    finally:
+        service.close()
+
+def test_issue_statistics_reports_uncertain_small_paired_samples(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        service.add_tool_version("m1", tool_id, "print('v1')", {**MANIFEST, "permissions": ["execute"]})
+        stats = service.tool_issue_statistics("m1", tool_id, version=1)
+        interval = stats["paired"]["improvement_confidence_interval"]
+        assert interval["status"] == "unknown"
+        assert interval["lower"] is None and interval["upper"] is None
+    finally:
+        service.close()
+
+
+def test_context_recall_report_separates_candidates_and_reliability_rejections(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        tool_id = propose(service)["tool_id"]
+        manifest = {**MANIFEST, "permissions": ["execute"], "risk_level": "low"}
+        service.add_tool_version("m1", tool_id, "raise SystemExit(1)", manifest)
+        run = service.execute_tool("m1", tool_id, 1, "bad", verification_only=True)
+        assert run["status"] == "failed"
+        report = service.tools.context_recall_report("m1", "通用分析", limit=10)
+        assert any(item["card"]["tool_id"] == tool_id for item in report["candidates"])
+        rejection = next(item for item in report["rejected"] if item["tool_id"] == tool_id)
+        assert rejection["reason"] == "tool_not_active"
+        assert service.tools.context_cards("m1", "通用分析", limit=10) == []
     finally:
         service.close()

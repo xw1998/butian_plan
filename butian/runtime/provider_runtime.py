@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
+import json
 from ..adapters.base import AgentProvider
 from ..adapters.registry import ProviderRegistry
 from .store import Store
@@ -21,7 +22,7 @@ class ProviderRuntime:
         provider_session_id = self.store.create_provider_session(member_id, provider.provider_id, task_id=task_id, model=selection.effective_model, remote_session_id=created.provider_event_id, prompt=prompt)
         return {"status": "running", "provider_session_id": provider_session_id, "provider_id": provider.provider_id, "model": selection.effective_model}
 
-    def consume(self, provider_session_id: str, provider: AgentProvider, prompt: str | None = None) -> dict[str, Any]:
+    def consume(self, provider_session_id: str, provider: AgentProvider, prompt: str | None = None, *, tool_executor: Callable[[str, str, int, Any], dict[str, Any]] | None = None, max_tool_rounds: int = 8) -> dict[str, Any]:
         if prompt is None:
             prompt = self.store.provider_session(provider_session_id).get("prompt")
             if not prompt:
@@ -31,13 +32,66 @@ class ProviderRuntime:
         reason: str | None = None
         session = self.store.provider_session(provider_session_id)
         remote_session_id = session.get("remote_session_id") or provider_session_id
+        if max_tool_rounds < 0:
+            raise ValueError("invalid_tool_round_limit")
+        seen_calls: set[str] = set()
+        tool_rounds = 0
         try:
-            for event in provider.stream(remote_session_id, prompt):
-                if event.kind == "output":
-                    if self.store.record_provider_output(provider_session_id, event.event_id, event.text, event.model):
-                        output += event.text
-                elif event.kind == "status":
-                    final_status, reason = self._map_status(event.status, event.reason)
+            while final_status is None:
+                for event in provider.stream(remote_session_id, prompt):
+                    if event.kind == "output":
+                        if self.store.record_provider_output(provider_session_id, event.event_id, event.text, event.model):
+                            output += event.text
+                    elif event.kind == "tool_call":
+                        call = event.metadata or {}
+                        call_id, tool_id = call.get("call_id"), call.get("tool_id")
+                        version, input_data = call.get("version"), call.get("input")
+                        if not isinstance(call_id, str) or not isinstance(tool_id, str) or not isinstance(version, int) or not isinstance(input_data, (dict, list, str, int, float, bool, type(None))):
+                            final_status, reason = "unknown", "provider_tool_call_invalid"
+                            break
+                        if call_id in seen_calls:
+                            final_status, reason = "unknown", "provider_tool_call_duplicate"
+                            break
+                        if tool_executor is None:
+                            final_status, reason = "unknown", "provider_tool_executor_unavailable"
+                            break
+                        if tool_rounds >= max_tool_rounds:
+                            final_status, reason = "unknown", "provider_tool_round_limit_exceeded"
+                            break
+                        seen_calls.add(call_id)
+                        tool_rounds += 1
+                        self.store.append_event(
+                            provider_session_id,
+                            "provider_tool_call",
+                            {"call_id": call_id, "tool_id": tool_id, "version": version, "input": input_data, "round": tool_rounds},
+                            f"provider-tool-call:{provider_session_id}:{call_id}",
+                        )
+                        try:
+                            result = tool_executor(session["member_id"], tool_id, version, input_data)
+                        except Exception as exc:
+                            self.store.append_event(
+                                provider_session_id,
+                                "provider_tool_result",
+                                {"call_id": call_id, "tool_id": tool_id, "status": "error", "error": type(exc).__name__},
+                                f"provider-tool-result:{provider_session_id}:{call_id}",
+                            )
+                            final_status, reason = "unknown", f"provider_tool_execution_error:{type(exc).__name__}"
+                            break
+                        self.store.append_event(
+                            provider_session_id,
+                            "provider_tool_result",
+                            {"call_id": call_id, "tool_id": tool_id, "status": "ok", "result": result},
+                            f"provider-tool-result:{provider_session_id}:{call_id}",
+                        )
+                        prompt = json.dumps({"tool_call_id": call_id, "tool_result": result}, ensure_ascii=False)
+                        break
+                    elif event.kind == "status":
+                        final_status, reason = self._map_status(event.status, event.reason)
+                else:
+                    if final_status is None:
+                        final_status, reason = "unknown", "provider_stream_ended_without_terminal_status"
+                if final_status is None and tool_rounds == 0:
+                    final_status, reason = "unknown", "provider_stream_ended_without_terminal_status"
         except Exception as exc:
             final_status, reason = "unknown", f"provider_stream_error:{type(exc).__name__}"
         if final_status is None:

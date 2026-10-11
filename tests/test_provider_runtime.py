@@ -1,3 +1,4 @@
+import json
 import sys
 
 from butian.adapters.local import LocalCommandProvider
@@ -195,3 +196,76 @@ def test_provider_lost_status_is_preserved(tmp_path):
     assert result["status"] == "provider_lost"
     assert result["reason"] == "remote_session_missing"
     store.close()
+
+
+def test_provider_runtime_executes_authorized_tool_and_returns_result(tmp_path):
+    from butian.adapters.base import ProviderEvent
+    store = Store(tmp_path / "tool-loop.db")
+    calls = []
+
+    class ToolProvider(ScriptedProvider):
+        provider_id = "tool-provider"
+        def __init__(self):
+            self.round = 0
+        def stream(self, provider_session_id, prompt):
+            self.round += 1
+            if self.round == 1:
+                yield ProviderEvent("call-1", "tool_call", metadata={"call_id": "call-1", "tool_id": "t1", "version": 1, "input": {"x": 1}})
+            else:
+                assert '"tool_result"' in prompt
+                yield ProviderEvent("out-1", "output", "done")
+                yield ProviderEvent("finish", "status", status="completed")
+
+    provider = ToolProvider()
+    session_id = store.create_provider_session("member-1", provider.provider_id, remote_session_id="remote-1", prompt="start")
+    result = ProviderRuntime(store).consume(
+        session_id, provider,
+        tool_executor=lambda member, tool, version, data: calls.append((member, tool, version, data)) or {"ok": True},
+    )
+    assert result["status"] == "completed"
+    assert result["text"] == "done"
+    assert calls == [("member-1", "t1", 1, {"x": 1})]
+    audit = store.db.execute("SELECT event_type, payload FROM events WHERE aggregate_id=? ORDER BY seq", (session_id,)).fetchall()
+    assert [row["event_type"] for row in audit] == ["provider_tool_call", "provider_tool_result"]
+    assert json.loads(audit[0]["payload"])["call_id"] == "call-1"
+    assert json.loads(audit[1]["payload"])["result"] == {"ok": True}
+    store.close()
+
+
+def test_openai_compatible_provider_emits_tool_call_event(monkeypatch):
+    from butian.adapters.http import OpenAICompatibleProvider
+
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc, tb):
+            return False
+        def read(self):
+            return (b'{"model":"gpt-test","choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"tool-1","arguments":"{\\"x\\":1}"}}]}}]}')
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Response())
+    provider = OpenAICompatibleProvider("http://provider", model="gpt-test")
+    session = provider.create_child_session("member", "prompt").provider_event_id
+    events = list(provider.stream(session, "prompt"))
+    assert events[0].kind == "tool_call"
+    assert events[0].metadata == {"call_id": "call-1", "tool_id": "tool-1", "version": 1, "input": {"x": 1}}
+
+
+def test_openai_compatible_provider_rejects_malformed_tool_arguments(monkeypatch):
+    from butian.adapters.http import OpenAICompatibleProvider
+
+    class Response:
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc, tb):
+            return False
+        def read(self):
+            return (b'{"choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"tool-1","arguments":"not-json"}}]}}]}')
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Response())
+    provider = OpenAICompatibleProvider("http://provider", model="gpt-test")
+    session = provider.create_child_session("member", "prompt").provider_event_id
+    events = list(provider.stream(session, "prompt"))
+    assert events[-1].kind == "status"
+    assert events[-1].status == "unknown"
+    assert events[-1].reason == "provider_tool_call_invalid_arguments"

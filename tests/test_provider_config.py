@@ -42,6 +42,17 @@ class ProviderConfigTests(unittest.TestCase):
         self.assertIn("api_key_env_not_set", errors[0].reason)
         self.assertEqual(registry.list(), ["manual"])
 
+    def test_context_window_is_bound_to_http_provider(self):
+        registry, errors = build_registry([{"type": "openai-compatible", "provider_id": "x", "base_url": "https://x/v1", "model": "m", "context_window": 32768}])
+        self.assertEqual(errors, [])
+        self.assertEqual(registry.get("x").capabilities().context_window, 32768)
+
+    def test_invalid_context_window_is_reported(self):
+        registry, errors = build_registry([{"type": "openai-compatible", "provider_id": "x", "base_url": "https://x/v1", "model": "m", "context_window": 0}])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("context_window_invalid", errors[0].reason)
+        self.assertEqual(registry.list(), ["manual"])
+
     def test_unknown_type_reported(self):
         registry, errors = build_registry([{"type": "no-such", "provider_id": "x"}])
         self.assertEqual(len(errors), 1)

@@ -153,9 +153,22 @@ for _action, _fields in {
         _properties.update({"execution_id": {"type": "string"}, "severity": {"type": "string"}})
     if _action in {"issue_triage", "issue_request_information", "issue_provide_information", "issue_link_duplicate", "issue_expire", "issue_pair", "issue_statistics", "circuit_breaker_open", "circuit_breaker_recover"}:
         _properties.update({"now": {"type": "number"}})
+    if _action == "issue_escalations":
+        _properties["status"] = {"type": "string", "enum": ["open", "claimed", "completed", "rejected"]}
+    elif _action == "issue_escalation_resolve":
+        _properties["status"] = {"type": "string", "enum": ["completed", "rejected"]}
+        _properties["resolution"] = {"type": "string"}
+    required = ["member_id", "actor_member_id", "token"]
+    if _action == "issue_escalation_claim":
+        required.append("work_item_id")
+    elif _action == "issue_escalation_resolve":
+        required.extend(["work_item_id", "status"])
+    elif _action == "issue_escalations":
+        pass
+    else:
+        required.extend(_fields)
     TOOLS.append({"name": "butian_tool_" + _action, "description": "Tool developer feedback: " + _action,
-                  "inputSchema": {"type": "object", "properties": _properties,
-                                  "required": list(_fields) + ["member_id", "actor_member_id", "token"]}})
+                  "inputSchema": {"type": "object", "properties": _properties, "required": required}})
 
 for _tool in TOOLS:
     if _tool["name"] in _MEMBER_TOOL_NAMES:

@@ -129,7 +129,11 @@ class ButianService:
         member = self.store.db.execute("SELECT provider_id, model_id FROM members WHERE member_id=?", (member_id,)).fetchone()
         if not member:
             raise ValueError("member_not_found")
-        composed, report = self.compose_context(member_id, prompt, task_id=task_id, environment=environment, include_tools=True)
+        selected_provider = self.providers.get(provider_id or member["provider_id"])
+        context_window = selected_provider.capabilities().context_window
+        if context_window is None:
+            raise ValueError("provider_context_window_unknown")
+        composed, report = self.compose_context(member_id, prompt, task_id=task_id, environment=environment, budgets={"WINDOW": context_window}, include_tools=True)
         operation_key = f"ctx_{report.decision_id}"
         if task_id:
             self.store.append_event(task_id, "provider_context_composed", report.as_dict(), operation_key)
@@ -155,7 +159,14 @@ class ButianService:
         """Consume a Provider session and move its running task to review when complete."""
         session = self.store.provider_session(provider_session_id)
         provider = self.providers.get(session["provider_id"])
-        result = self.provider_runtime.consume(provider_session_id, provider, prompt)
+        result = self.provider_runtime.consume(
+            provider_session_id,
+            provider,
+            prompt,
+            tool_executor=lambda member_id, tool_id, version, input_data: self.execute_tool(
+                member_id, tool_id, version, input_data, task_id=session.get("task_id")
+            ),
+        )
         if result.get("status") == "completed" and result.get("text", "").strip() and session.get("task_id"):
             task = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
             if task and task["status"] == "running" and not task["parent_id"]:
