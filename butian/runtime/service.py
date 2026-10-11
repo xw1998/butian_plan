@@ -664,14 +664,18 @@ class ButianService:
         rework_count = self.store.record_rework(task_id, revision, reviewer_member_id=reviewer_member_id or "", notes=notes, rework_limit=rework_limit)
         self.store.transition_task(task_id, revision, "ready", f"review_rework_{task_id}_{revision}_{rework_count}", payload={**self._task_payload(task), "review_verdict": "rework", "reviewer_member_id": reviewer_member_id, "review_notes": notes, "rework_count": rework_count})
         refreshed = next(item for item in self.store.list_tasks() if item["task_id"] == task_id)
-        next_revision = refreshed["revision"]
         instruction = self._task_payload(refreshed).get("instruction") or refreshed.get("title") or "请根据审核意见重新执行任务"
-        self.store.transition_task(task_id, next_revision, "claimed", f"review_rework_claim_{task_id}_{next_revision}")
-        claimed = next(item for item in self.store.list_tasks() if item["task_id"] == task_id)
-        self.store.transition_task(task_id, claimed["revision"], "running", f"review_rework_run_{task_id}_{claimed['revision']}")
-        execution = self.start_provider_task(refreshed["assignee_id"], instruction, task_id=task_id, environment=self._task_payload(refreshed).get("environment"))
+        execution = {"status": "ready", "reason": "provider_unavailable"}
+        if refreshed.get("assignee_id"):
+            member = self.store.db.execute("SELECT provider_id FROM members WHERE member_id=?", (refreshed["assignee_id"],)).fetchone()
+            if member and member["provider_id"]:
+                next_revision = refreshed["revision"]
+                self.store.transition_task(task_id, next_revision, "claimed", f"review_rework_claim_{task_id}_{next_revision}")
+                claimed = next(item for item in self.store.list_tasks() if item["task_id"] == task_id)
+                self.store.transition_task(task_id, claimed["revision"], "running", f"review_rework_run_{task_id}_{claimed['revision']}")
+                execution = self.start_provider_task(refreshed["assignee_id"], instruction, task_id=task_id, environment=self._task_payload(refreshed).get("environment"))
         learning = self._record_review_learning(task, revision, "rework", notes, handoff)
-        return {"task_id": task_id, "verdict": "rework", "status": "running", "rework_count": rework_count, "rework_limit": rework_limit, "execution": execution, "learning": learning}
+        return {"task_id": task_id, "verdict": "rework", "status": execution["status"], "rework_count": rework_count, "rework_limit": rework_limit, "execution": execution, "learning": learning}
 
     def _record_review_learning(self, task: dict[str, Any], revision: int, verdict: str, notes: str, handoff_row) -> dict[str, Any]:
         """Turn an audited review into a deduplicated candidate; never promotes it."""

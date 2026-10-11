@@ -89,9 +89,7 @@ class TeamGoalHttpTests(unittest.TestCase):
             server.server_close()
             svc.close()
 
-if __name__ == "__main__":
-    unittest.main()
-
+class TeamExecutionAndReviewTests(unittest.TestCase):
     def test_team_session_requires_dispatcher(self):
         svc, _ = _svc()
         try:
@@ -201,6 +199,7 @@ if __name__ == "__main__":
             # 返工：review→ready
             r = svc.review_task(task_id, 5, "rework", reviewer_member_id="m1", notes="不合格")
             self.assertEqual(r["status"], "ready"); self.assertEqual(r["rework_count"], 1)
+            self.assertEqual(r["execution"]["reason"], "provider_unavailable")
             # 重新走完到 review
             for rev, target in ((6, "claimed"), (7, "running"), (8, "review")):
                 svc.store.transition_task(task_id, rev, target, f"op_{task_id}_{rev}")
@@ -242,8 +241,6 @@ if __name__ == "__main__":
             svc.close()
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class NaturalLanguageTeamGoalTests(unittest.TestCase):
