@@ -844,11 +844,23 @@ class ButianService:
     def tool_stats(self, tool_id: str, version: int):
         return self.tools.stats(tool_id, version)
 
+    def grant_host_authorization(self, owner_member_id: str, tool_id: str, version: int, *, capabilities: list[str], reason: str):
+        return self.tools.grant_host_authorization(owner_member_id, tool_id, version, capabilities=capabilities, reason=reason)
+
+    def revoke_host_authorization(self, owner_member_id: str, authorization_id: str, *, reason: str):
+        return self.tools.revoke_host_authorization(owner_member_id, authorization_id, reason=reason)
+
     def execute_tool(self, actor_member_id: str, tool_id: str, version: int, input_data=None, **options):
         return self.tools.execute(actor_member_id, tool_id, version, input_data, **options)
 
     def list_tool_executions(self, actor_member_id: str, *, tool_id: str | None = None, limit: int = 50):
         return self.tools.list_executions(actor_member_id, tool_id=tool_id, limit=limit)
+
+    def list_running_tool_executions(self, actor_member_id: str):
+        return self.tools.list_running_executions(actor_member_id)
+
+    def cancel_tool_execution(self, actor_member_id: str, execution_id: str, *, reason: str):
+        return self.tools.cancel_execution(actor_member_id, execution_id, reason=reason)
 
     def share_tool(self, owner_member_id: str, tool_id: str, recipient_member_id: str, *, permission: str = "team_readonly"):
         return self.tools.share(owner_member_id, tool_id, recipient_member_id, permission=permission)

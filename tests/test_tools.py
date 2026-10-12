@@ -1160,6 +1160,7 @@ def test_host_trusted_backend_records_real_runtime_identity(tmp_path):
                                        call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
                                        risk_cost_upper=1)["tool_id"]
         service.add_tool_version("m1", tool_id, "print('{\"ok\": true}')", manifest)
+        service.grant_host_authorization("m1", tool_id, 1, capabilities=["process.spawn"], reason="test")
         result = service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
         assert result["status"] == "success"
         audit = service.list_tool_executions("m1", tool_id=tool_id)[0]
@@ -1173,5 +1174,79 @@ def test_host_trusted_backend_records_real_runtime_identity(tmp_path):
         assert capabilities["interpreter"] == sys.executable
         assert len(capabilities["content_hash"]) == 64
         assert len(capabilities["manifest_hash"]) == 64
+    finally:
+        service.close()
+
+
+def test_host_trusted_requires_revocable_host_authorization(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "object"},
+                    "permissions": ["execute"], "isolation": {"profile": "host_trusted"},
+                    "entrypoint": ["python", "tool.py"]}
+        tool_id = service.propose_tool("m1", "授权宿主工具", "需要显式宿主授权", reuse_lower=3, manual_cost_upper=10,
+                                       call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
+                                       risk_cost_upper=1)["tool_id"]
+        service.add_tool_version("m1", tool_id, "print('{\"ok\": true}')", manifest)
+        with pytest.raises(ValueError, match="host_authorization_required"):
+            service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
+        grant = service.grant_host_authorization("m1", tool_id, 1, capabilities=["process.spawn"], reason="test")
+        assert grant["status"] == "active"
+        result = service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
+        assert result["status"] == "success"
+        service.revoke_host_authorization("m1", grant["authorization_id"], reason="test revoke")
+        with pytest.raises(ValueError, match="host_authorization_revoked"):
+            service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
+    finally:
+        service.close()
+
+
+def test_unavailable_backend_fails_closed_before_execution(tmp_path, monkeypatch):
+    service = make_service(tmp_path)
+    try:
+        manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "object"},
+                    "permissions": ["execute"], "entrypoint": ["node", "tool.js"]}
+        tool_id = service.propose_tool("m1", "缺失解释器工具", "验证解释器 fail closed", reuse_lower=3, manual_cost_upper=10,
+                                       call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
+                                       risk_cost_upper=1)["tool_id"]
+        service.add_tool_version("m1", tool_id, "console.log('{}')", manifest)
+        monkeypatch.setattr("butian.runtime.tools.shutil.which", lambda name: None)
+        with pytest.raises(ValueError, match="tool_interpreter_unavailable:node"):
+            service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
+    finally:
+        service.close()
+
+
+def test_running_execution_can_be_cancelled_and_audited(tmp_path):
+    import threading
+    import time
+
+    service = make_service(tmp_path)
+    try:
+        manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "object"},
+                    "permissions": ["execute"], "entrypoint": ["python", "tool.py"]}
+        tool_id = service.propose_tool("m1", "可取消工具", "验证主动取消", reuse_lower=3, manual_cost_upper=10,
+                                       call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
+                                       risk_cost_upper=1)["tool_id"]
+        service.add_tool_version("m1", tool_id, "import time\ntime.sleep(30)\n", manifest)
+        result = {}
+        worker = threading.Thread(target=lambda: result.update(service.execute_tool("m1", tool_id, 1, {}, verification_only=True, timeout_seconds=60)))
+        worker.start()
+        execution_id = None
+        for _ in range(100):
+            running = service.list_running_tool_executions("m1")
+            if running:
+                execution_id = running[0]["execution_id"]
+                break
+            time.sleep(0.02)
+        assert execution_id is not None
+        cancelled = service.cancel_tool_execution("m1", execution_id, reason="test cancel")
+        assert cancelled["status"] == "cancelled"
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert result["status"] == "cancelled"
+        audit = service.list_tool_executions("m1", tool_id=tool_id)[0]
+        assert audit["status"] == "cancelled"
+        assert audit["termination_reason"] == "cancelled_by_actor"
     finally:
         service.close()

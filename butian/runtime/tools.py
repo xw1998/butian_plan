@@ -288,6 +288,8 @@ class ToolStore:
         self.tools_root = self.home / "members"
 
         self.recovery_events: list[dict[str, Any]] = []
+        self._active_executions: dict[str, dict[str, Any]] = {}
+        self._active_executions_lock = threading.RLock()
         self._create_schema()
         self._recover_orphan_version_dirs()
 
@@ -419,6 +421,13 @@ class ToolStore:
             actor_member_id TEXT NOT NULL, payload TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, created_at REAL NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS host_authorizations (
+            authorization_id TEXT PRIMARY KEY, owner_member_id TEXT NOT NULL, tool_id TEXT NOT NULL,
+            version INTEGER NOT NULL, capabilities TEXT NOT NULL, status TEXT NOT NULL,
+            reason TEXT NOT NULL, created_at REAL NOT NULL, revoked_at REAL, revoke_reason TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_host_auth_tool ON host_authorizations(tool_id, version, owner_member_id, status);
+
         CREATE TABLE IF NOT EXISTS tool_circuit_breakers (
             tool_id TEXT NOT NULL, version INTEGER NOT NULL, scope TEXT NOT NULL,
             reason TEXT NOT NULL, status TEXT NOT NULL, opened_at REAL NOT NULL,
@@ -549,9 +558,15 @@ class ToolStore:
 
         version_root = (self._member_dir(tool["owner_member_id"]) / tool_id / f"v{version}").resolve()
 
-        if not source.is_relative_to(version_root) or source.name != "tool.py" or not source.is_file():
+        if not source.is_relative_to(version_root) or not source.is_file():
 
             raise ValueError("tool_source_path_invalid")
+
+        entrypoint = manifest.get("entrypoint") or ["python", "tool.py"]
+        expected_source = {"python": "tool.py", "node": "tool.js", "powershell": "tool.ps1"}
+        if not isinstance(entrypoint, list) or len(entrypoint) != 2 or entrypoint[0] not in expected_source or entrypoint[1] != expected_source[entrypoint[0]] or source.name != expected_source[entrypoint[0]]:
+
+            raise ValueError("tool_entrypoint_not_allowlisted")
 
         raw = source.read_bytes()
 
@@ -591,14 +606,21 @@ class ToolStore:
         if required_isolation:
             raise ValueError("tool_isolation_backend_unavailable:python_host:" + ",".join(sorted(set(required_isolation))))
         runtime_profile = isolation.get("profile", "low_risk_host")
+        if runtime_profile == "host_trusted":
+            authorization = self.store.db.execute("SELECT authorization_id FROM host_authorizations WHERE owner_member_id=? AND tool_id=? AND version=? AND status='active' ORDER BY created_at DESC LIMIT 1", (actor_member_id, tool_id, version)).fetchone()
+            if not authorization:
+                revoked = self.store.db.execute("SELECT 1 FROM host_authorizations WHERE owner_member_id=? AND tool_id=? AND version=? AND status='revoked' LIMIT 1", (actor_member_id, tool_id, version)).fetchone()
+                raise ValueError("host_authorization_revoked" if revoked else "host_authorization_required")
         if runtime_profile not in {"low_risk_host", "host_trusted"}:
             raise ValueError("tool_isolation_profile_unsupported")
         assertions = manifest.get("business_assertions", [])
         if not isinstance(assertions, list) or any(not isinstance(item, dict) or not isinstance(item.get("path"), str) or "expected" not in item for item in assertions):
             raise ValueError("tool_business_assertions_invalid")
-        if manifest.get("entrypoint") not in (None, ["python", "tool.py"]):
-
-            raise ValueError("tool_entrypoint_not_allowlisted")
+        interpreter_names = {"python": sys.executable, "node": "node", "powershell": "powershell"}
+        interpreter = interpreter_names[entrypoint[0]]
+        resolved_interpreter = shutil.which(interpreter)
+        if not resolved_interpreter:
+            raise ValueError("tool_interpreter_unavailable:" + entrypoint[0])
 
         timeout = _finite(timeout_seconds, "timeout_seconds", nonnegative=True)
 
@@ -628,17 +650,17 @@ class ToolStore:
 
         runtime_backend = "host_trusted" if runtime_profile == "host_trusted" else "python_host"
         isolation_level = "same_account_host" if runtime_profile == "host_trusted" else "host_process"
-        runtime_capabilities = {"filesystem_isolation": False, "network_isolation": False, "subprocess_isolation": False, "memory_limit": False, "file_size_limit": False, "process_tree_control": False, "working_directory": "temporary_only_not_a_security_boundary", "timeout": True, "output_limit": True, "active_cancellation": False, "host_trusted": runtime_profile == "host_trusted", "same_account_no_os_isolation": runtime_profile == "host_trusted", "interpreter": sys.executable, "content_hash": actual_hash, "manifest_hash": manifest_digest, "source_path": str(source)}
+        runtime_capabilities = {"filesystem_isolation": False, "network_isolation": False, "subprocess_isolation": False, "memory_limit": False, "file_size_limit": False, "process_tree_control": False, "working_directory": "temporary_only_not_a_security_boundary", "timeout": True, "output_limit": True, "active_cancellation": False, "host_trusted": runtime_profile == "host_trusted", "same_account_no_os_isolation": runtime_profile == "host_trusted", "interpreter": resolved_interpreter, "interpreter_kind": entrypoint[0], "content_hash": actual_hash, "manifest_hash": manifest_digest, "source_path": str(source)}
         business_assertions = manifest.get("business_assertions", [])
         common = {"execution_id": execution_id, "tool_id": tool_id, "version": version, "actor_member_id": actor_member_id, "task_id": task_id, "input_hash": input_hash, "permissions": permissions, "runtime_backend": runtime_backend, "isolation_level": isolation_level, "isolation_capabilities": runtime_capabilities, "business_assertions": business_assertions, "verification_only": bool(verification_only)}
 
         if dry_run:
 
-            self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 1, "dry_run", None, "", "", "dry_run", json.dumps(permissions), started, started, "python_host", "host_process", json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+            self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 1, "dry_run", None, "", "", "dry_run", json.dumps(permissions), started, started, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
 
             self._event(tool_id, version, "execution_dry_run", {"execution_id": execution_id, "actor_member_id": actor_member_id, "permissions": permissions}, f"tool:execution:{execution_id}")
 
-            common["argv"] = [sys.executable, "-I", str(source)]
+            common["argv"] = [resolved_interpreter, "-I", str(source)] if entrypoint[0] == "python" else [resolved_interpreter, str(source)]
             return {**common, "status": "dry_run", "argv": common["argv"], "permissions": permissions}
 
         current = self.store.db.execute("SELECT status, current_version, owner_member_id FROM tool_assets WHERE tool_id=?", (tool_id,)).fetchone()
@@ -662,10 +684,15 @@ class ToolStore:
 
             with tempfile.TemporaryDirectory(prefix="butian-tool-") as work:
 
-                argv = [sys.executable, "-I", str(source)]
+                argv = [resolved_interpreter, "-I", str(source)] if entrypoint[0] == "python" else [resolved_interpreter, str(source)]
                 runtime_capabilities["argv"] = argv
                 runtime_capabilities["cwd"] = work
                 proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work, env={"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}, shell=False)
+
+                with self._active_executions_lock:
+                    self._active_executions[execution_id] = {"process": proc, "actor_member_id": actor_member_id, "tool_id": tool_id, "version": version, "started_at": started, "cancel_requested": False}
+                self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "running", None, "", "", None, json.dumps(permissions), started, None, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+                self._event(tool_id, version, "execution_started", {"execution_id": execution_id, "actor_member_id": actor_member_id}, f"tool:execution:{execution_id}:started")
 
                 captured: dict[str, bytes] = {"stdout": b"", "stderr": b""}
                 overflow = threading.Event()
@@ -711,9 +738,16 @@ class ToolStore:
                     for reader in readers:
                         reader.join(timeout=2)
                 exit_code = proc.returncode
+                with self._active_executions_lock:
+                    active = self._active_executions.get(execution_id)
+                    cancel_requested = bool(active and active["cancel_requested"])
+                    self._active_executions.pop(execution_id, None)
+                if cancel_requested:
+                    result_status = "cancelled" if proc.poll() is not None else "unknown"
+                    reason = "cancelled_by_actor" if result_status == "cancelled" else "cancel_unconfirmed"
                 out, err = captured["stdout"], captured["stderr"]
                 stdout, stderr = out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
-                if reason != "timeout":
+                if not cancel_requested and reason != "timeout":
                     result_status = "failed" if overflow.is_set() or exit_code else "success"
                     reason = "output_limit_exceeded" if overflow.is_set() else (None if exit_code == 0 else "nonzero_exit")
                     if result_status == "success":
@@ -742,10 +776,12 @@ class ToolStore:
         except OSError as exc:
 
             stderr, reason = str(exc)[:output_limit], "launch_failed"
+            if not self.store.db.execute("SELECT 1 FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone():
+                self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "failed", None, "", stderr, reason, json.dumps(permissions), started, time.time(), runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
 
         finished = time.time()
 
-        self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, result_status, exit_code, stdout, stderr, reason, json.dumps(permissions), started, finished, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+        self.store.db.execute("UPDATE tool_executions SET status=?, exit_code=?, stdout=?, stderr=?, termination_reason=?, finished_at=? WHERE execution_id=?", (result_status, exit_code, stdout, stderr, reason, finished, execution_id))
         self._event(tool_id, version, "execution", {"execution_id": execution_id, "actor_member_id": actor_member_id, "status": result_status, "reason": reason}, f"tool:execution:{execution_id}")
 
         if result_status in {"failed", "cancelled"}:
@@ -1215,6 +1251,60 @@ class ToolStore:
         if cur.rowcount != 1: raise ValueError("tool_circuit_breaker_not_open")
         self._event(tool_id,version,"circuit_breaker_recovered",{"scope":scope},f"breaker:{tool_id}:{version}:{scope}:recovered:{uuid.uuid4().hex}"); return dict(self.store.db.execute("SELECT * FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND scope=?",(tool_id,version,scope)).fetchone())
 
+    def grant_host_authorization(self, owner_member_id: str, tool_id: str, version: int, *, capabilities: list[str], reason: str) -> dict[str, Any]:
+        if owner_member_id != self._tool(tool_id)["owner_member_id"]:
+            raise ValueError("tool_access_denied")
+        allowed = {"filesystem.read", "filesystem.write", "network", "process.spawn", "application.control", "device", "package.install"}
+        if not isinstance(capabilities, list) or not capabilities or any(item not in allowed for item in capabilities) or not reason.strip():
+            raise ValueError("host_authorization_invalid")
+        if not self.store.db.execute("SELECT 1 FROM tool_versions WHERE tool_id=? AND version=?", (tool_id, version)).fetchone():
+            raise ValueError("tool_version_not_found")
+        now = time.time()
+        authorization_id = "hauth_" + uuid.uuid4().hex
+        self.store.db.execute("INSERT INTO host_authorizations VALUES (?,?,?,?,?,?,?,?,?,?)", (authorization_id, owner_member_id, tool_id, version, json.dumps(sorted(set(capabilities))), "active", reason, now, None, None))
+        self._event(tool_id, version, "host_authorization_granted", {"authorization_id": authorization_id, "capabilities": sorted(set(capabilities))}, f"host-auth:{authorization_id}:grant")
+        return dict(self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone())
+
+    def revoke_host_authorization(self, owner_member_id: str, authorization_id: str, *, reason: str) -> dict[str, Any]:
+        row = self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone()
+        if not row or row["owner_member_id"] != owner_member_id:
+            raise ValueError("host_authorization_not_found")
+        if not reason.strip():
+            raise ValueError("host_revoke_reason_required")
+        updated = self.store.db.execute("UPDATE host_authorizations SET status='revoked', revoked_at=?, revoke_reason=? WHERE authorization_id=? AND status='active'", (time.time(), reason, authorization_id)).rowcount
+        if updated != 1:
+            raise ValueError("host_authorization_not_active")
+        self._event(row["tool_id"], row["version"], "host_authorization_revoked", {"authorization_id": authorization_id, "reason": reason}, f"host-auth:{authorization_id}:revoke")
+        return dict(self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone())
+
+    def cancel_execution(self, actor_member_id: str, execution_id: str, *, reason: str) -> dict[str, Any]:
+
+        row = self.store.db.execute("SELECT e.*, a.owner_member_id FROM tool_executions e JOIN tool_assets a ON a.tool_id=e.tool_id WHERE e.execution_id=?", (execution_id,)).fetchone()
+        if not row or actor_member_id not in {row["actor_member_id"], row["owner_member_id"]}:
+            raise ValueError("execution_access_denied")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("execution_cancel_reason_required")
+        with self._active_executions_lock:
+            active = self._active_executions.get(execution_id)
+            if not active:
+                current = self.store.db.execute("SELECT status FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+                return {"execution_id": execution_id, "status": current["status"] if current else "unknown"}
+            active["cancel_requested"] = True
+            proc = active["process"]
+            self.store.db.execute("UPDATE tool_executions SET status='cancelling', termination_reason=? WHERE execution_id=? AND status='running'", (reason, execution_id))
+        _terminate_process_tree(proc)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            status = "unknown"
+        else:
+            status = "cancelled" if proc.poll() is not None else "unknown"
+        self._event(row["tool_id"], row["version"], "execution_cancel_requested", {"execution_id": execution_id, "actor_member_id": actor_member_id, "reason": reason, "status": status}, f"tool:execution:{execution_id}:cancel")
+        return {"execution_id": execution_id, "status": status}
+
+    def list_running_executions(self, actor_member_id: str) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.store.db.execute("SELECT execution_id, tool_id, version, actor_member_id, task_id, status, started_at FROM tool_executions WHERE status IN ('running','cancelling') AND (actor_member_id=? OR tool_id IN (SELECT tool_id FROM tool_assets WHERE owner_member_id=?)) ORDER BY started_at", (actor_member_id, actor_member_id))]
+
     def list_executions(self, actor_member_id: str, *, tool_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
 
         if limit < 1 or limit > 500:
@@ -1387,7 +1477,11 @@ class ToolStore:
 
         staging.mkdir(parents=False, exist_ok=False)
 
-        source = staging / "tool.py"
+        entrypoint = manifest.get("entrypoint") or ["python", "tool.py"]
+        source_names = {"python": "tool.py", "node": "tool.js", "powershell": "tool.ps1"}
+        if not isinstance(entrypoint, list) or len(entrypoint) != 2 or entrypoint[0] not in source_names or entrypoint[1] != source_names[entrypoint[0]]:
+            raise ValueError("tool_entrypoint_not_allowlisted")
+        source = staging / source_names[entrypoint[0]]
 
         try:
             with source.open("xb") as stream:
@@ -1397,7 +1491,7 @@ class ToolStore:
             now = time.time()
 
             os.replace(staging, path)
-            source = path / "tool.py"
+            source = path / source_names[entrypoint[0]]
             self._insert_version_row(tool_id, version, digest, source, manifest, now)
         except BaseException:
             if staging.exists():
