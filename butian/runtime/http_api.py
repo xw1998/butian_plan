@@ -174,7 +174,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             protected = ("/api/memory/", "/api/providers/", "/api/evolution/",
                          "/api/tools", "/api/tasks", "/api/goals/", "/api/sessions/",
                          "/api/evidence", "/api/hypotheses/",
-                         "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments")
+                         "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments", "/api/members")
             if path.startswith(protected) and not (path == "/api/providers/cancel" and not body.get("provider_session_id")) and not self._require_member(body):
                 return
             if path == "/api/tools/issues/report":
@@ -291,11 +291,16 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/goals/submit":
                 self._send(201, self.service.submit_goal(body["goal"], mode=body.get("mode", "solo"), member_id=body.get("member_id"), dispatcher_member_id=body.get("dispatcher_member_id"), requested_model=body.get("requested_model"), capabilities=body.get("capabilities"), environment=body.get("environment"), member_ids=body.get("member_ids"), subtasks=body.get("subtasks"))); return
             if path == "/api/goals/run-team":
+                if not self.service.store.task_access(body["task_id"], self._member_credentials(body)[0]):
+                    self._send(403, {"error": "task_access_denied"}); return
                 self._send(200, self.service.run_team_goal(body["task_id"])); return
             if path == "/api/providers/start":
                 self._send(201, self.service.start_provider_task(body["member_id"], body["prompt"], task_id=body.get("task_id"), provider_id=body.get("provider_id"), model=body.get("model"))); return
             if path == "/api/providers/consume":
-                self._send(200, self.service.consume_provider_task(body["provider_session_id"], body["prompt"])); return
+                actor = self._member_credentials(body)[0]
+                if not self.service.store.provider_session_access(body["provider_session_id"], actor):
+                    self._send(403, {"error": "provider_session_access_denied"}); return
+                self._send(200, self.service.consume_provider_task(body["provider_session_id"], body.get("prompt"), actor_member_id=actor)); return
             if path == "/api/evolution/compose":
                 self._send(201, self.service.compose_memories(body["member_id"], body["result_memory_id"], body["component_memory_ids"], content=body["content"], kind=body.get("kind", "compound"), environment=body.get("environment"), source_event_ids=body.get("source_event_ids"), composition_bonus=body.get("composition_bonus", 0.0), redundancy_penalty=body.get("redundancy_penalty", 0.0), conflict_penalty=body.get("conflict_penalty", 0.0))); return
             if path == "/api/evolution/skill/update":

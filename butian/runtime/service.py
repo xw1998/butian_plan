@@ -157,16 +157,32 @@ class ButianService:
             if memory is not None:
                 memory.close()
 
-    def consume_provider_task(self, provider_session_id: str, prompt: str | None = None):
+    def _provider_share_id(self, member_id: str, tool_id: str, version: int) -> str | None:
+        rows = self.store.db.execute("SELECT share_id FROM tool_shares WHERE tool_id=? AND version=? AND recipient_member_id=? AND status IN ('active','trial') AND permission='team_execute' AND (expires_at IS NULL OR expires_at>?)", (tool_id, version, member_id, time.time())).fetchall()
+        return rows[0]["share_id"] if len(rows) == 1 else None
+
+    def authorize_provider_session(self, provider_session_id: str, member_id: str) -> None:
+        if not self.store.provider_session_access(provider_session_id, member_id):
+            raise ValueError("provider_session_access_denied")
+
+    def authorize_task(self, task_id: str, member_id: str) -> None:
+        if not self.store.task_access(task_id, member_id):
+            raise ValueError("task_access_denied")
+
+    def consume_provider_task(self, provider_session_id: str, prompt: str | None = None, *, actor_member_id: str | None = None):
+        if actor_member_id is not None:
+            self.authorize_provider_session(provider_session_id, actor_member_id)
         """Consume a Provider session and move its running task to review when complete."""
         session = self.store.provider_session(provider_session_id)
         provider = self.providers.get(session["provider_id"])
+        if hasattr(provider, "set_session_tools"):
+            provider.set_session_tools(provider_session_id, self.tools.context_cards(session["member_id"], prompt or session.get("prompt") or "", limit=32))
         result = self.provider_runtime.consume(
             provider_session_id,
             provider,
             prompt,
-            tool_executor=lambda member_id, tool_id, version, input_data: self.execute_tool(
-                member_id, tool_id, version, input_data, task_id=session.get("task_id")
+            tool_executor=lambda member_id, tool_id, version, input_data, share_id=None: self.execute_tool(
+                member_id, tool_id, version, input_data, task_id=session.get("task_id"), share_id=(share_id or self._provider_share_id(member_id, tool_id, version))
             ),
         )
         if result.get("status") == "completed" and result.get("text", "").strip() and session.get("task_id"):

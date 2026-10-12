@@ -122,6 +122,24 @@ def test_http_sensitive_gets_require_member_auth(tmp_path, path):
         service.close()
 
 
+def test_http_member_creation_requires_auth(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "Member")
+    service.store.set_member_token("m1", "secret")
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        req = urlrequest.Request(base + "/api/members", data=json.dumps({"member_id":"m2","name":"Member 2"}).encode(), headers={"Content-Type":"application/json"}, method="POST")
+        with pytest.raises(HTTPError) as error:
+            urlrequest.urlopen(req, timeout=3)
+        assert error.value.code == 401
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=3); service.close()
+
 def test_mcp_escalation_schemas_only_require_action_fields():
     schemas = {item["name"]: item["inputSchema"] for item in mcp_server.TOOLS}
     assert "now" not in schemas["butian_tool_issue_escalations"]["properties"]

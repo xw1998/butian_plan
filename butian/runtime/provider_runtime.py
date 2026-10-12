@@ -22,7 +22,7 @@ class ProviderRuntime:
         provider_session_id = self.store.create_provider_session(member_id, provider.provider_id, task_id=task_id, model=selection.effective_model, remote_session_id=created.provider_event_id, prompt=prompt)
         return {"status": "running", "provider_session_id": provider_session_id, "provider_id": provider.provider_id, "model": selection.effective_model}
 
-    def consume(self, provider_session_id: str, provider: AgentProvider, prompt: str | None = None, *, tool_executor: Callable[[str, str, int, Any], dict[str, Any]] | None = None, max_tool_rounds: int = 8) -> dict[str, Any]:
+    def consume(self, provider_session_id: str, provider: AgentProvider, prompt: str | None = None, *, tool_executor: Callable[..., dict[str, Any]] | None = None, max_tool_rounds: int = 8, max_tool_calls: int = 32) -> dict[str, Any]:
         if prompt is None:
             prompt = self.store.provider_session(provider_session_id).get("prompt")
             if not prompt:
@@ -32,10 +32,11 @@ class ProviderRuntime:
         reason: str | None = None
         session = self.store.provider_session(provider_session_id)
         remote_session_id = session.get("remote_session_id") or provider_session_id
-        if max_tool_rounds < 0:
-            raise ValueError("invalid_tool_round_limit")
+        if max_tool_rounds < 0 or max_tool_calls < 0:
+            raise ValueError("invalid_tool_limit")
         seen_calls: set[str] = set()
         tool_rounds = 0
+        tool_calls = 0
         message_history = [{"role": "user", "content": prompt}]
         try:
             while final_status is None:
@@ -55,12 +56,15 @@ class ProviderRuntime:
                             break
                         if call_id in seen_calls:
                             final_status, reason = "unknown", "provider_tool_call_duplicate"
+                            pending_calls.clear()
                             break
                         if tool_executor is None:
                             final_status, reason = "unknown", "provider_tool_executor_unavailable"
+                            pending_calls.clear()
                             break
-                        if tool_rounds >= max_tool_rounds:
-                            final_status, reason = "unknown", "provider_tool_round_limit_exceeded"
+                        if tool_calls + len(pending_calls) > max_tool_calls:
+                            final_status, reason = "unknown", "provider_tool_call_limit_exceeded"
+                            pending_calls.clear()
                             break
                         seen_calls.add(call_id)
                         pending_calls.append((call_id, tool_id, version, input_data))
@@ -69,13 +73,14 @@ class ProviderRuntime:
                     elif event.kind == "status":
                         terminal_event = event
                 if pending_calls:
-                    if tool_rounds + len(pending_calls) > max_tool_rounds:
+                    if tool_rounds + 1 > max_tool_rounds:
                         final_status, reason = "unknown", "provider_tool_round_limit_exceeded"
                     else:
                         assistant_calls = [{"id": call_id, "type": "function", "function": {"name": tool_id, "arguments": json.dumps(input_data, ensure_ascii=False)}} for call_id, tool_id, version, input_data in pending_calls]
                         message_history.append({"role": "assistant", "tool_calls": assistant_calls})
+                        tool_rounds += 1
+                        tool_calls += len(pending_calls)
                         for call_id, tool_id, version, input_data in pending_calls:
-                            tool_rounds += 1
                             self.store.append_event(
                                 provider_session_id,
                                 "provider_tool_call",
@@ -83,7 +88,10 @@ class ProviderRuntime:
                                 f"provider-tool-call:{provider_session_id}:{call_id}",
                             )
                             try:
-                                result = tool_executor(session["member_id"], tool_id, version, input_data)
+                                try:
+                                    result = tool_executor(session["member_id"], tool_id, version, input_data, None)
+                                except TypeError:
+                                    result = tool_executor(session["member_id"], tool_id, version, input_data)
                             except Exception as exc:
                                 self.store.append_event(
                                     provider_session_id,

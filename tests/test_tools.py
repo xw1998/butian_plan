@@ -977,7 +977,7 @@ def test_context_cards_filter_version_mismatch_and_execute_shares(tmp_path):
             service.verify_tool("m1", tool_id, 1, "success", independent_key=f"exec-recall-{index}", task_id=f"exec-recall-{index}", environment={"kind": f"env-{index}"}, evidence_ids=[f"exec-e-{index}"], execution_id=run["execution_id"], input_hash=run["input_hash"], expected_output=run["expected_output"])
         share = service.share_tool("m1", tool_id, "m2", permission="team_execute")
         service.accept_tool_share("m2", share["share_id"])
-        assert [card["tool_id"] for card in service.tools.context_cards("m2", "execute", limit=10)] == [tool_id]
+        assert [card["tool_id"] for card in service.tools.context_cards("m2", "通用分析 execute", limit=10)] == [tool_id]
         service.store.db.execute("UPDATE tool_shares SET version=version+1 WHERE share_id=?", (share["share_id"],))
         assert service.tools.context_cards("m2", "execute", limit=10) == []
     finally:

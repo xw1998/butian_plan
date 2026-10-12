@@ -20,6 +20,7 @@ class OpenAICompatibleProvider:
         # 每个 provider 会话实际使用的模型（create_child_session 传入，stream 真正使用）
         self._session_models: dict[str, str | None] = {}
         self._session_messages: dict[str, list[dict]] = {}
+        self._session_tools: dict[str, list[dict]] = {}
 
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(can_create_child_session=True, can_stream_output=False, can_cancel_output=False, context_window=self.context_window)
@@ -38,7 +39,11 @@ class OpenAICompatibleProvider:
         session_id = f"http_{uuid.uuid4().hex}"
         self._session_models[session_id] = effective
         self._session_messages[session_id] = [{"role": "user", "content": prompt}]
+        self._session_tools[session_id] = [{"type": "function", "function": {"name": "butian_tool_execute", "description": "Execute an authorized Butian tool", "parameters": {"type": "object", "properties": {"tool_id": {"type": "string"}, "version": {"type": "integer"}, "input": {}}, "required": ["tool_id", "version", "input"]}}}]
         return ProviderResult("accepted", provider_event_id=session_id, model=effective)
+
+    def set_session_tools(self, provider_session_id: str, tools: list[dict]) -> None:
+        self._session_tools[provider_session_id] = [tool for tool in tools if isinstance(tool, dict)]
 
     def stream(self, provider_session_id: str, prompt: str) -> Iterable[ProviderEvent]:
         request_model = self._session_models.get(provider_session_id)
@@ -55,7 +60,7 @@ class OpenAICompatibleProvider:
         if not isinstance(messages, list):
             messages = [{"role": "user", "content": prompt}]
         self._session_messages[provider_session_id] = messages
-        payload = json.dumps({"model": request_model, "messages": messages, "tools": [], "stream": False}).encode()
+        payload = json.dumps({"model": request_model, "messages": messages, "tools": self._session_tools.get(provider_session_id, []), "stream": False}).encode()
         request = urllib.request.Request(self.base_url + "/chat/completions", data=payload, headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {self.api_key}"} if self.api_key else {})}, method="POST")
         try:
             with urllib.request.urlopen(request, timeout=120) as response:

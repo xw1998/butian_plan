@@ -112,6 +112,10 @@ class Store:
             raise ValueError("provider_session_not_found")
         return dict(row)
 
+    def provider_session_access(self, provider_session_id: str, member_id: str) -> bool:
+        row = self.db.execute("SELECT ps.member_id, s.dispatcher_member_id, t.assignee_id FROM provider_sessions ps LEFT JOIN tasks t ON t.task_id=ps.task_id LEFT JOIN sessions s ON s.session_id=t.session_id WHERE ps.provider_session_id=?", (provider_session_id,)).fetchone()
+        return bool(row and member_id in {row["member_id"], row["dispatcher_member_id"], row["assignee_id"]})
+
     @serialized_write
     def record_provider_output(self, provider_session_id: str, provider_event_id: str, text: str, model: str | None = None) -> bool:
         with self.db:
