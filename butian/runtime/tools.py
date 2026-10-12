@@ -1543,7 +1543,24 @@ class ToolStore:
         """Run candidate recall, then apply access/version/reliability admission."""
         if limit < 0:
             raise ValueError("invalid_tool_limit")
-        terms = {part.casefold() for part in instruction.split() if part.strip()}
+        query = instruction.casefold().strip()
+        # Preserve Chinese compound terms: replacing single-character stop words
+        # would corrupt terms such as "通用分析" ("用" is part of the term).
+        stop_phrases = ("请帮我", "请用", "帮我", "帮忙", "查询", "处理", "执行", "进行", "这份", "这个", "一下", "请")
+        for phrase in stop_phrases:
+            query = query.replace(phrase, " ")
+        query_terms = {part.casefold() for part in query.split() if len(part.strip()) >= 2}
+        chinese_spans = []
+        current = []
+        for char in query:
+            if "\u4e00" <= char <= "\u9fff":
+                current.append(char)
+            elif current:
+                chinese_spans.append("".join(current))
+                current = []
+        if current:
+            chinese_spans.append("".join(current))
+        query_terms.update(span for span in chinese_spans if len(span) >= 2)
         rows = self.store.db.execute(
             "SELECT * FROM tool_assets WHERE (owner_member_id=? OR tool_id IN (SELECT tool_id FROM tool_shares WHERE recipient_member_id=?))",
             (member_id, member_id),
@@ -1569,9 +1586,12 @@ class ToolStore:
             manifest = json.loads(row["manifest"] or "{}")
             contract = {key: manifest.get(key) for key in ("input_contract", "output_contract", "permissions", "failure_conditions")}
             text = " ".join((row["name"], row["description"], json.dumps(contract, ensure_ascii=False))).casefold()
-            matched_by = [term for term in sorted(terms) if term in text]
+            matched_by = sorted({term for term in query_terms if term in text})
+            if len(query) >= 2 and query in text:
+                matched_by.append(query)
+            matched_by = sorted(set(matched_by))
             score = len(matched_by)
-            card = {"tool_id": row["tool_id"], "name": row["name"], "description": row["description"], "version": row["current_version"], **contract, "matched_by": matched_by, "confidence": min(1.0, score / max(1, len(terms))), "permission": "owner_execute" if own else "team_readonly"}
+            card = {"tool_id": row["tool_id"], "name": row["name"], "description": row["description"], "version": row["current_version"], **contract, "matched_by": matched_by, "confidence": min(1.0, score / max(1, len(query_terms))), "permission": "owner_execute" if own else "team_readonly"}
             if not own:
                 share = self.store.db.execute("SELECT share_id, permission FROM tool_shares WHERE tool_id=? AND version=? AND recipient_member_id=? AND status IN ('trial','active')", (row["tool_id"], row["current_version"], member_id)).fetchone()
                 if share:

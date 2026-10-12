@@ -99,7 +99,7 @@ def test_http_tool_verify_authenticates_and_forwards_binding_fields(tmp_path, mo
 ])
 def test_http_sensitive_gets_require_member_auth(tmp_path, path):
     service = ButianService(tmp_path)
-    service.add_member("m1", "Member")
+    service.add_member("m1", "Member", role="bootstrap_admin")
     service.store.set_member_token("m1", "secret")
     http_api.ApiHandler.service = service
     http_api.ApiHandler.experiments = ExperimentStore(Path(tmp_path) / "experiments.db")
@@ -124,7 +124,7 @@ def test_http_sensitive_gets_require_member_auth(tmp_path, path):
 
 def test_http_member_creation_requires_auth(tmp_path):
     service = ButianService(tmp_path)
-    service.add_member("m1", "Member")
+    service.add_member("m1", "Member", role="bootstrap_admin")
     service.store.set_member_token("m1", "secret")
     http_api.ApiHandler.service = service
     http_api.ApiHandler.experiments = None
@@ -137,6 +137,16 @@ def test_http_member_creation_requires_auth(tmp_path):
         with pytest.raises(HTTPError) as error:
             urlrequest.urlopen(req, timeout=3)
         assert error.value.code == 401
+        authorized = urlrequest.Request(base + "/api/members", data=json.dumps({"member_id":"m2","name":"Member 2"}).encode(), headers={"Content-Type":"application/json", "X-Butian-Member":"m1", "X-Butian-Token":"secret"}, method="POST")
+        with urlrequest.urlopen(authorized, timeout=3) as response:
+            assert response.status == 201
+        assert service.store.db.execute("SELECT 1 FROM members WHERE member_id='m2'").fetchone()
+        service.store.set_member_token("m2", "secret2")
+        denied_request = urlrequest.Request(base + "/api/members", data=json.dumps({"member_id":"m3","name":"Member 3"}).encode(), headers={"Content-Type":"application/json", "X-Butian-Member":"m2", "X-Butian-Token":"secret2"}, method="POST")
+        with pytest.raises(HTTPError) as denied:
+            urlrequest.urlopen(denied_request, timeout=3)
+        assert denied.value.code == 403
+        assert not service.store.db.execute("SELECT 1 FROM members WHERE member_id='m3'").fetchone()
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=3); service.close()
 
@@ -243,3 +253,38 @@ def test_http_provider_cancel_requires_session_access(tmp_path):
         server.server_close()
         thread.join(timeout=3)
         service.close()
+
+
+def test_http_provider_start_binds_authenticated_actor(tmp_path, monkeypatch):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "Member 1")
+    service.add_member("m2", "Member 2")
+    service.store.set_member_token("m1", "secret1")
+    service.store.set_member_token("m2", "secret2")
+    captured = {}
+    monkeypatch.setattr(service, "start_provider_task", lambda member_id, prompt, **options: captured.update(member_id=member_id, prompt=prompt, options=options) or {"status": "running"})
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        payload = {"member_id": "m2", "prompt": "run"}
+        req = urlrequest.Request(base + "/api/providers/start", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+        with pytest.raises(HTTPError) as missing:
+            urlrequest.urlopen(req, timeout=3)
+        assert missing.value.code == 401
+        req = urlrequest.Request(base + "/api/providers/start", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "m1", "X-Butian-Token": "secret1"}, method="POST")
+        with pytest.raises(HTTPError) as foreign:
+            urlrequest.urlopen(req, timeout=3)
+        assert foreign.value.code == 403
+        assert captured == {}
+        payload["member_id"] = "m1"
+        req = urlrequest.Request(base + "/api/providers/start", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "m1", "X-Butian-Token": "secret1"}, method="POST")
+        with urlrequest.urlopen(req, timeout=3) as response:
+            assert response.status == 201
+        assert captured["member_id"] == "m1"
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=3); service.close()

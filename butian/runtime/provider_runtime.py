@@ -52,7 +52,10 @@ class ProviderRuntime:
                         call = event.metadata or {}
                         call_id, tool_id = call.get("call_id"), call.get("tool_id")
                         version, input_data = call.get("version"), call.get("input")
-                        if not isinstance(call_id, str) or not isinstance(tool_id, str) or not isinstance(version, int) or not isinstance(input_data, (dict, list, str, int, float, bool, type(None))):
+                        if (not isinstance(call_id, str) or not call_id.strip() or
+                                not isinstance(tool_id, str) or not tool_id.strip() or
+                                isinstance(version, bool) or not isinstance(version, int) or version < 1 or
+                                not isinstance(input_data, (dict, list, str, int, float, bool, type(None)))):
                             final_status, reason = "unknown", "provider_tool_call_invalid"
                             pending_calls.clear()
                             batch_invalid = True

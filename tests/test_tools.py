@@ -928,6 +928,11 @@ def test_context_cards_include_only_authorized_current_contracts(tmp_path):
             run = service.execute_tool("m1", tool_id, 1, f"recall-{index}", verification_only=True)
             service.verify_tool("m1", tool_id, 1, "success", independent_key=f"recall-{index}", task_id=f"recall-{index}", environment={"kind": f"env-{index}"}, evidence_ids=[f"recall-e-{index}"], execution_id=run["execution_id"], input_hash=run["input_hash"], expected_output=run["expected_output"])
         owner_cards = service.tools.context_cards("m1", "通用分析", limit=10)
+        natural_cards = service.tools.context_cards("m1", "请用通用分析处理这份文本", limit=10)
+        assert [card["tool_id"] for card in natural_cards] == [tool_id]
+        punctuated_cards = service.tools.context_cards("m1", "请用通用分析，处理这份文本。", limit=10)
+        assert [card["tool_id"] for card in punctuated_cards] == [tool_id]
+        assert service.tools.context_cards("m1", "请帮我查询明天的天气", limit=10) == []
         assert [card["tool_id"] for card in owner_cards] == [tool_id]
         assert all("source" not in card and "entrypoint" not in card for card in owner_cards)
         readonly = service.share_tool("m1", tool_id, "m2", permission="team_readonly")

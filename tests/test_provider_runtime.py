@@ -432,3 +432,31 @@ def test_provider_runtime_sends_standard_tool_message_and_bound_share(tmp_path):
     assert result["status"] == "completed"
     assert calls == [("member", "tool-1", 7, {"x": 1}, "share-1")]
     store.close()
+
+
+def test_provider_tool_call_identifiers_and_version_are_fail_closed(tmp_path):
+    from butian.adapters.base import ProviderEvent
+    store = Store(tmp_path / "invalid-tool-call.db")
+
+    class InvalidCalls(ScriptedProvider):
+        def __init__(self, metadata):
+            self.metadata = metadata
+
+        def stream(self, provider_session_id, prompt):
+            yield ProviderEvent("event", "tool_call", metadata=self.metadata)
+
+    cases = [
+        {"call_id": "", "tool_id": "t1", "version": 1, "input": {}},
+        {"call_id": "c1", "tool_id": "", "version": 1, "input": {}},
+        {"call_id": "c1", "tool_id": "t1", "version": True, "input": {}},
+        {"call_id": "c1", "tool_id": "t1", "version": 0, "input": {}},
+        {"call_id": "c1", "tool_id": "t1", "version": -1, "input": {}},
+    ]
+    try:
+        for index, metadata in enumerate(cases):
+            session_id = store.create_provider_session(f"member-{index}", "scripted", prompt="prompt")
+            result = ProviderRuntime(store).consume(session_id, InvalidCalls(metadata), tool_executor=lambda *args: {})
+            assert result["status"] == "unknown"
+            assert result["reason"] == "provider_tool_call_invalid"
+    finally:
+        store.close()

@@ -174,9 +174,17 @@ class ApiHandler(BaseHTTPRequestHandler):
             protected = ("/api/memory/", "/api/providers/", "/api/evolution/",
                          "/api/tools", "/api/tasks", "/api/goals/", "/api/sessions/",
                          "/api/evidence", "/api/hypotheses/",
-                         "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments", "/api/members")
+                         "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments")
             if path.startswith(protected) and not (path == "/api/providers/cancel" and not body.get("provider_session_id")) and not self._require_member(body):
                 return
+            if path == "/api/members":
+                actor, token = self._member_credentials(body)
+                if not actor:
+                    self._send(401, {"error": "actor_member_id_required"}); return
+                if not self.service.store.authenticate_member(actor, token):
+                    self._send(401, {"error": "member_authentication_failed"}); return
+                if actor != body.get("member_id") and self.service.store.db.execute("SELECT role FROM members WHERE member_id=?", (actor,)).fetchone()["role"] != "bootstrap_admin":
+                    self._send(403, {"error": "member_creation_forbidden"}); return
             if path == "/api/tools/issues/report":
                 result = self.service.report_tool_issue(body["member_id"], body["tool_id"], body["version"], description=body["description"], execution_id=body.get("execution_id"), severity=body.get("severity", "bug"), environment=body.get("environment"), input_summary=body.get("input_summary"), expected_output=body.get("expected_output"), actual_output=body.get("actual_output"), reproduction_steps=body.get("reproduction_steps"), impact_scope=body.get("impact_scope")); self._send(201, result); return
             if path == "/api/tools/issues":
@@ -295,7 +303,15 @@ class ApiHandler(BaseHTTPRequestHandler):
                     self._send(403, {"error": "task_access_denied"}); return
                 self._send(200, self.service.run_team_goal(body["task_id"])); return
             if path == "/api/providers/start":
-                self._send(201, self.service.start_provider_task(body["member_id"], body["prompt"], task_id=body.get("task_id"), provider_id=body.get("provider_id"), model=body.get("model"))); return
+                actor, token = self._member_credentials(body)
+                if not actor or not self.service.store.authenticate_member(actor, token):
+                    self._send(401, {"error": "member_authentication_failed"}); return
+                target_member_id = body.get("member_id")
+                if not target_member_id or target_member_id != actor:
+                    self._send(403, {"error": "member_access_denied"}); return
+                if body.get("task_id") and not self.service.store.task_access(body["task_id"], actor):
+                    self._send(403, {"error": "task_access_denied"}); return
+                self._send(201, self.service.start_provider_task(target_member_id, body["prompt"], task_id=body.get("task_id"), provider_id=body.get("provider_id"), model=body.get("model"))); return
             if path == "/api/providers/consume":
                 actor = self._member_credentials(body)[0]
                 if not self.service.store.provider_session_access(body["provider_session_id"], actor):
