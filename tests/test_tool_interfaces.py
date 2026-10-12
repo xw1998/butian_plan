@@ -288,3 +288,65 @@ def test_http_provider_start_binds_authenticated_actor(tmp_path, monkeypatch):
         assert captured["member_id"] == "m1"
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=3); service.close()
+
+
+def test_http_host_authorization_binds_authenticated_owner_and_supports_listing_revoke(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("owner", "Owner")
+    service.add_member("other", "Other")
+    service.store.set_member_token("owner", "owner-token")
+    service.store.set_member_token("other", "other-token")
+    tool_id = service.propose_tool("owner", "host", "host tool", reuse_lower=3, manual_cost_upper=10,
+                                   call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
+                                   risk_cost_upper=1)["tool_id"]
+    manifest = {"input_contract": {"type": "object"}, "output_contract": {"type": "object"},
+                "permissions": ["execute"], "failure_conditions": ["invalid_input"],
+                "isolation": {"profile": "host_trusted"}, "entrypoint": ["python", "tool.py"]}
+    service.add_tool_version("owner", tool_id, "print('{}')", manifest)
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    def request(path, payload, member="owner", token="owner-token"):
+        req = urlrequest.Request(base + path, data=json.dumps(payload).encode(),
+                                 headers={"Content-Type": "application/json", "X-Butian-Member": member,
+                                          "X-Butian-Token": token}, method="POST")
+        with urlrequest.urlopen(req, timeout=3) as response:
+            return json.loads(response.read())
+    try:
+        with pytest.raises(HTTPError) as denied:
+            request("/api/tools/host-authorizations/grant", {"member_id": "other", "tool_id": tool_id,
+                    "version": 1, "capabilities": ["process.spawn"], "reason": "test"})
+        assert denied.value.code == 403
+        grant = request("/api/tools/host-authorizations/grant", {"tool_id": tool_id,
+                "version": 1, "capabilities": ["process.spawn"], "reason": "test"})
+        assert grant["data"]["owner_member_id"] == "owner"
+        listed = request("/api/tools/host-authorizations/list", {})
+        assert listed["data"]["authorizations"][0]["authorization_id"] == grant["data"]["authorization_id"]
+        revoked = request("/api/tools/host-authorizations/revoke", {
+                 "authorization_id": grant["data"]["authorization_id"], "reason": "done"})
+        assert revoked["data"]["status"] == "revoked"
+    finally:
+        server.shutdown(); server.server_close(); thread.join(timeout=3); service.close()
+
+
+def test_host_authorization_capabilities_must_cover_manifest(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "Member 1")
+    try:
+        manifest = {"input_contract": {"type": "object"}, "output_contract": {"type": "object"},
+                    "permissions": ["execute"], "failure_conditions": ["invalid_input"],
+                    "host_capabilities": ["network"], "isolation": {"profile": "host_trusted"},
+                    "entrypoint": ["python", "tool.py"]}
+        tool_id = service.propose_tool("m1", "needs network", "coverage", reuse_lower=3, manual_cost_upper=10,
+                                       call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
+                                       risk_cost_upper=1)["tool_id"]
+        service.add_tool_version("m1", tool_id, "print('{}')", manifest)
+        service.grant_host_authorization("m1", tool_id, 1, capabilities=["process.spawn"], reason="wrong")
+        with pytest.raises(ValueError, match="host_authorization_capability_missing"):
+            service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
+    finally:
+        service.close()

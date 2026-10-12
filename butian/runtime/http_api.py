@@ -93,6 +93,14 @@ class ApiHandler(BaseHTTPRequestHandler):
             if latest:
                 latest_maintenance = {"event_type": latest["event_type"], "payload": json.loads(latest["payload"]), "created_at": latest["created_at"]}
             self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "authorized_url_queue", "rewarm_policy": "evidence_required"}}); return
+        if urlparse(self.path).path == "/api/tools/host-authorizations":
+            q = parse_qs(urlparse(self.path).query)
+            member_id = (q.get("member_id") or [""])[0]
+            if not member_id or not self._require_member({"member_id": member_id}, target_member_id=member_id):
+                return
+            self._send(200, {"authorizations": self.service.list_host_authorizations(member_id, status=(q.get("status") or [None])[0])}); return
+        if self.path == "/api/tools/executions/running":
+            self._send(200, {"executions": self.service.list_running_tool_executions(self._visible_member_id())}); return
         if self.path == "/api/tasks":
             self._send(200, {"tasks": self._visible_tasks(self._visible_member_id())}); return
         if urlparse(self.path).path == "/api/tools":
@@ -174,7 +182,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             protected = ("/api/memory/", "/api/providers/", "/api/evolution/",
                          "/api/tools", "/api/tasks", "/api/goals/", "/api/sessions/",
                          "/api/evidence", "/api/hypotheses/",
-                         "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments")
+                         "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments", "/api/tools/host-authorizations/", "/api/tools/executions/running", "/api/tools/executions/cancel")
             if path.startswith(protected) and not (path == "/api/providers/cancel" and not body.get("provider_session_id")) and not self._require_member(body):
                 return
             if path == "/api/members":
@@ -219,6 +227,21 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(200, self.service.recover_tool_circuit_breaker(body["member_id"], body["tool_id"], body["version"], scope=body.get("scope", "version"))); return
             if path == "/api/tools/execute":
                 result = self.service.execute_tool(body["member_id"], body["tool_id"], body["version"], body.get("input"), dry_run=body.get("dry_run", False), verification_only=body.get("verification_only", False), task_id=body.get("task_id"), share_id=body.get("share_id"), security_review_issue_id=body.get("security_review_issue_id"), timeout_seconds=body.get("timeout_seconds", 10), max_output_bytes=body.get("max_output_bytes", 65536)); self._send(200, result); return
+            if path == "/api/tools/host-authorizations/grant":
+                actor, _ = self._member_credentials(body)
+                self._send(201, self.service.grant_host_authorization(actor, body["tool_id"], body["version"], capabilities=body["capabilities"], reason=body["reason"])); return
+            if path == "/api/tools/host-authorizations/list":
+                actor, _ = self._member_credentials(body)
+                self._send(200, {"authorizations": self.service.list_host_authorizations(actor, status=body.get("status"))}); return
+            if path == "/api/tools/host-authorizations/revoke":
+                actor, _ = self._member_credentials(body)
+                self._send(200, self.service.revoke_host_authorization(actor, body["authorization_id"], reason=body["reason"])); return
+            if path == "/api/tools/executions/running":
+                actor, _ = self._member_credentials(body)
+                self._send(200, {"executions": self.service.list_running_tool_executions(actor)}); return
+            if path == "/api/tools/executions/cancel":
+                actor, _ = self._member_credentials(body)
+                self._send(200, self.service.cancel_tool_execution(actor, body["execution_id"], reason=body["reason"])); return
             if path == "/api/tools/executions":
                 self._send(200, {"executions": self.service.list_tool_executions(body["member_id"], tool_id=body.get("tool_id"), limit=body.get("limit", 50))}); return
             if path == "/api/tools/propose":

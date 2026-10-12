@@ -607,10 +607,16 @@ class ToolStore:
             raise ValueError("tool_isolation_backend_unavailable:python_host:" + ",".join(sorted(set(required_isolation))))
         runtime_profile = isolation.get("profile", "low_risk_host")
         if runtime_profile == "host_trusted":
-            authorization = self.store.db.execute("SELECT authorization_id FROM host_authorizations WHERE owner_member_id=? AND tool_id=? AND version=? AND status='active' ORDER BY created_at DESC LIMIT 1", (actor_member_id, tool_id, version)).fetchone()
+            required_host_capabilities = manifest.get("host_capabilities", [])
+            if not isinstance(required_host_capabilities, list) or any(not isinstance(item, str) for item in required_host_capabilities):
+                raise ValueError("host_capabilities_invalid")
+            authorization = self.store.db.execute("SELECT * FROM host_authorizations WHERE owner_member_id=? AND tool_id=? AND version=? AND status='active' ORDER BY created_at DESC LIMIT 1", (actor_member_id, tool_id, version)).fetchone()
             if not authorization:
                 revoked = self.store.db.execute("SELECT 1 FROM host_authorizations WHERE owner_member_id=? AND tool_id=? AND version=? AND status='revoked' LIMIT 1", (actor_member_id, tool_id, version)).fetchone()
                 raise ValueError("host_authorization_revoked" if revoked else "host_authorization_required")
+            granted_host_capabilities = set(json.loads(authorization["capabilities"]))
+            if not set(required_host_capabilities).issubset(granted_host_capabilities):
+                raise ValueError("host_authorization_capability_missing")
         if runtime_profile not in {"low_risk_host", "host_trusted"}:
             raise ValueError("tool_isolation_profile_unsupported")
         assertions = manifest.get("business_assertions", [])
@@ -1276,6 +1282,14 @@ class ToolStore:
             raise ValueError("host_authorization_not_active")
         self._event(row["tool_id"], row["version"], "host_authorization_revoked", {"authorization_id": authorization_id, "reason": reason}, f"host-auth:{authorization_id}:revoke")
         return dict(self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone())
+
+    def list_host_authorizations(self, owner_member_id: str, *, status: str | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM host_authorizations WHERE owner_member_id=?"
+        args: list[Any] = [owner_member_id]
+        if status is not None:
+            sql += " AND status=?"; args.append(status)
+        sql += " ORDER BY created_at DESC"
+        return [dict(row) for row in self.store.db.execute(sql, args)]
 
     def cancel_execution(self, actor_member_id: str, execution_id: str, *, reason: str) -> dict[str, Any]:
 

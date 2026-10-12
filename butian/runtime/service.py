@@ -850,6 +850,9 @@ class ButianService:
     def revoke_host_authorization(self, owner_member_id: str, authorization_id: str, *, reason: str):
         return self.tools.revoke_host_authorization(owner_member_id, authorization_id, reason=reason)
 
+    def list_host_authorizations(self, owner_member_id: str, *, status: str | None = None):
+        return self.tools.list_host_authorizations(owner_member_id, status=status)
+
     def execute_tool(self, actor_member_id: str, tool_id: str, version: int, input_data=None, **options):
         return self.tools.execute(actor_member_id, tool_id, version, input_data, **options)
 
