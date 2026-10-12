@@ -215,3 +215,31 @@ def test_http_member_cannot_read_another_members_tasks_questions_or_sessions(tmp
         server.server_close()
         thread.join(timeout=3)
         service.close()
+
+
+def test_http_provider_cancel_requires_session_access(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("owner", "Owner")
+    service.add_member("other", "Other")
+    service.store.set_member_token("owner", "owner-token")
+    service.store.set_member_token("other", "other-token")
+    session_id = service.store.create_provider_session("owner", "manual", prompt="work")
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        body = json.dumps({"provider_session_id": session_id}).encode()
+        req = urlrequest.Request(base + "/api/providers/cancel", data=body, headers={"Content-Type": "application/json", "X-Butian-Member": "other", "X-Butian-Token": "other-token"}, method="POST")
+        with pytest.raises(HTTPError) as denied:
+            urlrequest.urlopen(req, timeout=3)
+        assert denied.value.code == 403
+        assert service.store.provider_session(session_id)["status"] == "running"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+        service.close()

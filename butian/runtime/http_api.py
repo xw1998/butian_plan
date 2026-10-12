@@ -357,7 +357,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path.startswith("/api/tasks/") and path.endswith("/cancel"):
                 task_id = path.split("/")[3]; self._send(200, self.service.cancel_task(task_id, body["revision"], body.get("operation_key"))); return
             if path == "/api/providers/cancel":
-                self._send(200, self.service.cancel_provider_task(body["provider_session_id"])); return
+                actor = self._member_credentials(body)[0]
+                if not self.service.store.provider_session_access(body["provider_session_id"], actor):
+                    self._send(403, {"error": "provider_session_access_denied"}); return
+                self._send(200, self.service.cancel_provider_task(body["provider_session_id"], actor_member_id=actor)); return
             if path == "/api/questions":
                 qid = self.service.ask_user(body["task_id"], body["revision"], body["member_id"], body["question"]); self._send(201, {"question_id": qid}); return
             if path == "/api/strategies/recommend":

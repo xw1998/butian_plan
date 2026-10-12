@@ -201,7 +201,9 @@ class ButianService:
                 result["task_status"] = task["status"]
         return result
 
-    def cancel_provider_task(self, provider_session_id: str) -> dict[str, Any]:
+    def cancel_provider_task(self, provider_session_id: str, *, actor_member_id: str | None = None) -> dict[str, Any]:
+        if actor_member_id is not None:
+            self.authorize_provider_session(provider_session_id, actor_member_id)
         session = self.store.provider_session(provider_session_id)
         terminal = {"completed", "cancelled", "provider_lost", "unknown"}
         if session["status"] in terminal:

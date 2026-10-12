@@ -220,11 +220,11 @@ def test_provider_runtime_executes_authorized_tool_and_returns_result(tmp_path):
     session_id = store.create_provider_session("member-1", provider.provider_id, remote_session_id="remote-1", prompt="start")
     result = ProviderRuntime(store).consume(
         session_id, provider,
-        tool_executor=lambda member, tool, version, data: calls.append((member, tool, version, data)) or {"ok": True},
+        tool_executor=lambda member, tool, version, data, share_id=None: calls.append((member, tool, version, data, share_id)) or {"ok": True},
     )
     assert result["status"] == "completed"
     assert result["text"] == "done"
-    assert calls == [("member-1", "t1", 1, {"x": 1})]
+    assert calls == [("member-1", "t1", 1, {"x": 1}, None)]
     audit = store.db.execute("SELECT event_type, payload FROM events WHERE aggregate_id=? ORDER BY seq", (session_id,)).fetchall()
     assert [row["event_type"] for row in audit] == ["provider_tool_call", "provider_tool_result"]
     assert json.loads(audit[0]["payload"])["call_id"] == "call-1"
@@ -269,3 +269,49 @@ def test_openai_compatible_provider_rejects_malformed_tool_arguments(monkeypatch
     assert events[-1].kind == "status"
     assert events[-1].status == "unknown"
     assert events[-1].reason == "provider_tool_call_invalid_arguments"
+
+
+def test_invalid_tool_batch_has_no_side_effects(tmp_path):
+    from butian.adapters.base import ProviderEvent
+    store = Store(tmp_path / "invalid-batch.db")
+    class InvalidBatch(ScriptedProvider):
+        def stream(self, provider_session_id, prompt):
+            yield ProviderEvent("call", "tool_call", metadata={"call_id": "one", "tool_id": "t1", "version": 1, "input": {}})
+            yield ProviderEvent("bad", "tool_call", metadata={})
+    calls = []
+    session_id = store.create_provider_session("member", "invalid", prompt="prompt")
+    result = ProviderRuntime(store).consume(session_id, InvalidBatch(), tool_executor=lambda *args: calls.append(args) or {})
+    assert result["status"] == "unknown"
+    assert calls == []
+    store.close()
+
+
+def test_tool_call_budget_is_inclusive(tmp_path):
+    from butian.adapters.base import ProviderEvent
+    store = Store(tmp_path / "budget.db")
+    class OneCall(ScriptedProvider):
+        def stream(self, provider_session_id, prompt):
+            yield ProviderEvent("call", "tool_call", metadata={"call_id": "one", "tool_id": "t1", "version": 1, "input": {}})
+    for limit, expected in ((0, 0), (1, 1)):
+        calls = []
+        session_id = store.create_provider_session("member", "budget", prompt="prompt")
+        ProviderRuntime(store).consume(session_id, OneCall(), max_tool_calls=limit, tool_executor=lambda *args: calls.append(args) or {})
+        assert len(calls) == expected
+    store.close()
+
+
+def test_executor_typeerror_is_not_retried_with_legacy_signature(tmp_path):
+    from butian.adapters.base import ProviderEvent
+    store = Store(tmp_path / "executor-error.db")
+    class OneCall(ScriptedProvider):
+        def stream(self, provider_session_id, prompt):
+            yield ProviderEvent("call", "tool_call", metadata={"call_id": "one", "tool_id": "t1", "version": 1, "input": {}})
+    calls = []
+    def executor(*args):
+        calls.append(args)
+        raise TypeError("executor body failure")
+    session_id = store.create_provider_session("member", "executor-error", prompt="prompt")
+    result = ProviderRuntime(store).consume(session_id, OneCall(), tool_executor=executor)
+    assert result["status"] == "unknown"
+    assert len(calls) == 1
+    store.close()

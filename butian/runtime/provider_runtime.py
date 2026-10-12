@@ -43,6 +43,7 @@ class ProviderRuntime:
                 round_had_tool_call = False
                 pending_calls = []
                 terminal_event = None
+                batch_invalid = False
                 for event in provider.stream(remote_session_id, prompt):
                     if event.kind == "output":
                         if self.store.record_provider_output(provider_session_id, event.event_id, event.text, event.model):
@@ -53,6 +54,8 @@ class ProviderRuntime:
                         version, input_data = call.get("version"), call.get("input")
                         if not isinstance(call_id, str) or not isinstance(tool_id, str) or not isinstance(version, int) or not isinstance(input_data, (dict, list, str, int, float, bool, type(None))):
                             final_status, reason = "unknown", "provider_tool_call_invalid"
+                            pending_calls.clear()
+                            batch_invalid = True
                             break
                         if call_id in seen_calls:
                             final_status, reason = "unknown", "provider_tool_call_duplicate"
@@ -62,7 +65,7 @@ class ProviderRuntime:
                             final_status, reason = "unknown", "provider_tool_executor_unavailable"
                             pending_calls.clear()
                             break
-                        if tool_calls + len(pending_calls) > max_tool_calls:
+                        if tool_calls + len(pending_calls) + 1 > max_tool_calls:
                             final_status, reason = "unknown", "provider_tool_call_limit_exceeded"
                             pending_calls.clear()
                             break
@@ -72,6 +75,11 @@ class ProviderRuntime:
                         continue
                     elif event.kind == "status":
                         terminal_event = event
+                if batch_invalid:
+                    pending_calls.clear()
+                if pending_calls and terminal_event is not None and terminal_event.status not in {None, "completed"}:
+                    final_status, reason = self._map_status(terminal_event.status, terminal_event.reason)
+                    pending_calls.clear()
                 if pending_calls:
                     if tool_rounds + 1 > max_tool_rounds:
                         final_status, reason = "unknown", "provider_tool_round_limit_exceeded"
@@ -88,10 +96,7 @@ class ProviderRuntime:
                                 f"provider-tool-call:{provider_session_id}:{call_id}",
                             )
                             try:
-                                try:
-                                    result = tool_executor(session["member_id"], tool_id, version, input_data, None)
-                                except TypeError:
-                                    result = tool_executor(session["member_id"], tool_id, version, input_data)
+                                result = tool_executor(session["member_id"], tool_id, version, input_data, None)
                             except Exception as exc:
                                 self.store.append_event(
                                     provider_session_id,
