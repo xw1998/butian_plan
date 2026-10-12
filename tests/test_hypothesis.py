@@ -1,8 +1,10 @@
+import concurrent.futures
 import pytest
 from butian.runtime.service import ButianService
 
 def test_prior_hypothesis_requires_real_running_action_and_evidence_for_conclusion(tmp_path):
     service = ButianService(tmp_path)
+    service.add_member("user", "验证成员")
     prior = service.hypotheses.add_prior("skill", "基础学识", "该拓扑应降低噪声", environment={"board": "sample"}, reliability=.4)
     assessment = service.hypotheses.assess(["skill", "deduction"], environment_match=.8)
     hypothesis = service.hypotheses.propose("hardware_hypothesis", "样机上的该拓扑降低噪声", prior_ids=[prior], rationale="由基础电路知识推导", conditions={"board": "sample"}, predictions=["噪声下降"], falsifiers=["噪声不变"], assessment=assessment)
@@ -22,6 +24,7 @@ def test_prior_hypothesis_requires_real_running_action_and_evidence_for_conclusi
 
 def test_prior_only_is_not_fact_and_conflicting_observations_are_inconclusive(tmp_path):
     service = ButianService(tmp_path)
+    service.add_member("user", "验证成员")
     assessment = service.hypotheses.assess(["analogy"], counterexamples=1)
     h = service.hypotheses.propose("causal_hypothesis", "A causes B", rationale="类比推导", assessment=assessment)
     a = service.hypotheses.authorize(h, "对照实验", cost=1, risk=0, information_gain=1)
@@ -119,6 +122,7 @@ def test_member_memory_outbox_is_idempotent_after_crash_after_member_write(tmp_p
 
 def test_observation_and_outbox_are_atomic_in_team_database(tmp_path):
     service = ButianService(tmp_path)
+    service.add_member("user", "验证成员")
     prior = service.hypotheses.add_prior("deduction", "推理", "待验证")
     assessment = service.hypotheses.assess(["deduction"])
     hypothesis = service.hypotheses.propose("practice_hypothesis", "待验证假设", prior_ids=[prior], rationale="test", assessment=assessment)
@@ -135,3 +139,82 @@ def test_observation_and_outbox_are_atomic_in_team_database(tmp_path):
     assert service.store.db.execute("SELECT status FROM hypothesis_actions WHERE action_id=?", (action,)).fetchone()[0] == "running"
     assert service.store.db.execute("SELECT COUNT(*) FROM member_memory_outbox").fetchone()[0] == 0
     service.close()
+
+
+def test_hypothesis_resources_are_member_scoped_across_full_action_chain(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "成员一")
+    service.add_member("m2", "成员二")
+    prior = service.hypotheses.add_prior("skill", "m1知识", "仅属于m1", owner_member_id="m1")
+    assessment = service.hypotheses.assess(["skill"])
+    hypothesis = service.hypotheses.propose("practice_hypothesis", "m1假设", prior_ids=[prior], rationale="隔离回归", assessment=assessment, owner_member_id="m1")
+    with pytest.raises(ValueError, match="not_found"):
+        service.get_hypothesis(hypothesis, owner_member_id="m2")
+    with pytest.raises(ValueError, match="not_found"):
+        service.authorize_hypothesis(hypothesis, "越权动作", cost=1, risk=0, information_gain=1, owner_member_id="m2")
+    action = service.authorize_hypothesis(hypothesis, "m1验证", cost=1, risk=0, information_gain=1, owner_member_id="m1")
+    with pytest.raises(ValueError, match="not_found"):
+        service.grant_hypothesis_authorization(action, actor_member_id="m2", reason="越权", authorized=True, owner_member_id="m2")
+    service.grant_hypothesis_authorization(action, actor_member_id="m1", reason="批准", authorized=True, owner_member_id="m1")
+    with pytest.raises(ValueError, match="not_found"):
+        service.start_hypothesis_action(action, owner_member_id="m2")
+    service.start_hypothesis_action(action, owner_member_id="m1")
+    with pytest.raises(ValueError, match="not_found"):
+        service.observe_hypothesis(action, "inconclusive", [], independent_key="m2", actor_member_id="m2", owner_member_id="m2")
+    service.observe_hypothesis(action, "inconclusive", [], independent_key="m1", actor_member_id="m1", owner_member_id="m1")
+    service.close()
+
+
+def test_external_claim_prepare_is_concurrent_idempotent(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m1", "验证成员")
+        source_id = service.learning.add_source("paper", "https://example.test/paper", "测试论文", "hash-paper", owner_member_id="m1")
+        claim_id = service.learning.add_claim(source_id, "并发主张", owner_member_id="m1")
+        def prepare():
+            return service.prepare_claim_practice(claim_id, owner_member_id="m1", description="并发复测")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(lambda _: prepare(), range(4)))
+        assert len({item["action_id"] for item in results}) == 1
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM claim_practice_preparations").fetchone()[0] == 1
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM hypothesis_actions").fetchone()[0] == 1
+    finally:
+        service.close()
+
+
+def test_external_claim_prepares_idempotent_awaiting_action_without_execution(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m1", "验证成员")
+        source_id = service.learning.add_source("paper", "https://example.test/paper", "测试论文", "hash-paper", owner_member_id="m1")
+        claim_id = service.learning.add_claim(source_id, "该方法在目标环境有效", owner_member_id="m1", conditions={"board": "sample"}, confidence=0.0)
+        first = service.prepare_claim_practice(claim_id, owner_member_id="m1", description="在样机上复测", kind="practice_hypothesis")
+        assert first["status"] == "awaiting_authorization"
+        assert first["claim_id"] == claim_id
+        assert service.hypotheses.get(first["hypothesis_id"], owner_member_id="m1")["status"] == "candidate"
+        action = service.hypotheses.db.execute("SELECT status FROM hypothesis_actions WHERE action_id=?", (first["action_id"],)).fetchone()
+        assert action["status"] == "awaiting_authorization"
+        second = service.prepare_claim_practice(claim_id, owner_member_id="m1", description="在样机上复测", kind="practice_hypothesis")
+        assert {key: second[key] for key in ("claim_id", "prior_id", "hypothesis_id", "action_id", "status")} == {key: first[key] for key in ("claim_id", "prior_id", "hypothesis_id", "action_id", "status")}
+        assert second["idempotent"] is True
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM prior_knowledge").fetchone()[0] == 1
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM practice_hypotheses").fetchone()[0] == 1
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM hypothesis_actions").fetchone()[0] == 1
+    finally:
+        service.close()
+
+
+def test_external_claim_prepare_failure_leaves_no_partial_resources(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m1", "验证成员")
+        source_id = service.learning.add_source("paper", "https://example.test/failure", "失败论文", "hash-failure", owner_member_id="m1")
+        claim_id = service.learning.add_claim(source_id, "必须完整回滚", owner_member_id="m1")
+        with pytest.raises(ValueError, match="invalid_verification_metrics"):
+            service.prepare_claim_practice(claim_id, owner_member_id="m1", description="坏参数", risk=2.0)
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM prior_knowledge WHERE owner_member_id='m1'").fetchone()[0] == 0
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM practice_hypotheses WHERE owner_member_id='m1'").fetchone()[0] == 0
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM hypothesis_actions WHERE owner_member_id='m1'").fetchone()[0] == 0
+        assert service.hypotheses.db.execute("SELECT COUNT(*) FROM claim_practice_preparations WHERE owner_member_id='m1'").fetchone()[0] == 0
+    finally:
+        service.close()

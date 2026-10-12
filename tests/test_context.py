@@ -137,6 +137,9 @@ class ProviderTaskContextTests(unittest.TestCase):
 
     def test_context_report_audited_via_event(self):
         task_id = self.service.store.create_task(self.service.store.create_session("solo", "m_p", None, {}), "标题", assignee_id="m_p")
+        self.service.store.transition_task(task_id, 1, "ready", "context-ready")
+        lease = self.service.store.claim_task(task_id, "m_p", internal=True)
+        self.service.store.transition_task(task_id, lease["revision"], "running", "context-running")
         result = self.service.start_provider_task("m_p", "干活", task_id=task_id)
         rows = self.service.store.db.execute("SELECT event_type, payload FROM events WHERE aggregate_id=?", (task_id,)).fetchall()
         types = [row["event_type"] for row in rows]

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hashlib
 import json
 import os
 import sqlite3
@@ -21,14 +22,16 @@ class ButianService:
     def __init__(self, home: str | Path | None = None):
         self.home = Path(home or os.environ.get("BUTIAN_HOME", Path.home() / ".butian"))
         self.home.mkdir(parents=True, exist_ok=True)
+        self._claim_practice_lock = threading.RLock()
         self.store = Store(self.home / "team.db")
         # 启动先收口崩溃前的 prepared 操作，再回收过期租约；结果保留供状态页和审计使用。
         self.startup_recovery = {
             "recovered_operations": self.store.recover(),
             "reclaimed_task_ids": self.store.reclaim_expired_leases(),
         }
-        self.hypotheses = HypothesisStore(self.store.db)
-        self.learning = LearningStore(self.store.db)
+        self.hypotheses = HypothesisStore(self.store.db, write_lock=self.store._write_lock)
+        self.learning = LearningStore(self.store.db, write_lock=self.store._write_lock)
+        self.store.db.execute("CREATE TABLE IF NOT EXISTS claim_practice_preparations (claim_id TEXT NOT NULL, owner_member_id TEXT NOT NULL, prior_id TEXT NOT NULL, hypothesis_id TEXT NOT NULL, action_id TEXT NOT NULL, description TEXT NOT NULL, created_at REAL NOT NULL, PRIMARY KEY (claim_id, owner_member_id))")
         self.tools = ToolStore(self.store, self.home)
         self.bootstrap_personas()
         # Provider 从 BUTIAN_PROVIDERS_FILE 或 <home>/providers.json 加载；无效条目记录错误、不静默丢弃
@@ -55,6 +58,10 @@ class ButianService:
         self._maintenance_stop.set()
         if self._maintenance_thread is not None and self._maintenance_thread is not threading.current_thread():
             self._maintenance_thread.join(timeout=min(5.0, self._maintenance_interval + 0.1))
+            if self._maintenance_thread.is_alive():
+                raise RuntimeError("shutdown_incomplete_active_maintenance")
+        if not self.tools.wait_for_executions(timeout=10.0):
+            raise RuntimeError("shutdown_incomplete_active_tool_executions")
         self.store.close()
 
     def _maintenance_loop(self):
@@ -121,6 +128,30 @@ class ButianService:
             memory.close()
 
     def start_provider_task(self, member_id: str, prompt: str, *, task_id: str | None = None, provider_id: str | None = None, model: str | None = None, environment: dict | None = None):
+        with self.store._write_lock:
+            snapshot = self.store.db.execute("SELECT revision FROM tasks WHERE task_id=?", (task_id,)).fetchone() if task_id else None
+            previous = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (task_id,)).fetchone() if task_id else None
+            expected_revision = snapshot[0] if snapshot else None
+            expected_session = previous[0] if previous else None
+        try:
+            result = self._start_provider_task(member_id, prompt, task_id=task_id, provider_id=provider_id, model=model, environment=environment)
+        except Exception as exc:
+            self._record_provider_start_failure(task_id, type(exc).__name__ + ":" + str(exc), expected_revision, expected_session)
+            raise
+        if result.get("status") != "running":
+            self._record_provider_start_failure(task_id, result.get("reason") or result.get("status") or "provider_start_failed", expected_revision, expected_session)
+        return result
+
+    def _record_provider_start_failure(self, task_id: str | None, reason: str, expected_revision: int | None, expected_session: str | None):
+        if task_id is None:
+            return
+        with self.store._write_lock:
+            task = self.store.db.execute("SELECT status,revision,lease_id FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            latest = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (task_id,)).fetchone()
+            if task and task["status"] == "running" and task["revision"] == expected_revision and (latest[0] if latest else None) == expected_session:
+                self.store.transition_task(task_id, task["revision"], "unknown", f"provider-start-failed:{task_id}:{task['revision']}", payload={"reason": reason, "provider_start_failed": True})
+
+    def _start_provider_task(self, member_id: str, prompt: str, *, task_id: str | None = None, provider_id: str | None = None, model: str | None = None, environment: dict | None = None):
         """Start execution using the member binding unless explicitly overridden.
 
         每次执行自动组装 L0–L4 上下文（当前指令、任务状态包、近期事件、独立记忆召回、身份与职责），
@@ -133,11 +164,14 @@ class ButianService:
         context_window = selected_provider.capabilities().context_window
         if context_window is None:
             raise ValueError("provider_context_window_unknown")
-        composed, report = self.compose_context(member_id, prompt, task_id=task_id, environment=environment, budgets={"WINDOW": context_window}, include_tools=True)
+        with self.store._write_lock:
+            context_task = self.store.db.execute("SELECT revision FROM tasks WHERE task_id=?", (task_id,)).fetchone() if task_id else None
+            context_revision = context_task[0] if context_task else None
+            composed, report = self.compose_context(member_id, prompt, task_id=task_id, environment=environment, budgets={"WINDOW": context_window}, include_tools=True)
         operation_key = f"ctx_{report.decision_id}"
         if task_id:
             self.store.append_event(task_id, "provider_context_composed", report.as_dict(), operation_key)
-        result = self.provider_runtime.start(member_id, composed, task_id=task_id, provider_id=provider_id or member["provider_id"], model=model or member["model_id"])
+        result = self.provider_runtime.start(member_id, composed, task_id=task_id, provider_id=provider_id or member["provider_id"], model=model or member["model_id"], expected_revision=context_revision)
         if isinstance(result, dict):
             result["context_report"] = report.as_dict()
         return result
@@ -169,12 +203,51 @@ class ButianService:
         if not self.store.task_access(task_id, member_id):
             raise ValueError("task_access_denied")
 
+    def run_solo_task(self, task_id: str, *, actor_member_id: str):
+        self.authorize_task(task_id, actor_member_id)
+        with self.store._write_lock:
+            row = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if not row:
+                raise ValueError("task_not_found")
+            task = dict(row)
+            payload = self._task_payload(task)
+            if task["parent_id"] or payload.get("mode") != "solo":
+                raise ValueError("solo_task_required")
+            if task["status"] not in {"ready", "running"}:
+                raise ValueError("solo_task_not_executable")
+            if task["status"] == "ready":
+                if not task["assignee_id"]:
+                    raise ValueError("assignee_required")
+                self._preflight_provider(task["assignee_id"])
+                lease = self.store.claim_task(task_id, task["assignee_id"], lease_seconds=300, internal=True)
+                self.store.transition_task(task_id, lease["revision"], "running", f"solo-resume:{task_id}:{lease['revision']}")
+                session_id = None
+            else:
+                current = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (task_id,)).fetchone()
+                if not current:
+                    raise ValueError("provider_session_not_found")
+                session_id = current["provider_session_id"]
+        if session_id is None:
+            execution = self.start_provider_task(task["assignee_id"], payload.get("goal") or task["title"], task_id=task_id, environment=payload.get("environment"))
+            if execution.get("status") != "running":
+                return execution
+            session_id = execution["provider_session_id"]
+        return self.consume_provider_task(session_id, actor_member_id=actor_member_id)
+
     def consume_provider_task(self, provider_session_id: str, prompt: str | None = None, *, actor_member_id: str | None = None):
         if actor_member_id is not None:
             self.authorize_provider_session(provider_session_id, actor_member_id)
         """Consume a Provider session and move its running task to review when complete."""
         session = self.store.provider_session(provider_session_id)
         provider = self.providers.get(session["provider_id"])
+        with self.store._write_lock:
+            if session.get("task_id"):
+                latest = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (session["task_id"],)).fetchone()
+                task = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
+                if not latest or latest["provider_session_id"] != provider_session_id:
+                    raise ValueError("provider_execution_superseded")
+                if session["status"] == "running" and (not task or task["status"] not in {"running", "cancelling"} or (task["status"] == "running" and session.get("task_revision") != task["revision"])):
+                    raise ValueError("provider_execution_revision_conflict")
         if hasattr(provider, "set_session_tools"):
             cards = self.tools.context_cards(session["member_id"], prompt or session.get("prompt") or "", limit=32)
             provider.set_session_tools(session.get("remote_session_id") or provider_session_id, cards)
@@ -182,24 +255,53 @@ class ButianService:
             provider_session_id,
             provider,
             prompt,
-            tool_executor=lambda member_id, tool_id, version, input_data, share_id=None: self.execute_tool(
+            tool_executor=lambda member_id, tool_id, version, input_data, share_id=None: self._execute_provider_tool(session,
                 member_id, tool_id, version, input_data, task_id=session.get("task_id"), share_id=(share_id or self._provider_share_id(member_id, tool_id, version))
             ),
         )
-        if result.get("status") == "completed" and result.get("text", "").strip() and session.get("task_id"):
-            task = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
-            if task and task["status"] == "running" and not task["parent_id"]:
-                artifact_dir = self.home / "artifacts" / "solo" / task["task_id"]
-                artifact_dir.mkdir(parents=True, exist_ok=True)
-                artifact_path = artifact_dir / "result.txt"
-                artifact_path.write_text(result["text"], encoding="utf-8")
-                evidence_id = self.store.record_evidence(artifact_path, artifact_dir, owner_member_id=task["assignee_id"], actor_member_id=task["assignee_id"], internal=True)
-                self.store.transition_task(task["task_id"], task["revision"], "review", f"solo:{task['task_id']}:review:{task['revision']}", payload={"provider_status": "completed", "provider_output": result["text"], "provider_session_id": provider_session_id, "artifact_path": str(artifact_path), "evidence_id": evidence_id})
-                revision = task["revision"] + 1
-                self.submit_handoff({"task_id": task["task_id"], "task_revision": revision, "member_id": task["assignee_id"], "status": "done", "summary": result["text"][:2000], "evidence_ids": [evidence_id], "next_action": "审核任务结果", "confidence": 0.7})
-                result.update({"task_status": "review", "evidence_id": evidence_id})
-            elif task:
-                result["task_status"] = task["status"]
+        with self.store._write_lock:
+            if session.get("task_id"):
+                with self.store._write_lock:
+                    latest = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (session["task_id"],)).fetchone()
+                    task = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
+                    if not latest or latest["provider_session_id"] != provider_session_id or (task and task["status"] == "running" and session.get("task_revision") != task["revision"]):
+                        result.update({"task_status": task["status"] if task else "unknown", "stale_execution": True})
+                        return result
+            if result.get("status") == "completed" and result.get("text", "").strip() and session.get("task_id"):
+                task = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
+                latest_session = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (session["task_id"],)).fetchone()
+                if latest_session and latest_session["provider_session_id"] != provider_session_id:
+                    result.update({"task_status": task["status"] if task else "unknown", "stale_execution": True})
+                    return result
+                if task and task["status"] == "running" and not task["parent_id"]:
+                    artifact_dir = self.home / "artifacts" / "solo" / task["task_id"]
+                    artifact_dir.mkdir(parents=True, exist_ok=True)
+                    artifact_path = artifact_dir / f"result-r{task['revision']}.txt"
+                    artifact_path.write_text(result["text"], encoding="utf-8")
+                    evidence_id = self.store.record_evidence(artifact_path, artifact_dir, owner_member_id=task["assignee_id"], actor_member_id=task["assignee_id"], internal=True)
+                    self.store.transition_task(task["task_id"], task["revision"], "review", f"solo:{task['task_id']}:review:{task['revision']}", payload={"provider_status": "completed", "provider_output": result["text"], "provider_session_id": provider_session_id, "artifact_path": str(artifact_path), "evidence_id": evidence_id})
+                    revision = task["revision"] + 1
+                    self.submit_handoff({"task_id": task["task_id"], "task_revision": revision, "member_id": task["assignee_id"], "status": "done", "summary": result["text"][:2000], "evidence_ids": [evidence_id], "next_action": "审核任务结果", "confidence": 0.7})
+                    result.update({"task_status": "review", "evidence_id": evidence_id})
+                elif task:
+                    result["task_status"] = task["status"]
+            if session.get("task_id"):
+                task = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
+                if task and not task["parent_id"]:
+                    status = result.get("status")
+                    target = None
+                    if task["status"] == "running" and status in {"unknown", "provider_lost"}:
+                        target = status
+                    elif task["status"] == "running" and (status == "cancelled" or (status == "completed" and not result.get("text", "").strip())):
+                        target = "unknown"
+                    elif task["status"] == "cancelling" and status in {"cancelled", "provider_lost", "unknown"}:
+                        target = status
+                    if target:
+                        self.store.transition_task(task["task_id"], task["revision"], target, f"solo:{task['task_id']}:{target}:{task['revision']}", payload={"provider_status": status, "reason": result.get("reason") or ("provider_completed_without_output" if status == "completed" else None)})
+                        result["task_status"] = target
+                    latest = self.store.db.execute("SELECT status,lease_id FROM tasks WHERE task_id=?", (task["task_id"],)).fetchone()
+                    if latest["status"] in {"review", "unknown", "provider_lost", "cancelled", "failed"} and latest["lease_id"]:
+                        self.store.release_lease(task["task_id"], latest["lease_id"])
         return result
 
     def cancel_provider_task(self, provider_session_id: str, *, actor_member_id: str | None = None) -> dict[str, Any]:
@@ -255,24 +357,50 @@ class ButianService:
     def propose_hypothesis(self, kind: str, statement: str, **kwargs):
         return self.hypotheses.propose(kind, statement, **kwargs)
 
-    def promote_claim_to_prior(self, claim_id: str, **kwargs):
-        payload = self.learning.claim_as_prior(claim_id, **kwargs)
-        prior_id = self.hypotheses.add_prior(**{key: payload[key] for key in ("source_kind", "title", "claim", "environment", "source_refs", "reliability")})
+    def promote_claim_to_prior(self, claim_id: str, *, owner_member_id: str | None = None, **kwargs):
+        payload = self.learning.claim_as_prior(claim_id, owner_member_id=owner_member_id, **kwargs)
+        prior_id = self.hypotheses.add_prior(**{key: payload[key] for key in ("source_kind", "title", "claim", "environment", "source_refs", "reliability")}, owner_member_id=owner_member_id)
         return {"prior_id": prior_id, "claim_id": claim_id, "status": "candidate"}
 
-    def authorize_hypothesis(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float):
-        return self.hypotheses.authorize(hypothesis_id, description, cost=cost, risk=risk, information_gain=information_gain)
+    def prepare_claim_practice(self, claim_id: str, *, owner_member_id: str, description: str, kind: str = "practice_hypothesis", cost: float = 1.0, risk: float = 0.0, information_gain: float = 1.0):
+        if not owner_member_id or not description.strip():
+            raise ValueError("member_and_description_required")
+        with self._claim_practice_lock:
+            return self._prepare_claim_practice_locked(claim_id, owner_member_id=owner_member_id, description=description, kind=kind, cost=cost, risk=risk, information_gain=information_gain)
 
-    def grant_hypothesis_authorization(self, action_id: str, *, actor_member_id: str, reason: str, authorized: bool):
-        return self.hypotheses.grant_authorization(action_id, actor_member_id=actor_member_id, reason=reason, authorized=authorized)
+    def _prepare_claim_practice_locked(self, claim_id: str, *, owner_member_id: str, description: str, kind: str, cost: float, risk: float, information_gain: float):
+        if kind not in self.hypotheses.KINDS or cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
+            raise ValueError("invalid_verification_metrics")
+        existing = self.store.db.execute("SELECT * FROM claim_practice_preparations WHERE claim_id=? AND owner_member_id=?", (claim_id, owner_member_id)).fetchone()
+        if existing:
+            return {"claim_id": claim_id, "prior_id": existing["prior_id"], "hypothesis_id": existing["hypothesis_id"], "action_id": existing["action_id"], "status": "awaiting_authorization", "idempotent": True}
+        with self.store.db:
+            claim = self.learning.get_claim(claim_id, owner_member_id=owner_member_id)
+            prior_payload = self.learning.claim_as_prior(claim_id, owner_member_id=owner_member_id)
+            prior_id = self.hypotheses.add_prior(**{key: prior_payload[key] for key in ("source_kind", "title", "claim", "environment", "source_refs", "reliability")}, owner_member_id=owner_member_id)
+            assessment = self.hypotheses.assess([prior_payload["source_kind"]], environment_match=1.0)
+            hypothesis_id = self.hypotheses.propose(kind, claim["claim"], prior_ids=[prior_id], rationale="external claim requires explicit practice verification", conditions=claim["conditions"], predictions=claim["predictions"], falsifiers=claim["falsifiers"], assessment=assessment, owner_member_id=owner_member_id)
+            action_id = self.hypotheses.authorize(hypothesis_id, description, cost=cost, risk=risk, information_gain=information_gain, owner_member_id=owner_member_id)
+            try:
+                self.store.db.execute("INSERT INTO claim_practice_preparations VALUES (?,?,?,?,?,?,?)", (claim_id, owner_member_id, prior_id, hypothesis_id, action_id, description, time.time()))
+            except sqlite3.IntegrityError:
+                existing = self.store.db.execute("SELECT * FROM claim_practice_preparations WHERE claim_id=? AND owner_member_id=?", (claim_id, owner_member_id)).fetchone()
+                return {"claim_id": claim_id, "prior_id": existing["prior_id"], "hypothesis_id": existing["hypothesis_id"], "action_id": existing["action_id"], "status": "awaiting_authorization", "idempotent": True}
+        return {"claim_id": claim_id, "prior_id": prior_id, "hypothesis_id": hypothesis_id, "action_id": action_id, "status": "awaiting_authorization", "idempotent": False}
 
-    def start_hypothesis_action(self, action_id: str):
-        return self.hypotheses.start(action_id)
+    def authorize_hypothesis(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float, owner_member_id: str | None = None):
+        return self.hypotheses.authorize(hypothesis_id, description, cost=cost, risk=risk, information_gain=information_gain, owner_member_id=owner_member_id)
 
-    def get_hypothesis(self, hypothesis_id: str):
-        return self.hypotheses.get(hypothesis_id)
+    def grant_hypothesis_authorization(self, action_id: str, *, actor_member_id: str, reason: str, authorized: bool, owner_member_id: str | None = None):
+        return self.hypotheses.grant_authorization(action_id, actor_member_id=actor_member_id, reason=reason, authorized=authorized, owner_member_id=owner_member_id)
 
-    def observe_hypothesis(self, action_id: str, outcome: str, evidence_ids: list[str], *, independent_key: str, notes: str = "", environment=None, actor_member_id: str | None = None, member_id: str | None = None):
+    def start_hypothesis_action(self, action_id: str, *, owner_member_id: str | None = None):
+        return self.hypotheses.start(action_id, owner_member_id=owner_member_id)
+
+    def get_hypothesis(self, hypothesis_id: str, *, owner_member_id: str | None = None):
+        return self.hypotheses.get(hypothesis_id, owner_member_id=owner_member_id)
+
+    def observe_hypothesis(self, action_id: str, outcome: str, evidence_ids: list[str], *, independent_key: str, notes: str = "", environment=None, actor_member_id: str | None = None, member_id: str | None = None, owner_member_id: str | None = None):
         if outcome in {"supported", "rejected"}:
             if not evidence_ids:
                 raise ValueError("evidence_required_for_conclusive_outcome")
@@ -285,12 +413,12 @@ class ButianService:
         observation_id = f"obs_{uuid.uuid4().hex}"
         outbox = None
         if outcome == "supported" and member_id:
-            action = self.store.db.execute("SELECT hypothesis_id FROM hypothesis_actions WHERE action_id=?", (action_id,)).fetchone()
+            action = self.store.db.execute("SELECT hypothesis_id FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
             if not action:
                 raise ValueError("verification_action_not_found")
-            hypothesis = self.hypotheses.get(action["hypothesis_id"])
+            hypothesis = self.hypotheses.get(action["hypothesis_id"], owner_member_id=owner_member_id)
             outbox = {"member_id": member_id, "memory_id": f"mem_hyp_{observation_id}", "kind": hypothesis["kind"], "content": hypothesis["statement"]}
-        observation_id = self.hypotheses.observe(action_id, outcome, evidence_ids, independent_key=independent_key, notes=notes, environment=environment, outbox=outbox, observation_id=observation_id)
+        observation_id = self.hypotheses.observe(action_id, outcome, evidence_ids, independent_key=independent_key, notes=notes, environment=environment, outbox=outbox, observation_id=observation_id, owner_member_id=owner_member_id)
         result = {"observation_id": observation_id, "outcome": outcome}
         if outbox is not None:
             memory_id = outbox["memory_id"]
@@ -544,8 +672,36 @@ class ButianService:
         children = self.store.db.execute("SELECT * FROM tasks WHERE parent_id=? ORDER BY rowid", (task_id,)).fetchall()
         if not children:
             raise ValueError("team_subtasks_required")
+        root_execution = self.store.db.execute("SELECT provider_session_id,status FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (task_id,)).fetchone()
+        if root["status"] == "running" and root_execution:
+            self.consume_provider_task(root_execution["provider_session_id"])
+            current_root = self.store.db.execute("SELECT status,payload FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            return {"task_id": task_id, "status": current_root["status"], "children": [], "aggregate": json.loads(current_root["payload"] or "{}").get("results", [])}
+        if root["status"] in {"done", "cancelled", "waiting_user", "cancelling"} or (root["status"] == "ready" and json.loads(root["payload"] or "{}").get("review_verdict") == "rework"):
+            return {"task_id": task_id, "status": root["status"], "children": []}
         results = []
         for child in children:
+            if child["status"] == "waiting_user":
+                results.append({"task_id": child["task_id"], "status": "waiting_user"})
+                continue
+            if child["status"] == "ready":
+                member_id = child["assignee_id"]
+                if not member_id:
+                    results.append({"task_id": child["task_id"], "status": "ready", "reason": "assignee_required"})
+                    continue
+                child_payload = json.loads(child["payload"] or "{}")
+                lease = self.store.claim_task(child["task_id"], member_id, internal=True)
+                self.store.transition_task(child["task_id"], lease["revision"], "running", f"team-resume:{child['task_id']}:{lease['revision']}")
+                execution = self.start_provider_task(member_id, child_payload.get("instruction") or child["title"], task_id=child["task_id"], environment=child_payload.get("environment"))
+                if execution.get("status") != "running":
+                    results.append({"task_id": child["task_id"], "status": "unknown", "reason": execution.get("reason")})
+                    continue
+            if child["status"] in {"unknown", "provider_lost", "failed", "cancelled", "blocked"}:
+                child_payload = json.loads(child["payload"] or "{}")
+                if child["lease_id"]:
+                    self.store.release_lease(child["task_id"], child["lease_id"])
+                results.append({"task_id": child["task_id"], "status": child["status"], "reason": child_payload.get("reason")})
+                continue
             if child["status"] in {"review", "done"}:
                 child_payload = json.loads(child["payload"] or "{}")
                 results.append({"task_id": child["task_id"], "status": child["status"], "text": child_payload.get("provider_output", ""), "evidence_ids": [child_payload["evidence_id"]] if child_payload.get("evidence_id") else []})
@@ -564,13 +720,21 @@ class ButianService:
                 output_rows = self.store.db.execute("SELECT text FROM provider_outputs WHERE provider_session_id=? ORDER BY created_at, provider_event_id", (provider_row["provider_session_id"],)).fetchall()
                 text = "".join(row["text"] for row in output_rows)
             current = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (child["task_id"],)).fetchone()
+            if current["status"] == "cancelling":
+                target = status if status in {"cancelled", "provider_lost", "unknown"} else "unknown"
+                self.store.transition_task(child["task_id"], current["revision"], target, f"team-cancel-final:{child['task_id']}:{current['revision']}", payload={"reason": consumed.get("reason") or "provider_completed_during_cancellation"})
+                latest = self.store.db.execute("SELECT lease_id FROM tasks WHERE task_id=?", (child["task_id"],)).fetchone()
+                if latest["lease_id"]:
+                    self.store.release_lease(child["task_id"], latest["lease_id"])
+                results.append({"task_id": child["task_id"], "status": target})
+                continue
             if status == "completed" and text.strip():
                 artifact_dir = self.home / "artifacts" / "team" / task_id
                 artifact_dir.mkdir(parents=True, exist_ok=True)
-                artifact_path = artifact_dir / f"{child['task_id']}.txt"
+                artifact_path = artifact_dir / f"{child['task_id']}-r{current['revision']}.txt"
                 artifact_path.write_text(text, encoding="utf-8")
                 evidence_id = self.record_evidence(artifact_path, root=artifact_dir, owner_member_id=child["assignee_id"], actor_member_id=child["assignee_id"])
-                dispatcher = session.get("dispatcher_member_id") or root.get("assignee_id")
+                dispatcher = session.get("dispatcher_member_id") or root["assignee_id"]
                 if dispatcher and dispatcher != child["assignee_id"]:
                     self.store.grant_evidence_access(evidence_id, dispatcher, actor_member_id=child["assignee_id"], internal=True)
                 self.store.transition_task(child["task_id"], current["revision"], "review", f"team:{task_id}:review:{child['task_id']}:{current['revision']}", payload={"provider_status": status, "provider_output": text, "provider_session_id": provider_row["provider_session_id"], "artifact_path": str(artifact_path), "evidence_id": evidence_id})
@@ -581,16 +745,29 @@ class ButianService:
                 self.submit_handoff({"task_id": child["task_id"], "task_revision": child_revision, "member_id": child["assignee_id"], "status": "done", "summary": text[:2000], "evidence_ids": [evidence_id], "next_action": "派活者审核子任务结果", "confidence": 0.7})
                 results.append({"task_id": child["task_id"], "status": "review", "text": text, "provider_session_id": provider_row["provider_session_id"], "evidence_ids": [evidence_id]})
             else:
-                target = "failed" if status in {"cancelled", "provider_lost"} else "unknown"
+                target = "provider_lost" if status == "provider_lost" else "unknown"
                 if current["status"] == "cancelling" and status == "completed":
                     target = "unknown"
                 if current["status"] == "running":
 
                     self.store.transition_task(child["task_id"], current["revision"], target, f"team:{task_id}:{target}:{child['task_id']}:{current['revision']}", payload={"provider_status": status, "reason": consumed.get("reason")})
+                latest_child = self.store.db.execute("SELECT lease_id FROM tasks WHERE task_id=?", (child["task_id"],)).fetchone()
+                if latest_child["lease_id"]:
+                    self.store.release_lease(child["task_id"], latest_child["lease_id"])
                 results.append({"task_id": child["task_id"], "status": target, "reason": consumed.get("reason")})
         refreshed = self.store.db.execute("SELECT task_id,status,revision,assignee_id,payload FROM tasks WHERE parent_id=? ORDER BY rowid", (task_id,)).fetchall()
+        failures = [row["task_id"] for row in refreshed if row["status"] in {"unknown", "provider_lost", "failed", "cancelled", "blocked"}]
+        root_state = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if failures and root_state["status"] in {"todo", "ready"}:
+            if root_state["status"] == "todo":
+                self.store.transition_task(task_id, root_state["revision"], "ready", f"team:{task_id}:failure-ready:{root_state['revision']}")
+                root_state = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            self.store.transition_task(task_id, root_state["revision"], "blocked", f"team:{task_id}:blocked:{root_state['revision']}", payload={"reason": "child_tasks_require_recovery", "failed_child_task_ids": failures})
         if refreshed and all(row["status"] == "done" for row in refreshed):
             root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            if root_now["status"] == "blocked":
+                self.store.transition_task(task_id, root_now["revision"], "ready", f"team:{task_id}:unblocked:{root_now['revision']}")
+                root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
             if root_now["status"] == "todo":
                 self.store.transition_task(task_id, root_now["revision"], "ready", f"team:{task_id}:ready")
                 root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
@@ -605,11 +782,11 @@ class ButianService:
                 aggregate = {"goal": root["title"], "results": outputs}
                 artifact_dir = self.home / "artifacts" / "team" / task_id
                 artifact_dir.mkdir(parents=True, exist_ok=True)
-                aggregate_path = artifact_dir / "aggregate.json"
+                aggregate_path = artifact_dir / f"aggregate-r{root_now['revision']}.json"
                 aggregate_path.write_text(json.dumps(aggregate, ensure_ascii=False, indent=2), encoding="utf-8")
                 root_owner = root["assignee_id"] or session.get("dispatcher_member_id")
                 aggregate_evidence = self.record_evidence(aggregate_path, root=artifact_dir, owner_member_id=root_owner, actor_member_id=root_owner)
-                self.store.transition_task(task_id, root_now["revision"], "review", f"team:{task_id}:aggregate", payload={**aggregate, "artifact_path": str(aggregate_path), "evidence_id": aggregate_evidence})
+                self.store.transition_task(task_id, root_now["revision"], "review", f"team:{task_id}:aggregate:{root_now['revision']}", payload={**aggregate, "artifact_path": str(aggregate_path), "evidence_id": aggregate_evidence})
                 root_revision = root_now["revision"] + 1
                 self.submit_handoff({"task_id": task_id, "task_revision": root_revision, "member_id": root_owner, "status": "done", "summary": f"已汇总 {len(outputs)} 个子任务结果", "evidence_ids": [aggregate_evidence] + [item["evidence_id"] for item in outputs if item.get("evidence_id")], "next_action": "最终审核并交付", "confidence": 0.7})
                 results.append({"task_id": task_id, "status": "review", "aggregate": outputs, "evidence_ids": [aggregate_evidence]})
@@ -706,7 +883,6 @@ class ButianService:
             learning = self._record_review_learning(task, revision, "approve", notes, handoff)
             return {"task_id": task_id, "verdict": "approve", "status": "done", "learning": learning}
         rework_count = self.store.record_rework(task_id, revision, reviewer_member_id=reviewer_member_id or "", notes=notes, rework_limit=rework_limit)
-        self.store.transition_task(task_id, revision, "ready", f"review_rework_{task_id}_{revision}_{rework_count}", payload={**self._task_payload(task), "review_verdict": "rework", "reviewer_member_id": reviewer_member_id, "review_notes": notes, "rework_count": rework_count})
         refreshed = next(item for item in self.store.list_tasks() if item["task_id"] == task_id)
         instruction = self._task_payload(refreshed).get("instruction") or refreshed.get("title") or "请根据审核意见重新执行任务"
         execution = {"status": "ready", "reason": "provider_unavailable"}
@@ -762,20 +938,31 @@ class ButianService:
 
     def ask_user(self, task_id: str, revision: int, member_id: str, question: str):
         qid = f"q_{uuid.uuid4().hex}"
-        self.store.db.execute("INSERT INTO questions VALUES (?,?,?,?,?,?,?,?)", (qid, task_id, revision, member_id, question, None, "open", time.time()))
-        self.store.transition_task(task_id, revision, "waiting_user", f"question:{qid}", {"question_id": qid})
+        self.store.transition_task(
+            task_id, revision, "waiting_user", f"question:{qid}", {"question_id": qid},
+            question_record=(qid, task_id, revision, member_id, question, None, "open", time.time()),
+        )
         return qid
 
     def answer_user(self, question_id: str, answer: str):
+        with self.store._write_lock:
+            return self._answer_user(question_id, answer)
+
+    def _answer_user(self, question_id: str, answer: str):
         row = self.store.db.execute("SELECT * FROM questions WHERE question_id=?", (question_id,)).fetchone()
         if not row or row["status"] != "open":
             raise ValueError("question_not_open")
-        task = self.store.db.execute("SELECT revision FROM tasks WHERE task_id=?", (row["task_id"],)).fetchone()
-        if not task or task["revision"] != row["revision"] + 1:
+        task = self.store.db.execute("SELECT revision,status,payload FROM tasks WHERE task_id=?", (row["task_id"],)).fetchone()
+        if not task or task["status"] != "waiting_user" or task["revision"] != row["revision"] + 1:
             raise ValueError("question_revision_conflict")
-        with self.store.db:
-            self.store.db.execute("UPDATE questions SET answer=?, status='answered' WHERE question_id=?", (answer, question_id))
-            self.store.db.execute("UPDATE tasks SET status='ready', revision=revision+1, payload=? WHERE task_id=? AND revision=?", (json.dumps({"answer": answer}), row["task_id"], task["revision"]))
+        payload = {**json.loads(task["payload"] or "{}"), "answer": answer}
+        with self.store._write_lock, self.store.db:
+            self.store.db.execute("BEGIN IMMEDIATE")
+            updated = self.store.db.execute("UPDATE tasks SET status='ready', revision=revision+1, payload=? WHERE task_id=? AND revision=? AND status='waiting_user'", (json.dumps(payload, ensure_ascii=False), row["task_id"], task["revision"])).rowcount
+            answered = self.store.db.execute("UPDATE questions SET answer=?, status='answered' WHERE question_id=? AND status='open'", (answer, question_id)).rowcount
+            if updated != 1 or answered != 1:
+                raise ValueError("question_revision_conflict")
+            self.store.append_event(row["task_id"], "user_question_answered", {"question_id": question_id, "task_revision": task["revision"] + 1}, f"question-answer:{question_id}")
         return row["task_id"]
 
     def report_tool_issue(self, member_id, tool_id, version, **details):
@@ -853,6 +1040,24 @@ class ButianService:
     def list_host_authorizations(self, owner_member_id: str, *, status: str | None = None):
         return self.tools.list_host_authorizations(owner_member_id, status=status)
 
+    def _assert_provider_execution_current(self, session):
+        current = self.store.provider_session(session["provider_session_id"])
+        if current["status"] != "running":
+            raise ValueError("provider_execution_not_running")
+        if session.get("task_id"):
+            latest = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (session["task_id"],)).fetchone()
+            task = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (session["task_id"],)).fetchone()
+            if not latest or latest[0] != session["provider_session_id"]:
+                raise ValueError("provider_execution_superseded")
+            if not task or task["status"] != "running" or task["revision"] != session.get("task_revision"):
+                raise ValueError("provider_execution_revision_conflict")
+
+    def _execute_provider_tool(self, session, actor_member_id, tool_id, version, input_data=None, **options):
+        with self.store._write_lock:
+            self._assert_provider_execution_current(session)
+        return self.execute_tool(actor_member_id, tool_id, version, input_data,
+                                 execution_guard=lambda: self._assert_provider_execution_current(session), **options)
+
     def execute_tool(self, actor_member_id: str, tool_id: str, version: int, input_data=None, **options):
         return self.tools.execute(actor_member_id, tool_id, version, input_data, **options)
 
@@ -915,10 +1120,14 @@ class ButianService:
         if not row or row["status"] not in ("candidate", "verified", "rejected", "inconclusive"):
             raise ValueError("peer_learning_not_candidate")
         status = "verified" if success else "rejected"
-        if success:
-            self.store.record_verification(row["candidate_memory_id"], f"{learning_id}:verification:{time.time_ns()}", "success", evidence_ids or [], {"peer_learning_id": learning_id})
-        else:
-            self.store.record_verification(row["candidate_memory_id"], f"{learning_id}:verification:{time.time_ns()}", "failure", evidence_ids or [], {"peer_learning_id": learning_id})
+        evidence_ids = list(dict.fromkeys(evidence_ids or []))
+        if success and not evidence_ids:
+            raise ValueError("evidence_required_for_success")
+        prior_evidence = set(json.loads(row["evidence_ids"] or "[]"))
+        if success and prior_evidence.intersection(evidence_ids):
+            raise ValueError("independent_evidence_required")
+        operation_key = f"{learning_id}:verification:{hashlib.sha256(json.dumps(evidence_ids, sort_keys=True).encode()).hexdigest()}"
+        self.store.record_verification(row["candidate_memory_id"], operation_key, "success" if success else "failure", evidence_ids, {"peer_learning_id": learning_id})
         memory = self.memory(row["asker_id"])
         try:
             mem = memory.db.execute("SELECT * FROM memories WHERE memory_id=?", (row["candidate_memory_id"],)).fetchone()

@@ -4,6 +4,8 @@ import json
 import sqlite3
 import time
 import uuid
+import threading
+from .store import serialized_write
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,7 +27,8 @@ class HypothesisStore:
     KINDS = {"practice_hypothesis", "hardware_hypothesis", "causal_hypothesis"}
     OUTCOMES = {"supported", "rejected", "inconclusive", "execution_failed", "unknown"}
 
-    def __init__(self, db: sqlite3.Connection):
+    def __init__(self, db: sqlite3.Connection, *, write_lock=None):
+        self._write_lock = write_lock or threading.RLock()
         self.db = db
         self.db.row_factory = sqlite3.Row
         self.db.executescript("""
@@ -33,40 +36,47 @@ class HypothesisStore:
             prior_id TEXT PRIMARY KEY, source_kind TEXT NOT NULL, title TEXT NOT NULL,
             claim TEXT NOT NULL, environment TEXT NOT NULL, source_refs TEXT NOT NULL,
             reliability REAL NOT NULL, status TEXT NOT NULL DEFAULT 'candidate',
-            created_at REAL NOT NULL, updated_at REAL NOT NULL
+            created_at REAL NOT NULL, updated_at REAL NOT NULL,
+            owner_member_id TEXT
         );
         CREATE TABLE IF NOT EXISTS practice_hypotheses (
             hypothesis_id TEXT PRIMARY KEY, prior_ids TEXT NOT NULL, kind TEXT NOT NULL,
             statement TEXT NOT NULL, rationale TEXT NOT NULL, conditions TEXT NOT NULL,
             predictions TEXT NOT NULL, falsifiers TEXT NOT NULL, status TEXT NOT NULL,
             prior_reliability REAL NOT NULL, verification_required INTEGER NOT NULL DEFAULT 1,
-            created_at REAL NOT NULL, updated_at REAL NOT NULL
+            created_at REAL NOT NULL, updated_at REAL NOT NULL, owner_member_id TEXT
         );
-        CREATE TABLE IF NOT EXISTS hypothesis_authorizations (authorization_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, actor_member_id TEXT NOT NULL, decision TEXT NOT NULL, reason TEXT NOT NULL, created_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS hypothesis_authorizations (authorization_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, actor_member_id TEXT NOT NULL, decision TEXT NOT NULL, reason TEXT NOT NULL, created_at REAL NOT NULL, owner_member_id TEXT);
         CREATE TABLE IF NOT EXISTS hypothesis_actions (
             action_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, description TEXT NOT NULL,
             cost REAL NOT NULL, risk REAL NOT NULL, information_gain REAL NOT NULL,
             authorization TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL,
-            started_at REAL, finished_at REAL
+            started_at REAL, finished_at REAL, owner_member_id TEXT
         );
         CREATE TABLE IF NOT EXISTS hypothesis_observations (
             observation_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL,
             action_id TEXT NOT NULL, outcome TEXT NOT NULL, evidence_ids TEXT NOT NULL,
             environment TEXT NOT NULL, independent_key TEXT NOT NULL, notes TEXT NOT NULL,
-            created_at REAL NOT NULL, UNIQUE(hypothesis_id, independent_key)
+            created_at REAL NOT NULL, owner_member_id TEXT, UNIQUE(hypothesis_id, independent_key)
         );
         """)
+        for table in ("prior_knowledge", "practice_hypotheses", "hypothesis_authorizations", "hypothesis_actions", "hypothesis_observations"):
+            columns = {row[1] for row in self.db.execute(f"PRAGMA table_info({table})")}
+            if "owner_member_id" not in columns:
+                self.db.execute(f"ALTER TABLE {table} ADD COLUMN owner_member_id TEXT")
+        self.db.commit()
 
     @staticmethod
     def _json(value: Any) -> str:
         return json.dumps(value if value is not None else {}, ensure_ascii=False, sort_keys=True)
 
-    def add_prior(self, source_kind: str, title: str, claim: str, *, environment=None, source_refs=None, reliability: float = 0.0) -> str:
+    @serialized_write
+    def add_prior(self, source_kind: str, title: str, claim: str, *, environment=None, source_refs=None, reliability: float = 0.0, owner_member_id: str | None = None) -> str:
         if source_kind not in self.SOURCES or not title.strip() or not claim.strip() or not 0 <= reliability <= 1:
             raise ValueError("invalid_prior_knowledge")
         prior_id = f"prior_{uuid.uuid4().hex}"
         now = time.time()
-        self.db.execute("INSERT INTO prior_knowledge VALUES (?,?,?,?,?,?,?,?,?,?)", (prior_id, source_kind, title.strip(), claim.strip(), self._json(environment or {}), self._json(list(source_refs or [])), reliability, "candidate", now, now))
+        self.db.execute("INSERT INTO prior_knowledge VALUES (?,?,?,?,?,?,?,?,?,?,?)", (prior_id, source_kind, title.strip(), claim.strip(), self._json(environment or {}), self._json(list(source_refs or [])), reliability, "candidate", now, now, owner_member_id))
         return prior_id
 
     def assess(self, source_kinds: list[str], *, environment_match: float = 0.5, independent_sources: int = 0, counterexamples: int = 0) -> HypothesisAssessment:
@@ -79,49 +89,66 @@ class HypothesisStore:
         score = max(0.0, min(1.0, base * environment_match + independent_bonus - contradiction_penalty))
         return HypothesisAssessment(score, {"source_kinds": source_kinds, "environment_match": environment_match, "independent_sources": independent_sources, "counterexamples": counterexamples, "is_prior_only": True})
 
-    def propose(self, kind: str, statement: str, *, prior_ids=None, rationale: str, conditions=None, predictions=None, falsifiers=None, assessment: HypothesisAssessment) -> str:
+    @serialized_write
+    def propose(self, kind: str, statement: str, *, prior_ids=None, rationale: str, conditions=None, predictions=None, falsifiers=None, assessment: HypothesisAssessment, owner_member_id: str | None = None) -> str:
         if kind not in self.KINDS or not statement.strip() or not rationale.strip() or not assessment.rationale.get("is_prior_only"):
             raise ValueError("invalid_practice_hypothesis")
         ids = list(dict.fromkeys(prior_ids or []))
         if ids:
-            found = {row[0] for row in self.db.execute("SELECT prior_id FROM prior_knowledge WHERE prior_id IN (%s)" % ",".join("?" * len(ids)), ids)}
+            found = {row[0] for row in self.db.execute("SELECT prior_id FROM prior_knowledge WHERE prior_id IN (%s) AND owner_member_id IS ?" % ",".join("?" * len(ids)), ids + [owner_member_id])}
             if found != set(ids):
                 raise ValueError("prior_knowledge_not_found")
         hypothesis_id = f"hyp_{uuid.uuid4().hex}"
         now = time.time()
-        self.db.execute("INSERT INTO practice_hypotheses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", (hypothesis_id, self._json(ids), kind, statement.strip(), rationale.strip(), self._json(conditions or {}), self._json(predictions or []), self._json(falsifiers or []), "candidate", assessment.reliability, 1, now, now))
+        self.db.execute("INSERT INTO practice_hypotheses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (hypothesis_id, self._json(ids), kind, statement.strip(), rationale.strip(), self._json(conditions or {}), self._json(predictions or []), self._json(falsifiers or []), "candidate", assessment.reliability, 1, now, now, owner_member_id))
         return hypothesis_id
 
-    def authorize(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float) -> str:
-        if not self.db.execute("SELECT 1 FROM practice_hypotheses WHERE hypothesis_id=?", (hypothesis_id,)).fetchone():
+    @serialized_write
+    def authorize(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float, owner_member_id: str | None = None) -> str:
+        if not self.db.execute("SELECT 1 FROM practice_hypotheses WHERE hypothesis_id=? AND owner_member_id IS ?", (hypothesis_id, owner_member_id)).fetchone():
             raise ValueError("hypothesis_not_found")
         if cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
             raise ValueError("invalid_verification_metrics")
         action_id = f"act_{uuid.uuid4().hex}"
-        self.db.execute("INSERT INTO hypothesis_actions VALUES (?,?,?,?,?,?,?,?,?,?,?)", (action_id, hypothesis_id, description, cost, risk, information_gain, "", "awaiting_authorization", time.time(), None, None))
+        self.db.execute("INSERT INTO hypothesis_actions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (action_id, hypothesis_id, description, cost, risk, information_gain, "", "awaiting_authorization", time.time(), None, None, owner_member_id))
         return action_id
 
-    def grant_authorization(self, action_id: str, *, actor_member_id: str, reason: str, authorized: bool) -> None:
-        row = self.db.execute("SELECT * FROM hypothesis_actions WHERE action_id=?", (action_id,)).fetchone()
-        if not row or row["status"] != "awaiting_authorization":
+    @serialized_write
+    def grant_authorization(self, action_id: str, *, actor_member_id: str, reason: str, authorized: bool, owner_member_id: str | None = None) -> None:
+        row = self.db.execute("SELECT * FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
+        if not row:
+            raise ValueError("verification_action_not_found")
+        if row["status"] != "awaiting_authorization":
             raise ValueError("verification_action_not_awaiting_authorization")
         if not actor_member_id.strip() or not reason.strip():
             raise ValueError("authorization_actor_and_reason_required")
+        if not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (actor_member_id,)).fetchone():
+            raise ValueError("authorization_actor_not_found")
         now = time.time()
         auth_id = f"auth_{uuid.uuid4().hex}"
-        self.db.execute("INSERT INTO hypothesis_authorizations VALUES (?,?,?,?,?,?)", (auth_id, row["hypothesis_id"], actor_member_id, "approved" if authorized else "denied", reason, now))
-        self.db.execute("UPDATE hypothesis_actions SET authorization=?,status=? WHERE action_id=?", (auth_id, "queued" if authorized else "denied", action_id))
+        with self.db:
+            self.db.execute("INSERT INTO hypothesis_authorizations VALUES (?,?,?,?,?,?,?)", (auth_id, row["hypothesis_id"], actor_member_id, "approved" if authorized else "denied", reason, now, owner_member_id))
+            updated = self.db.execute("UPDATE hypothesis_actions SET authorization=?,status=? WHERE action_id=? AND status='awaiting_authorization' AND owner_member_id IS ?", (auth_id, "queued" if authorized else "denied", action_id, owner_member_id)).rowcount
+            if updated != 1:
+                raise ValueError("verification_action_not_awaiting_authorization")
 
-    def start(self, action_id: str) -> None:
-        updated = self.db.execute("UPDATE hypothesis_actions SET status='running',started_at=? WHERE action_id=? AND status='queued'", (time.time(), action_id)).rowcount
+    @serialized_write
+    def start(self, action_id: str, *, owner_member_id: str | None = None) -> None:
+        updated = self.db.execute("UPDATE hypothesis_actions SET status='running',started_at=? WHERE action_id=? AND status='queued' AND owner_member_id IS ?", (time.time(), action_id, owner_member_id)).rowcount
         if updated != 1:
+            visible = self.db.execute("SELECT 1 FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
+            if not visible:
+                raise ValueError("verification_action_not_found")
             raise ValueError("verification_action_not_authorized_or_not_queued")
 
-    def observe(self, action_id: str, outcome: str, evidence_ids: list[str], *, environment=None, independent_key: str, notes: str = "", outbox: dict[str, Any] | None = None, observation_id: str | None = None) -> str:
+    @serialized_write
+    def observe(self, action_id: str, outcome: str, evidence_ids: list[str], *, environment=None, independent_key: str, notes: str = "", outbox: dict[str, Any] | None = None, observation_id: str | None = None, owner_member_id: str | None = None) -> str:
         if outcome not in self.OUTCOMES or not independent_key.strip():
             raise ValueError("invalid_hypothesis_observation")
-        action = self.db.execute("SELECT * FROM hypothesis_actions WHERE action_id=?", (action_id,)).fetchone()
-        if not action or action["status"] != "running":
+        action = self.db.execute("SELECT * FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
+        if not action:
+            raise ValueError("verification_action_not_found")
+        if action["status"] != "running":
             raise ValueError("verification_action_not_running")
         if outcome in {"supported", "rejected"} and not evidence_ids:
             raise ValueError("evidence_required_for_conclusive_outcome")
@@ -134,9 +161,9 @@ class HypothesisStore:
         now = time.time()
         self.db.execute("SAVEPOINT hypothesis_observation")
         try:
-            self.db.execute("INSERT INTO hypothesis_observations VALUES (?,?,?,?,?,?,?,?,?)", (observation_id, action["hypothesis_id"], action_id, outcome, self._json(evidence_ids), self._json(environment or {}), independent_key, notes, now))
-            self.db.execute("UPDATE hypothesis_actions SET status='completed',finished_at=? WHERE action_id=?", (now, action_id))
-            self._refresh_status(action["hypothesis_id"])
+            self.db.execute("INSERT INTO hypothesis_observations VALUES (?,?,?,?,?,?,?,?,?,?)", (observation_id, action["hypothesis_id"], action_id, outcome, self._json(evidence_ids), self._json(environment or {}), independent_key, notes, now, owner_member_id))
+            self.db.execute("UPDATE hypothesis_actions SET status='completed',finished_at=? WHERE action_id=? AND owner_member_id IS ?", (now, action_id, owner_member_id))
+            self._refresh_status(action["hypothesis_id"], owner_member_id=owner_member_id)
             if outbox is not None:
                 operation_key = f"member-memory:{observation_id}:{outbox['member_id']}"
                 outbox_id = f"outbox_{uuid.uuid4().hex}"
@@ -149,8 +176,9 @@ class HypothesisStore:
             raise
         return observation_id
 
-    def _refresh_status(self, hypothesis_id: str) -> str:
-        rows = self.db.execute("SELECT outcome FROM hypothesis_observations WHERE hypothesis_id=?", (hypothesis_id,)).fetchall()
+    @serialized_write
+    def _refresh_status(self, hypothesis_id: str, *, owner_member_id: str | None = None) -> str:
+        rows = self.db.execute("SELECT outcome FROM hypothesis_observations WHERE hypothesis_id=? AND owner_member_id IS ?", (hypothesis_id, owner_member_id)).fetchall()
         outcomes = [row[0] for row in rows]
         if any(x == "supported" for x in outcomes) and not any(x == "rejected" for x in outcomes):
             status = "supported"
@@ -160,13 +188,14 @@ class HypothesisStore:
             status = "inconclusive"
         else:
             status = "candidate"
-        self.db.execute("UPDATE practice_hypotheses SET status=?,updated_at=? WHERE hypothesis_id=?", (status, time.time(), hypothesis_id))
+        self.db.execute("UPDATE practice_hypotheses SET status=?,updated_at=? WHERE hypothesis_id=? AND owner_member_id IS ?", (status, time.time(), hypothesis_id, owner_member_id))
         return status
 
-    def get(self, hypothesis_id: str) -> dict[str, Any]:
-        row = self.db.execute("SELECT * FROM practice_hypotheses WHERE hypothesis_id=?", (hypothesis_id,)).fetchone()
+    @serialized_write
+    def get(self, hypothesis_id: str, *, owner_member_id: str | None = None) -> dict[str, Any]:
+        row = self.db.execute("SELECT * FROM practice_hypotheses WHERE hypothesis_id=? AND owner_member_id IS ?", (hypothesis_id, owner_member_id)).fetchone()
         if not row:
             raise ValueError("hypothesis_not_found")
         result = dict(row)
-        result["observations"] = [dict(item) for item in self.db.execute("SELECT * FROM hypothesis_observations WHERE hypothesis_id=? ORDER BY created_at", (hypothesis_id,))]
+        result["observations"] = [dict(item) for item in self.db.execute("SELECT * FROM hypothesis_observations WHERE hypothesis_id=? AND owner_member_id IS ? ORDER BY created_at", (hypothesis_id, owner_member_id))]
         return result

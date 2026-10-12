@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
+import ctypes
 import json
 
 import math
@@ -53,18 +54,80 @@ _ALLOWED_TRANSITIONS = {
 
 
 
-def _terminate_process_tree(proc: subprocess.Popen[Any]) -> None:
-    """Best-effort cleanup; this is not an isolation boundary."""
+class _PROCESSENTRY32W(ctypes.Structure):
+    _fields_ = [("dwSize", ctypes.c_uint32), ("cntUsage", ctypes.c_uint32), ("th32ProcessID", ctypes.c_uint32), ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", ctypes.c_uint32), ("cntThreads", ctypes.c_uint32), ("th32ParentProcessID", ctypes.c_uint32), ("pcPriClassBase", ctypes.c_int32), ("dwFlags", ctypes.c_uint32), ("szExeFile", ctypes.c_wchar * 260)]
+
+def _windows_process_tree(root_pid: int) -> set[int] | None:
+    """Return the observed process tree, or None when it cannot be observed."""
+    if os.name != "nt":
+        return {root_pid}
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateToolhelp32Snapshot.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    kernel32.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    kernel32.Process32FirstW.argtypes = [ctypes.c_void_p, ctypes.POINTER(_PROCESSENTRY32W)]
+    kernel32.Process32FirstW.restype = ctypes.c_int
+    kernel32.Process32NextW.argtypes = [ctypes.c_void_p, ctypes.POINTER(_PROCESSENTRY32W)]
+    kernel32.Process32NextW.restype = ctypes.c_int
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.c_int
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+    if snapshot == ctypes.c_void_p(-1).value:
+        return None
+    try:
+        entry = _PROCESSENTRY32W()
+        entry.dwSize = ctypes.sizeof(entry)
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+            return None
+        children: dict[int, set[int]] = {}
+        while True:
+            children.setdefault(int(entry.th32ParentProcessID), set()).add(int(entry.th32ProcessID))
+            if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                break
+        result, pending = {root_pid}, [root_pid]
+        while pending:
+            parent = pending.pop()
+            for child in children.get(parent, ()):
+                if child not in result:
+                    result.add(child)
+                    pending.append(child)
+        return result
+    finally:
+        kernel32.CloseHandle(snapshot)
+
+
+def _terminate_process_tree(proc: subprocess.Popen[Any]) -> bool:
+    """Terminate and report whether the complete process tree was confirmed gone."""
+    tree = _windows_process_tree(proc.pid)
+    if tree is None:
+        return False
     if os.name == "nt":
         try:
             subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=5)
         except (OSError, subprocess.TimeoutExpired):
             pass
+    if os.name == "nt":
+        for pid in sorted(tree - {proc.pid}, reverse=True):
+            try:
+                subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
     if proc.poll() is None:
         try:
             proc.kill()
         except OSError:
             pass
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        current_tree = _windows_process_tree(proc.pid)
+        if current_tree is not None:
+            descendants = tree - {proc.pid}
+            alive = current_tree.intersection(descendants)
+            if not alive and proc.poll() is not None:
+                return True
+        time.sleep(0.05)
+    current_tree = _windows_process_tree(proc.pid)
+    descendants = tree - {proc.pid}
+    return current_tree is not None and not current_tree.intersection(descendants) and proc.poll() is not None
 
 
 def _finite(value: Any, name: str, *, nonnegative: bool = False) -> float:
@@ -293,6 +356,17 @@ class ToolStore:
         self._create_schema()
         self._recover_orphan_version_dirs()
 
+    def wait_for_executions(self, timeout: float = 10.0) -> bool:
+        """Wait until execute workers have removed their active records before DB close."""
+        deadline = time.monotonic() + max(0.0, timeout)
+        while time.monotonic() < deadline:
+            with self._active_executions_lock:
+                if not self._active_executions:
+                    return True
+            time.sleep(0.01)
+        with self._active_executions_lock:
+            return not self._active_executions
+
 
 
     def _recover_orphan_version_dirs(self) -> None:
@@ -502,7 +576,7 @@ class ToolStore:
 
 
 
-    def execute(self, actor_member_id: str, tool_id: str, version: int, input_data: Any = None, *, dry_run: bool = False, verification_only: bool = False, task_id: str | None = None, timeout_seconds: float = 10.0, max_output_bytes: int = 65536, share_id: str | None = None, security_review_issue_id: str | None = None) -> dict[str, Any]:
+    def execute(self, actor_member_id: str, tool_id: str, version: int, input_data: Any = None, *, dry_run: bool = False, verification_only: bool = False, task_id: str | None = None, timeout_seconds: float = 10.0, max_output_bytes: int = 65536, share_id: str | None = None, security_review_issue_id: str | None = None, execution_guard=None) -> dict[str, Any]:
 
         tool = self._tool(tool_id)
 
@@ -683,6 +757,7 @@ class ToolStore:
             if current_share["max_uses"] is not None and current_share["used_count"] >= current_share["max_uses"]:
                 raise ValueError("tool_trial_exhausted")
         result_status, exit_code, stdout, stderr, reason = "failed", None, "", "", None
+        termination_reason_locked = False
 
         decoded = None
 
@@ -693,10 +768,13 @@ class ToolStore:
                 argv = [resolved_interpreter, "-I", str(source)] if entrypoint[0] == "python" else [resolved_interpreter, str(source)]
                 runtime_capabilities["argv"] = argv
                 runtime_capabilities["cwd"] = work
-                proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work, env={"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}, shell=False)
+                with self.store._write_lock:
+                    if execution_guard is not None:
+                        execution_guard()
+                    proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work, env={"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}, shell=False)
 
                 with self._active_executions_lock:
-                    self._active_executions[execution_id] = {"process": proc, "actor_member_id": actor_member_id, "tool_id": tool_id, "version": version, "started_at": started, "cancel_requested": False}
+                    self._active_executions[execution_id] = {"process": proc, "actor_member_id": actor_member_id, "tool_id": tool_id, "version": version, "started_at": started, "cancel_requested": False, "cancel_cleanup_confirmed": None}
                 self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "running", None, "", "", None, json.dumps(permissions), started, None, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
                 self._event(tool_id, version, "execution_started", {"execution_id": execution_id, "actor_member_id": actor_member_id}, f"tool:execution:{execution_id}:started")
 
@@ -735,25 +813,53 @@ class ToolStore:
                     proc.stdin.close()
                     proc.wait(timeout=timeout)
                 except subprocess.TimeoutExpired:
-                    _terminate_process_tree(proc)
+                    cleaned = _terminate_process_tree(proc)
                     proc.wait()
-                    result_status, reason = "failed", "timeout"
+                    result_status = "failed" if cleaned else "unknown"
+                    reason = "timeout" if cleaned else "cleanup_unconfirmed"
+                    termination_reason_locked = True
                 except (BrokenPipeError, OSError):
                     proc.wait()
                 finally:
                     for reader in readers:
                         reader.join(timeout=2)
                 exit_code = proc.returncode
+                cancel_cleanup_confirmed = None
                 with self._active_executions_lock:
                     active = self._active_executions.get(execution_id)
                     cancel_requested = bool(active and active["cancel_requested"])
-                    self._active_executions.pop(execution_id, None)
                 if cancel_requested:
-                    result_status = "cancelled" if proc.poll() is not None else "unknown"
-                    reason = "cancelled_by_actor" if result_status == "cancelled" else "cancel_unconfirmed"
+                    deadline = time.monotonic() + 5.0
+                    while time.monotonic() < deadline:
+                        with self._active_executions_lock:
+                            active = self._active_executions.get(execution_id)
+                            cancel_cleanup_confirmed = active.get("cancel_cleanup_confirmed") if active else None
+                        if cancel_cleanup_confirmed is not None:
+                            break
+                        time.sleep(0.01)
+                with self._active_executions_lock:
+                    active = self._active_executions.get(execution_id)
+                    cancel_requested = cancel_requested or bool(active and active["cancel_requested"])
+                    if cancel_cleanup_confirmed is None and active:
+                        cancel_cleanup_confirmed = active.get("cancel_cleanup_confirmed")
+                    self._active_executions.pop(execution_id, None)
+                recorded = self.store.db.execute("SELECT termination_reason FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+                recorded_reason = recorded["termination_reason"] if recorded else None
+                if recorded_reason in {"cancelled_by_actor", "cancel_unconfirmed"}:
+                    cancel_requested = True
+                if cancel_requested and not termination_reason_locked:
+                    recorded = self.store.db.execute("SELECT termination_reason FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+                    recorded_reason = recorded["termination_reason"] if recorded else None
+                    if recorded_reason in {"cancelled_by_actor", "cancel_unconfirmed"}:
+                        reason = recorded_reason
+                        result_status = "cancelled" if reason == "cancelled_by_actor" else "unknown"
+                    else:
+                        result_status = "cancelled" if cancel_cleanup_confirmed is True and proc.poll() is not None else "unknown"
+                        reason = "cancelled_by_actor" if result_status == "cancelled" else "cancel_unconfirmed"
+                    termination_reason_locked = True
                 out, err = captured["stdout"], captured["stderr"]
                 stdout, stderr = out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
-                if not cancel_requested and reason != "timeout":
+                if not cancel_requested and not termination_reason_locked:
                     result_status = "failed" if overflow.is_set() or exit_code else "success"
                     reason = "output_limit_exceeded" if overflow.is_set() else (None if exit_code == 0 else "nonzero_exit")
                     if result_status == "success":
@@ -781,7 +887,8 @@ class ToolStore:
 
         except OSError as exc:
 
-            stderr, reason = str(exc)[:output_limit], "launch_failed"
+            if not termination_reason_locked:
+                stderr, reason = str(exc)[:output_limit], "launch_failed"
             if not self.store.db.execute("SELECT 1 FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone():
                 self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "failed", None, "", stderr, reason, json.dumps(permissions), started, time.time(), runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
 
@@ -1306,13 +1413,19 @@ class ToolStore:
             active["cancel_requested"] = True
             proc = active["process"]
             self.store.db.execute("UPDATE tool_executions SET status='cancelling', termination_reason=? WHERE execution_id=? AND status='running'", (reason, execution_id))
-        _terminate_process_tree(proc)
+        cleaned = _terminate_process_tree(proc)
+        with self._active_executions_lock:
+            current = self._active_executions.get(execution_id)
+            if current is not None:
+                current["cancel_cleanup_confirmed"] = cleaned
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             status = "unknown"
         else:
-            status = "cancelled" if proc.poll() is not None else "unknown"
+            status = "cancelled" if cleaned and proc.poll() is not None else "unknown"
+        final_reason = "cancelled_by_actor" if status == "cancelled" else "cancel_unconfirmed"
+        self.store.db.execute("UPDATE tool_executions SET status='cancelling', termination_reason=? WHERE execution_id=? AND status='cancelling'", (final_reason, execution_id))
         self._event(row["tool_id"], row["version"], "execution_cancel_requested", {"execution_id": execution_id, "actor_member_id": actor_member_id, "reason": reason, "status": status}, f"tool:execution:{execution_id}:cancel")
         return {"execution_id": execution_id, "status": status}
 

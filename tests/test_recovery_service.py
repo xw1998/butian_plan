@@ -1,3 +1,5 @@
+import pytest
+
 from butian.runtime.service import ButianService
 
 
@@ -128,3 +130,96 @@ def test_team_child_lease_is_released_when_child_enters_review(tmp_path):
         assert child["lease_until"] is None
     finally:
         service.close()
+
+
+def test_service_close_does_not_close_database_when_executions_remain(tmp_path, monkeypatch):
+    service = ButianService(tmp_path)
+    try:
+        monkeypatch.setattr(service.tools, "wait_for_executions", lambda timeout=10.0: False)
+        original_close = service.store.close
+        closed = []
+        monkeypatch.setattr(service.store, "close", lambda: closed.append(True))
+        with pytest.raises(RuntimeError, match="shutdown_incomplete_active_tool_executions"):
+            service.close()
+        assert closed == []
+    finally:
+        if not closed:
+            monkeypatch.setattr(service.tools, "wait_for_executions", lambda timeout=10.0: True)
+            original_close()
+
+
+def test_stale_rework_does_not_increment_count(tmp_path):
+    svc = ButianService(tmp_path)
+    try:
+        session = svc.store.create_session('solo', None, None, {})
+        task = svc.store.create_task(session, 'stale review')
+        for revision, state in enumerate(['ready', 'claimed', 'running', 'review'], 1):
+            svc.store.transition_task(task, revision, state, f'stale:{state}')
+        with pytest.raises(ValueError):
+            svc.review_task(task, 4, 'rework')
+        row = svc.store.db.execute('SELECT rework_count,status FROM tasks WHERE task_id=?', (task,)).fetchone()
+        assert row['rework_count'] == 0
+        assert row['status'] == 'review'
+    finally:
+        svc.close()
+
+
+def test_close_refuses_live_maintenance_before_closing_database(tmp_path):
+    svc = ButianService(tmp_path)
+    original = svc._maintenance_thread
+    if original:
+        svc._maintenance_stop.set()
+        original.join(3)
+    class LiveMaintenance:
+        def join(self, timeout):
+            pass
+        def is_alive(self):
+            return True
+    svc._maintenance_thread = LiveMaintenance()
+    try:
+        with pytest.raises(RuntimeError, match='shutdown_incomplete_active_maintenance'):
+            svc.close()
+        assert svc.store.db.execute('SELECT 1').fetchone()[0] == 1
+    finally:
+        svc._maintenance_thread = None
+        svc.close()
+
+
+def test_provider_start_rejection_releases_running_task(tmp_path):
+    import json
+    import sys
+    (tmp_path / 'providers.json').write_text(json.dumps({'providers': [{'type': 'local-command', 'command': [sys.executable, '-c', 'print(1)']}]}), encoding='utf-8')
+    svc = ButianService(tmp_path)
+    try:
+        svc.add_member('worker', 'Worker', provider_id='local-command')
+        session = svc.store.create_session('solo', 'worker', None, {})
+        task = svc.store.create_task(session, 'rejected start', assignee_id='worker')
+        svc.store.transition_task(task, 1, 'ready', 'start-ready')
+        lease = svc.store.claim_task(task, 'worker', internal=True)
+        svc.store.transition_task(task, lease['revision'], 'running', 'start-running')
+        result = svc.start_provider_task('worker', 'work', task_id=task, model='unavailable-model')
+        assert result['status'] == 'unsupported'
+        row = svc.store.db.execute('SELECT status,lease_id,payload FROM tasks WHERE task_id=?', (task,)).fetchone()
+        assert row['status'] == 'unknown'
+        assert row['lease_id'] is None
+        assert json.loads(row['payload'])['reason']
+    finally:
+        svc.close()
+
+
+def test_rework_transition_failure_rolls_back_count(tmp_path):
+    import sqlite3
+    svc = ButianService(tmp_path)
+    try:
+        session = svc.store.create_session('solo', None, None, {})
+        task = svc.store.create_task(session, 'transaction failure')
+        for revision, state in enumerate(['ready', 'claimed', 'running', 'review'], 1):
+            svc.store.transition_task(task, revision, state, f'rollback:{state}')
+        svc.store.db.execute("CREATE TRIGGER reject_rework BEFORE UPDATE OF status ON tasks WHEN NEW.status='ready' BEGIN SELECT RAISE(ABORT, 'forced_transition_failure'); END")
+        with pytest.raises(sqlite3.IntegrityError, match='forced_transition_failure'):
+            svc.review_task(task, 5, 'rework')
+        row = svc.store.db.execute('SELECT rework_count,status FROM tasks WHERE task_id=?', (task,)).fetchone()
+        assert row['rework_count'] == 0
+        assert row['status'] == 'review'
+    finally:
+        svc.close()

@@ -90,6 +90,8 @@ class Store:
         if "prompt" not in provider_cols:
             self.db.execute("ALTER TABLE provider_sessions ADD COLUMN prompt TEXT")
 
+        if "task_revision" not in provider_cols:
+            self.db.execute("ALTER TABLE provider_sessions ADD COLUMN task_revision INTEGER")
         task_cols = {row[1] for row in self.db.execute("PRAGMA table_info(tasks)")}
         if "rework_count" not in task_cols:
             self.db.execute("ALTER TABLE tasks ADD COLUMN rework_count INTEGER NOT NULL DEFAULT 0")
@@ -104,14 +106,18 @@ class Store:
         session_id = provider_session_id or f"psess_{uuid.uuid4().hex}"
         now = time.time()
         self.db.execute("INSERT INTO provider_sessions(provider_session_id,task_id,member_id,provider_id,model,status,last_provider_event_id,reason,created_at,updated_at,capabilities,requested_model,selection_status,remote_session_id,prompt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (session_id, task_id, member_id, provider_id, model, "running", None, None, now, now, json.dumps(capabilities or {}, ensure_ascii=False), requested_model, selection_status, remote_session_id, prompt))
+        if task_id:
+            self.db.execute("UPDATE provider_sessions SET task_revision=(SELECT revision FROM tasks WHERE task_id=?) WHERE provider_session_id=?", (task_id, session_id))
         return session_id
 
+    @serialized_write
     def provider_session(self, provider_session_id: str) -> dict[str, Any]:
         row = self.db.execute("SELECT * FROM provider_sessions WHERE provider_session_id=?", (provider_session_id,)).fetchone()
         if not row:
             raise ValueError("provider_session_not_found")
         return dict(row)
 
+    @serialized_write
     def provider_session_access(self, provider_session_id: str, member_id: str) -> bool:
         row = self.db.execute("SELECT ps.member_id, s.dispatcher_member_id, t.assignee_id FROM provider_sessions ps LEFT JOIN tasks t ON t.task_id=ps.task_id LEFT JOIN sessions s ON s.session_id=t.session_id WHERE ps.provider_session_id=?", (provider_session_id,)).fetchone()
         return bool(row and member_id in {row["member_id"], row["dispatcher_member_id"], row["assignee_id"]})
@@ -156,6 +162,7 @@ class Store:
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         self.db.execute("INSERT INTO members_auth VALUES (?, ?, ?) ON CONFLICT(member_id) DO UPDATE SET token_hash=excluded.token_hash", (member_id, token_hash, time.time()))
 
+    @serialized_write
     def authenticate_member(self, member_id: str, token: str | None = None) -> bool:
         if not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
             return False
@@ -167,6 +174,7 @@ class Store:
         row = self.db.execute("SELECT t.assignee_id, s.dispatcher_member_id FROM tasks t JOIN sessions s ON s.session_id=t.session_id WHERE t.task_id=?", (task_id,)).fetchone()
         return bool(row and member_id in {row["assignee_id"], row["dispatcher_member_id"]})
 
+    @serialized_write
     def claim_task(self, task_id: str, member_id: str, lease_seconds: int = 300, token: str | None = None, *, internal: bool = False) -> dict[str, Any]:
         if not internal and (not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone() or (token is not None and not self.authenticate_member(member_id, token))):
             raise ValueError("member_authentication_failed")
@@ -262,9 +270,11 @@ class Store:
     def create_task(self, session_id: str, title: str, assignee_id: str | None = None, parent_id: str | None = None, payload: dict[str, Any] | None = None) -> str:
         self.session(session_id)
         if parent_id:
-            parent = self.db.execute("SELECT status FROM tasks WHERE task_id=?", (parent_id,)).fetchone()
+            parent = self.db.execute("SELECT status,session_id FROM tasks WHERE task_id=?", (parent_id,)).fetchone()
             if not parent:
                 raise ValueError("parent_task_not_found")
+            if parent["session_id"] != session_id:
+                raise ValueError("parent_session_mismatch")
             if parent["status"] in {"done", "cancelled"}:
                 raise ValueError("parent_task_closed")
         task_id = f"task_{uuid.uuid4().hex}"
@@ -315,7 +325,7 @@ class Store:
         return [dict(row) for row in self.db.execute("SELECT * FROM strategy_steps WHERE task_id=? ORDER BY created_at", (task_id,))]
 
     @serialized_write
-    def transition_task(self, task_id: str, expected_revision: int, target: str, operation_key: str, payload: dict[str, Any] | None = None) -> None:
+    def transition_task(self, task_id: str, expected_revision: int, target: str, operation_key: str, payload: dict[str, Any] | None = None, *, question_record: tuple | None = None, rework_count: int | None = None) -> None:
         existing = self.db.execute("SELECT state FROM operations WHERE idempotency_key=?", (operation_key,)).fetchone()
         if existing:
             if existing["state"] == "committed":
@@ -335,12 +345,22 @@ class Store:
         now = time.time()
         with self._write_lock, self.db:
             self.db.execute("BEGIN IMMEDIATE")
+            if question_record is not None:
+                if target != "waiting_user" or question_record[1:3] != (task_id, expected_revision):
+                    raise ValueError("question_transition_mismatch")
+                self.db.execute("INSERT INTO questions VALUES (?,?,?,?,?,?,?,?)", question_record)
+            if rework_count is not None:
+                if row["status"] != "review" or target != "ready":
+                    raise ValueError("rework_transition_mismatch")
+                self.db.execute("UPDATE tasks SET rework_count=? WHERE task_id=? AND revision=?", (rework_count, task_id, expected_revision))
             self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "prepared", now, None))
             current_payload = json.loads(row["payload"] or "{}")
             next_payload = current_payload if payload is None else {**current_payload, **payload}
             updated = self.db.execute("UPDATE tasks SET status=?, revision=revision+1, payload=? WHERE task_id=? AND revision=?", (target, json.dumps(next_payload, ensure_ascii=False), task_id, expected_revision)).rowcount
             if updated != 1:
                 raise ValueError("revision_conflict")
+            if target in {"waiting_user", "review", "done", "cancelled", "failed", "unknown", "provider_lost"}:
+                self.db.execute("UPDATE tasks SET lease_id=NULL, lease_until=NULL WHERE task_id=?", (task_id,))
             seq = self.db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events").fetchone()[0]
             event_id = f"evt_{uuid.uuid4().hex}"
             self.db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)", (event_id, operation_id, operation_key, task_id, "task_transition", json.dumps({"from": row["status"], "to": target, "revision": expected_revision + 1}, ensure_ascii=False), seq, now, "prepared"))
@@ -413,16 +433,17 @@ class Store:
     @serialized_write
     def record_rework(self, task_id: str, revision: int, *, reviewer_member_id: str, notes: str, rework_limit: int) -> int:
         """review→ready 返工记账：超上限拒绝，不静默放行。"""
-        row = self.db.execute("SELECT rework_count, status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        row = self.db.execute("SELECT rework_count, status, revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
         if not row:
             raise ValueError("task_not_found")
+        if row["revision"] != revision:
+            raise ValueError("revision_conflict")
         if row["status"] != "review":
             raise ValueError("task_not_in_review")
         new_count = int(row["rework_count"] or 0) + 1
         if new_count > rework_limit:
             raise ValueError("rework_limit_exceeded")
-        with self.db:
-            self.db.execute("UPDATE tasks SET rework_count=? WHERE task_id=?", (new_count, task_id))
+        self.transition_task(task_id, revision, "ready", f"review_rework_{task_id}_{revision}_{new_count}", payload={"review_verdict": "rework", "reviewer_member_id": reviewer_member_id, "review_notes": notes, "rework_count": new_count}, rework_count=new_count)
         return new_count
 
     def list_tasks(self, status: str | None = None) -> list[dict[str, Any]]:

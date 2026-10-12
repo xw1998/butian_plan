@@ -33,8 +33,14 @@ class ApiHandler(BaseHTTPRequestHandler):
     def _require_member(self, body=None, target_member_id=None):
         actor, token = self._member_credentials(body)
         task_id = (body or {}).get("task_id")
-        if not task_id and self.path.startswith("/api/tasks/"):
-            task_id = self.path.split("/")[3]
+        path = urlparse(self.path).path
+        if not task_id and path.startswith("/api/tasks/") and path not in {"/api/tasks/review", "/api/tasks/tree"}:
+            task_id = path.split("/")[3]
+        if path.startswith("/api/questions/") and path.endswith("/answer"):
+            question = self.service.store.db.execute(
+                "SELECT task_id FROM questions WHERE question_id=?", (path.split("/")[3],)
+            ).fetchone()
+            task_id = question["task_id"] if question else None
         # Authentication must come from the caller; resource ownership is checked separately.
         # Inferring an actor from a task/provider session would turn an unauthenticated read
         # or write into an authenticated request.
@@ -48,10 +54,29 @@ class ApiHandler(BaseHTTPRequestHandler):
         if not self.service.store.authenticate_member(actor, token):
             self._send(401, {"error": "member_authentication_failed"})
             return False
+        self._authenticated_member_id = actor
+        if (body or {}).get("actor_member_id") and (body or {}).get("actor_member_id") != actor:
+            self._send(403, {"error": "actor_identity_mismatch"})
+            return False
+        if (body or {}).get("current_member_id") and (body or {}).get("current_member_id") != actor:
+            self._send(403, {"error": "current_identity_mismatch"})
+            return False
+        if (body or {}).get("reviewer_member_id") and (body or {}).get("reviewer_member_id") != actor:
+            self._send(403, {"error": "reviewer_identity_mismatch"})
+            return False
+        if (body or {}).get("dispatcher_member_id") and path in {"/api/sessions", "/api/goals/submit"} and (body or {})["dispatcher_member_id"] != actor:
+            self._send(403, {"error": "dispatcher_identity_mismatch"})
+            return False
+        task_resource = path.startswith(("/api/tasks", "/api/questions", "/api/goals/", "/api/providers/"))
+        if task_resource and task_id and not self.service.store.task_access(task_id, actor):
+            self._send(403, {"error": "task_access_denied"})
+            return False
         return True
 
     def _visible_member_id(self):
-        actor, _ = self._member_credentials()
+        actor = getattr(self, "_authenticated_member_id", None)
+        if not actor:
+            raise ValueError("member_authentication_required")
         return actor
 
     def _visible_tasks(self, actor):
@@ -62,6 +87,14 @@ class ApiHandler(BaseHTTPRequestHandler):
         )]
 
     def do_GET(self):
+        # All page reads share one SQLite connection with transactional writers.
+        # Keep concurrent refresh requests outside another request's transaction.
+        if self.service is None:
+            return self._do_GET()
+        with self.service.store._write_lock:
+            return self._do_GET()
+
+    def _do_GET(self):
         if not self.path.startswith("/api/"):
             relative = "index.html" if self.path == "/" else self.path.lstrip("/")
             root = (self.web_root or Path(__file__).resolve().parents[2] / "web").resolve()
@@ -95,7 +128,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "authorized_url_queue", "rewarm_policy": "evidence_required"}}); return
         if urlparse(self.path).path == "/api/tools/host-authorizations":
             q = parse_qs(urlparse(self.path).query)
-            member_id = (q.get("member_id") or [""])[0]
+            member_id = (q.get("member_id") or [self._visible_member_id()])[0]
             if not member_id or not self._require_member({"member_id": member_id}, target_member_id=member_id):
                 return
             self._send(200, {"authorizations": self.service.list_host_authorizations(member_id, status=(q.get("status") or [None])[0])}); return
@@ -151,10 +184,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(200, {"hypotheses": []}); return
         if self.path == "/api/knowledge/claims":
             actor = self._visible_member_id()
-            # Source claims inherit no member ownership in the current schema.
-            self._send(200, {"claims": []}); return
+            rows = [dict(row) for row in self.service.learning.db.execute("SELECT c.*, s.title, s.locator FROM source_claims c JOIN knowledge_sources s ON s.source_id=c.source_id WHERE c.owner_member_id=? ORDER BY c.created_at DESC", (actor,))]
+            self._send(200, {"claims": rows}); return
         if self.path == "/api/knowledge/runs":
-            self._send(200, {"runs": self.service.learning.list_learning_runs()}); return
+            self._send(200, {"runs": self.service.learning.list_learning_runs(owner_member_id=self._visible_member_id())}); return
         if self.path == "/api/events":
             actor = self._visible_member_id()
             self._send(200, {"events": [dict(row) for row in self.service.store.db.execute("SELECT e.* FROM events e WHERE e.aggregate_id IN (SELECT t.task_id FROM tasks t JOIN sessions s ON s.session_id=t.session_id WHERE s.dispatcher_member_id=? OR t.assignee_id=?) OR e.aggregate_id IN (SELECT provider_session_id FROM provider_sessions WHERE member_id=?) ORDER BY e.created_at DESC LIMIT 50", (actor, actor, actor))]}); return
@@ -181,7 +214,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             body = self._body(); path = urlparse(self.path).path
             protected = ("/api/memory/", "/api/providers/", "/api/evolution/",
                          "/api/tools", "/api/tasks", "/api/goals/", "/api/sessions/",
-                         "/api/evidence", "/api/hypotheses/",
+                         "/api/evidence", "/api/hypotheses/", "/api/sessions",
                          "/api/knowledge/", "/api/questions", "/api/strategies/", "/api/experiments", "/api/tools/host-authorizations/", "/api/tools/executions/running", "/api/tools/executions/cancel")
             if path.startswith(protected) and not (path == "/api/providers/cancel" and not body.get("provider_session_id")) and not self._require_member(body):
                 return
@@ -284,35 +317,43 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path.startswith("/api/experiments/") and path.endswith("/summary"):
                 experiment_id = path.split("/")[3]; self._send(200, self.experiments.summarize(experiment_id, body["metric"])); return
             if path == "/api/evidence":
-                evidence_id = self.service.record_evidence(body["path"], owner_member_id=body.get("owner_member_id"), actor_member_id=body.get("actor_member_id"), token=body.get("token"), root=body.get("root"))
+                actor, token = self._member_credentials(body)
+                if body.get("owner_member_id") not in {None, actor}:
+                    self._send(403, {"error": "member_access_denied"}); return
+                evidence_id = self.service.record_evidence(body["path"], owner_member_id=actor, actor_member_id=actor, token=token, root=body.get("root"))
                 self._send(201, {"evidence_id": evidence_id}); return
             if path == "/api/hypotheses/propose":
                 source_kinds = body.get("source_kinds") or ["unknown"]
                 assessment = self.service.assess_hypothesis(source_kinds, environment_match=float(body.get("environment_match", 0.5)), independent_sources=int(body.get("independent_sources", 0)), counterexamples=int(body.get("counterexamples", 0)))
-                hypothesis_id = self.service.propose_hypothesis(body["kind"], body["statement"], prior_ids=body.get("prior_ids", []), rationale=body.get("rationale", ""), conditions=body.get("conditions"), predictions=body.get("predictions"), falsifiers=body.get("falsifiers"), assessment=assessment)
+                hypothesis_id = self.service.propose_hypothesis(body["kind"], body["statement"], prior_ids=body.get("prior_ids", []), rationale=body.get("rationale", ""), conditions=body.get("conditions"), predictions=body.get("predictions"), falsifiers=body.get("falsifiers"), assessment=assessment, owner_member_id=self._visible_member_id())
                 self._send(201, {"hypothesis_id": hypothesis_id, "assessment": {"reliability": assessment.reliability, "rationale": assessment.rationale}}); return
             if path == "/api/knowledge/sources":
-                source_id = self.service.learning.add_source(body["source_type"], body["locator"], body["title"], body["content_hash"], metadata=body.get("metadata")); self._send(201, {"source_id": source_id}); return
+                source_id = self.service.learning.add_source(body["source_type"], body["locator"], body["title"], body["content_hash"], owner_member_id=self._visible_member_id(), metadata=body.get("metadata")); self._send(201, {"source_id": source_id}); return
             if path == "/api/knowledge/capture":
-                result = self.service.learning.capture_url(body["url"], title=body.get("title"), source_type=body.get("source_type", "web"), timeout=float(body.get("timeout", 10)), max_bytes=int(body.get("max_bytes", 1_000_000)))
+                result = self.service.learning.capture_url(body["url"], owner_member_id=self._visible_member_id(), title=body.get("title"), source_type=body.get("source_type", "web"), timeout=float(body.get("timeout", 10)), max_bytes=int(body.get("max_bytes", 1_000_000)))
                 result.pop("content", None)
                 self._send(201, result); return
             if path == "/api/knowledge/sources/verify":
-                result = self.service.learning.verify_source_content(body["source_id"], body["content"]); self._send(200, result); return
+                result = self.service.learning.verify_source_content(body["source_id"], body["content"], owner_member_id=self._visible_member_id()); self._send(200, result); return
             if path == "/api/knowledge/claims":
-                claim_id = self.service.learning.add_claim(body["source_id"], body["claim"], conditions=body.get("conditions"), limitations=body.get("limitations"), confidence=body.get("confidence", 0.0), predictions=body.get("predictions"), falsifiers=body.get("falsifiers")); self._send(201, {"claim_id": claim_id}); return
+                claim_id = self.service.learning.add_claim(body["source_id"], body["claim"], owner_member_id=self._visible_member_id(), conditions=body.get("conditions"), limitations=body.get("limitations"), confidence=body.get("confidence", 0.0), predictions=body.get("predictions"), falsifiers=body.get("falsifiers")); self._send(201, {"claim_id": claim_id}); return
             if path == "/api/hypotheses/from-claim":
-                self._send(201, self.service.promote_claim_to_prior(body["claim_id"])); return
+                self._send(201, self.service.promote_claim_to_prior(body["claim_id"], owner_member_id=self._visible_member_id())); return
+            if path == "/api/hypotheses/prepare-claim-practice":
+                self._send(201, self.service.prepare_claim_practice(body["claim_id"], owner_member_id=self._visible_member_id(), description=body["description"], kind=body.get("kind", "practice_hypothesis"), cost=float(body.get("cost", 1.0)), risk=float(body.get("risk", 0.0)), information_gain=float(body.get("information_gain", 1.0)))); return
             if path == "/api/hypotheses/authorize":
-                action_id = self.service.authorize_hypothesis(body["hypothesis_id"], body["description"], cost=body["cost"], risk=body["risk"], information_gain=body["information_gain"]); self._send(201, {"action_id": action_id}); return
+                action_id = self.service.authorize_hypothesis(body["hypothesis_id"], body["description"], cost=body["cost"], risk=body["risk"], information_gain=body["information_gain"], owner_member_id=self._visible_member_id()); self._send(201, {"action_id": action_id}); return
             if path == "/api/hypotheses/grant":
-                self.service.grant_hypothesis_authorization(body["action_id"], actor_member_id=body["actor_member_id"], reason=body["reason"], authorized=body["authorized"]); self._send(200, {"ok": True}); return
+                actor = self._visible_member_id()
+                if body.get("actor_member_id") and body["actor_member_id"] != actor:
+                    self._send(403, {"error": "actor_identity_mismatch"}); return
+                self.service.grant_hypothesis_authorization(body["action_id"], actor_member_id=actor, reason=body["reason"], authorized=body["authorized"], owner_member_id=actor); self._send(200, {"ok": True}); return
             if path == "/api/hypotheses/start":
-                self.service.start_hypothesis_action(body["action_id"]); self._send(200, {"ok": True}); return
+                self.service.start_hypothesis_action(body["action_id"], owner_member_id=self._visible_member_id()); self._send(200, {"ok": True}); return
             if path == "/api/hypotheses/get":
-                self._send(200, self.service.get_hypothesis(body["hypothesis_id"])); return
+                self._send(200, self.service.get_hypothesis(body["hypothesis_id"], owner_member_id=self._visible_member_id())); return
             if path == "/api/hypotheses/observe":
-                self._send(200, self.service.observe_hypothesis(body["action_id"], body["outcome"], body.get("evidence_ids", []), independent_key=body["independent_key"], notes=body.get("notes", ""), environment=body.get("environment"), actor_member_id=body.get("actor_member_id"), member_id=body.get("member_id"))); return
+                self._send(200, self.service.observe_hypothesis(body["action_id"], body["outcome"], body.get("evidence_ids", []), independent_key=body["independent_key"], notes=body.get("notes", ""), environment=body.get("environment"), actor_member_id=body.get("actor_member_id"), member_id=body.get("member_id"), owner_member_id=self._visible_member_id())); return
             if path == "/api/members":
                 self.service.add_member(body["member_id"], body["name"], body.get("role", "member"), body.get("responsibilities"), body.get("provider_id"), body.get("model_id")); self._send(201, {"member_id": body["member_id"]}); return
             if path == "/api/migration/preflight":
@@ -321,6 +362,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
             if path == "/api/goals/submit":
                 self._send(201, self.service.submit_goal(body["goal"], mode=body.get("mode", "solo"), member_id=body.get("member_id"), dispatcher_member_id=body.get("dispatcher_member_id"), requested_model=body.get("requested_model"), capabilities=body.get("capabilities"), environment=body.get("environment"), member_ids=body.get("member_ids"), subtasks=body.get("subtasks"))); return
+            if path == "/api/goals/run-solo":
+                self._send(200, self.service.run_solo_task(body["task_id"], actor_member_id=self._member_credentials(body)[0])); return
             if path == "/api/goals/run-team":
                 if not self.service.store.task_access(body["task_id"], self._member_credentials(body)[0]):
                     self._send(403, {"error": "task_access_denied"}); return
@@ -373,8 +416,15 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/sessions":
                 self._send(201, self.service.create_session(body.get("mode", "solo"), body.get("dispatcher_member_id"), body.get("requested_model"), body.get("capabilities"), current_member_id=body.get("current_member_id"))); return
             if path == "/api/sessions/switch":
-                self._send(200, self.service.switch_session_mode(body["session_id"], body["mode"], current_member_id=body.get("current_member_id"))); return
+                actor = self._visible_member_id()
+                session = self.service.store.session(body["session_id"])
+                if session.get("dispatcher_member_id") != actor:
+                    self._send(403, {"error": "session_access_denied"}); return
+                self._send(200, self.service.switch_session_mode(body["session_id"], body["mode"], current_member_id=actor)); return
             if path == "/api/sessions/dispatcher":
+                role = self.service.store.db.execute("SELECT role FROM members WHERE member_id=?", (self._visible_member_id(),)).fetchone()
+                if not role or role["role"] != "bootstrap_admin":
+                    self._send(403, {"error": "admin_authorization_required"}); return
                 self.service.set_dispatcher_config(body["member_id"]); self._send(200, {"dispatcher_member_id": body["member_id"]}); return
             if path == "/api/tasks/review":
                 actor, _ = self._member_credentials(body)
@@ -384,7 +434,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/tasks":
                 actor, _ = self._member_credentials(body)
                 session = self.service.store.session(body["session_id"])
-                if actor not in {session.get("dispatcher_member_id"), body.get("assignee_id")}:
+                if actor != session.get("dispatcher_member_id"):
                     self._send(403, {"error": "task_create_forbidden"}); return
                 task_id = self.service.store.create_task(body["session_id"], body["title"], body.get("assignee_id"), body.get("parent_id"), body.get("payload")); self._send(201, {"task_id": task_id}); return
             if path.startswith("/api/tasks/") and path.endswith("/claim"):

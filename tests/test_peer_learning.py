@@ -19,7 +19,10 @@ def test_peer_answer_is_candidate_until_reproduced(tmp_path):
     memory = service.memory("a")
     assert memory.search("输入格式")[0]["status"] == "candidate"
     memory.close()
-    second = service.verify_peer_learning(learning_id, success=True, evidence_ids=[evidence_id], notes="第二次独立复现")
+    second_evidence = tmp_path / "verify-second.txt"
+    second_evidence.write_text("independent reproduction", encoding="utf-8")
+    second_evidence_id = service.store.record_evidence(second_evidence)
+    second = service.verify_peer_learning(learning_id, success=True, evidence_ids=[second_evidence_id], notes="第二次独立复现")
     assert second["memory_status"] == "warm"
     memory = service.memory("a")
     assert memory.search("输入格式")[0]["status"] == "warm"

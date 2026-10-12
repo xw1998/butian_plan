@@ -394,3 +394,163 @@ def test_task_heartbeat_and_cancel_http_routes():
         server.shutdown()
         server.server_close()
         service.close()
+
+
+def test_team_goal_uses_sqlite_row_assignee_when_child_completes(tmp_path):
+    (tmp_path / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"]}]}), encoding="utf-8")
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("dispatcher", "派活者", provider_id="local-command", model_id="local-command")
+        service.add_member("worker", "执行者", provider_id="local-command", model_id="local-command")
+        result = service.submit_goal("团队验证", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["完成实际验证"])
+        child = result["children"][0]
+        session = service.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=?", (child["task_id"],)).fetchone()
+        output = service.run_team_goal(result["task_id"])
+        assert output["status"] in {"review", "awaiting_child_reviews"}
+    finally:
+        service.close()
+
+
+def test_real_provider_rework_receives_review_notes(tmp_path):
+    command = [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"]
+    (tmp_path / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("dispatcher", "Dispatcher")
+        service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
+        goal = service.submit_goal("review-loop", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["initial instruction"])
+        service.run_team_goal(goal["task_id"])
+        child_id = goal["children"][0]["task_id"]
+        child = next(t for t in service.store.list_tasks() if t["task_id"] == child_id)
+        service.review_task(child_id, child["revision"], "rework", reviewer_member_id="dispatcher", notes="REWORK_REQUIRED_unique_add_boundary_evidence")
+        rerun = service.run_team_goal(goal["task_id"])
+        assert "REWORK_REQUIRED_unique_add_boundary_evidence" in rerun["children"][0]["text"]
+        child = next(t for t in service.store.list_tasks() if t["task_id"] == child_id)
+        service.review_task(child_id, child["revision"], "approve", reviewer_member_id="dispatcher")
+        assert service.run_team_goal(goal["task_id"])["status"] == "review"
+    finally:
+        service.close()
+
+
+def test_real_solo_provider_error_does_not_leave_task_running(tmp_path):
+    command = [sys.executable, "-c", "import sys; sys.exit(7)"]
+    (tmp_path / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
+        goal = service.submit_goal("failure", member_id="worker")
+        result = service.consume_provider_task(goal["execution"]["provider_session_id"])
+        assert result["status"] == "unknown"
+        task = service.store.db.execute("SELECT status,payload,lease_id FROM tasks WHERE task_id=?", (goal["task_id"],)).fetchone()
+        assert task["status"] == "unknown"
+        assert json.loads(task["payload"])["reason"] == "exit_code:7"
+        assert task["lease_id"] is None
+    finally:
+        service.close()
+
+
+def test_real_team_root_rework_runs_provider_instead_of_reusing_aggregate(tmp_path):
+    command = [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"]
+    (tmp_path / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
+    service = ButianService(tmp_path)
+    try:
+        for member in ("dispatcher", "worker"):
+            service.add_member(member, member, provider_id="local-command", model_id="local-command")
+        goal = service.submit_goal("root-review", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["child-instruction"])
+        service.run_team_goal(goal["task_id"])
+        child = next(t for t in service.store.list_tasks() if t["parent_id"] == goal["task_id"])
+        service.review_task(child["task_id"], child["revision"], "approve", reviewer_member_id="dispatcher")
+        service.run_team_goal(goal["task_id"])
+        root = next(t for t in service.store.list_tasks() if t["task_id"] == goal["task_id"])
+        rework = service.review_task(root["task_id"], root["revision"], "rework", reviewer_member_id="dispatcher", notes="ROOT_REWORK_UNIQUE_required_final_evidence")
+        provider_id = rework["execution"]["provider_session_id"]
+        service.run_team_goal(goal["task_id"])
+        assert service.store.provider_session(provider_id)["status"] == "completed"
+        root = next(t for t in service.store.list_tasks() if t["task_id"] == goal["task_id"])
+        assert root["status"] == "review"
+        assert "ROOT_REWORK_UNIQUE_required_final_evidence" in json.loads(root["payload"])["provider_output"]
+        assert service.review_task(root["task_id"], root["revision"], "approve", reviewer_member_id="dispatcher")["status"] == "done"
+    finally:
+        service.close()
+
+
+def test_real_team_failure_releases_lease_and_blocks_root(tmp_path):
+    (tmp_path / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": [sys.executable, "-c", "import sys; sys.exit(7)"]}]}), encoding="utf-8")
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("dispatcher", "Dispatcher")
+        service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
+        goal = service.submit_goal("failure", mode="team", member_id="dispatcher", member_ids=["worker"])
+        result = service.run_team_goal(goal["task_id"])
+        child = service.store.db.execute("SELECT * FROM tasks WHERE parent_id=?", (goal["task_id"],)).fetchone()
+        assert child["status"] == "unknown"
+        assert json.loads(child["payload"])["reason"] == "exit_code:7"
+        assert child["lease_id"] is None
+        assert result["status"] == "blocked"
+        assert service.run_team_goal(goal["task_id"])["status"] == "blocked"
+    finally:
+        service.close()
+
+
+def test_terminal_provider_can_publish_persisted_output_without_reexecution(tmp_path):
+    command = [sys.executable, "-c", "import sys; sys.stdout.write('persisted-original-output')"]
+    (tmp_path / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
+        goal = service.submit_goal("resume", member_id="worker")
+        pid = goal["execution"]["provider_session_id"]
+        service.provider_runtime.consume(pid, service.providers.get("local-command"))
+        assert service.store.provider_session(pid)["status"] == "completed"
+        result = service.consume_provider_task(pid)
+        assert result["task_status"] == "review"
+        assert result["text"] == "persisted-original-output"
+        repeated = service.consume_provider_task(pid)
+        assert repeated["task_status"] == "review"
+        assert repeated["text"] == "persisted-original-output"
+    finally:
+        service.close()
+
+
+def test_team_root_rework_without_provider_does_not_reaggregate(tmp_path):
+    command = [sys.executable, '-c', 'print("original-output")']
+    (tmp_path / 'providers.json').write_text(json.dumps({'providers': [{'type': 'local-command', 'command': command}]}), encoding='utf-8')
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('dispatcher', 'Dispatcher')
+        service.add_member('worker', 'Worker', provider_id='local-command')
+        goal = service.submit_goal('root rework', mode='team', member_id='dispatcher', member_ids=['worker'])
+        service.run_team_goal(goal['task_id'])
+        child = service.store.db.execute('SELECT * FROM tasks WHERE parent_id=?', (goal['task_id'],)).fetchone()
+        service.review_task(child['task_id'], child['revision'], 'approve', reviewer_member_id='dispatcher')
+        service.run_team_goal(goal['task_id'])
+        root = service.store.db.execute('SELECT * FROM tasks WHERE task_id=?', (goal['task_id'],)).fetchone()
+        service.review_task(root['task_id'], root['revision'], 'rework', reviewer_member_id='dispatcher', notes='new evidence required')
+        result = service.run_team_goal(goal['task_id'])
+        assert result['status'] == 'ready'
+        root = service.store.db.execute('SELECT * FROM tasks WHERE task_id=?', (goal['task_id'],)).fetchone()
+        assert root['status'] == 'ready'
+    finally:
+        service.close()
+
+
+def test_team_question_wait_does_not_consume_previous_execution(tmp_path):
+    command = [sys.executable, '-c', 'print("output-before-answer")']
+    (tmp_path / 'providers.json').write_text(json.dumps({'providers': [{'type': 'local-command', 'command': command}]}), encoding='utf-8')
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('dispatcher', 'Dispatcher')
+        service.add_member('worker', 'Worker', provider_id='local-command')
+        goal = service.submit_goal('question wait', mode='team', member_id='dispatcher', member_ids=['worker'])
+        child = service.store.db.execute('SELECT * FROM tasks WHERE parent_id=?', (goal['task_id'],)).fetchone()
+        qid = service.ask_user(child['task_id'], child['revision'], 'worker', 'input required')
+        result = service.run_team_goal(goal['task_id'])
+        assert result['children'][0]['status'] == 'waiting_user'
+        assert service.store.provider_session(goal['children'][0]['execution']['provider_session_id'])['status'] == 'running'
+        service.answer_user(qid, 'new-input')
+        result = service.run_team_goal(goal['task_id'])
+        assert result['children'][0]['status'] == 'review'
+        latest = service.store.db.execute('SELECT prompt FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1', (child['task_id'],)).fetchone()
+        assert 'new-input' in latest['prompt']
+    finally:
+        service.close()

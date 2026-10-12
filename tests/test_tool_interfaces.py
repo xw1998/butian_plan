@@ -350,3 +350,171 @@ def test_host_authorization_capabilities_must_cover_manifest(tmp_path):
             service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
     finally:
         service.close()
+
+
+def test_http_session_creation_requires_member_auth(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("m1", "Member")
+    service.store.set_member_token("m1", "secret")
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    http_api.ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        body = json.dumps({"mode": "solo", "current_member_id": "m1"}).encode()
+        req = urlrequest.Request(base + "/api/sessions", data=body, headers={"Content-Type": "application/json"}, method="POST")
+        with pytest.raises(HTTPError) as denied:
+            urlrequest.urlopen(req, timeout=3)
+        assert denied.value.code == 401
+        req = urlrequest.Request(base + "/api/sessions", data=body, headers={"Content-Type": "application/json", "X-Butian-Member": "m1", "X-Butian-Token": "secret"}, method="POST")
+        with urlrequest.urlopen(req, timeout=3) as response:
+            payload = json.loads(response.read())
+        assert payload["status"] == "ok"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+        service.close()
+
+
+def test_http_session_switch_denies_other_members_session(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("owner", "Owner")
+    service.add_member("other", "Other")
+    service.store.set_member_token("other", "other-test-token")
+    session_id = service.create_session("solo", current_member_id="owner")["session_id"]
+    http_api.ApiHandler.service = service
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        req = urlrequest.Request(f"http://127.0.0.1:{server.server_port}/api/sessions/switch", data=json.dumps({"session_id": session_id, "mode": "team", "current_member_id": "other"}).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "other", "X-Butian-Token": "other-test-token"}, method="POST")
+        with pytest.raises(HTTPError) as denied:
+            urlrequest.urlopen(req, timeout=3)
+        assert denied.value.code == 403
+        assert service.store.session(session_id)["mode"] == "solo"
+        assert service.store.session(session_id)["dispatcher_member_id"] == "owner"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+        service.close()
+
+
+def test_mcp_session_switch_denies_other_members_session(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("owner", "Owner")
+        service.add_member("other", "Other")
+        service.store.set_member_token("other", "other-secret")
+        session = service.create_session("solo", current_member_id="owner")
+        with pytest.raises(ValueError, match="session_access_denied"):
+            mcp_server.call_tool(service, "butian_session_switch_mode", {
+                "session_id": session["session_id"], "mode": "team",
+                "current_member_id": "other", "actor_member_id": "other", "token": "other-secret",
+            })
+        unchanged = service.store.session(session["session_id"])
+        assert unchanged["mode"] == "solo"
+        assert unchanged["dispatcher_member_id"] == "owner"
+    finally:
+        service.close()
+
+
+def test_http_header_evidence_is_owned_and_dispatcher_config_requires_admin(tmp_path):
+    service = ButianService(tmp_path)
+    service.add_member("worker", "Worker")
+    service.store.set_member_token("worker", "worker-secret")
+    evidence_path = tmp_path / "header-evidence.txt"
+    evidence_path.write_text("actual evidence", encoding="utf-8")
+    http_api.ApiHandler.service = service
+    http_api.ApiHandler.experiments = None
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    def post(path, body):
+        req = urlrequest.Request(f"http://127.0.0.1:{server.server_address[1]}" + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "worker", "X-Butian-Token": "worker-secret"}, method="POST")
+        with urlrequest.urlopen(req, timeout=3) as response:
+            return json.loads(response.read())
+    try:
+        recorded = post("/api/evidence", {"path": str(evidence_path)})
+        row = service.store.db.execute("SELECT owner_member_id FROM evidence WHERE evidence_id=?", (recorded["data"]["evidence_id"],)).fetchone()
+        assert row["owner_member_id"] == "worker"
+        with pytest.raises(HTTPError) as forbidden:
+            post("/api/sessions/dispatcher", {"member_id": "worker"})
+        assert forbidden.value.code == 403
+        assert service.get_dispatcher_config() is None
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+        service.close()
+
+
+@pytest.mark.parametrize("interface", ["http", "mcp"])
+def test_foreign_member_cannot_cancel_task_or_answer_question(tmp_path, interface):
+    service = ButianService(tmp_path)
+    for member in ("owner", "other"):
+        service.add_member(member, member)
+        service.store.set_member_token(member, member + "-secret")
+    session = service.create_session("solo", current_member_id="owner")
+    task_id = service.store.create_task(session["session_id"], "private", "owner")
+    for revision, status in enumerate(["ready", "claimed", "running"], 1):
+        service.store.transition_task(task_id, revision, status, f"private-{revision}")
+    question_id = service.ask_user(task_id, 4, "owner", "private scope?")
+    server = thread = None
+    try:
+        if interface == "http":
+            http_api.ApiHandler.service = service
+            server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            for path, body in [(f"/api/questions/{question_id}/answer", {"answer": "forged"}), (f"/api/tasks/{task_id}/cancel", {"revision": 5})]:
+                req = urlrequest.Request(f"http://127.0.0.1:{server.server_address[1]}" + path, data=json.dumps(body).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "other", "X-Butian-Token": "other-secret"}, method="POST")
+                with pytest.raises(HTTPError) as denied:
+                    urlrequest.urlopen(req, timeout=3)
+                assert denied.value.code == 403
+        else:
+            with pytest.raises(ValueError, match="task_access_denied"):
+                mcp_server.call_tool(service, "butian_user_answer", {"question_id": question_id, "answer": "forged", "actor_member_id": "other", "token": "other-secret"})
+        assert service.store.db.execute("SELECT status FROM tasks WHERE task_id=?", (task_id,)).fetchone()["status"] == "waiting_user"
+        assert service.store.db.execute("SELECT status FROM questions WHERE question_id=?", (question_id,)).fetchone()["status"] == "open"
+    finally:
+        if server:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=3)
+        service.close()
+
+
+@pytest.mark.parametrize("action,body", [
+    ("release", {"lease_id": "foreign-lease"}),
+    ("heartbeat", {"lease_id": "foreign-lease"}),
+    ("strategy", {"strategy_id": "foreign-strategy"}),
+    ("strategy-step", {"revision": 1, "strategy_id": "foreign-strategy", "stage": "plan"}),
+])
+def test_http_foreign_task_writes_are_denied(tmp_path, action, body):
+    service = ButianService(tmp_path)
+    for member in ("owner", "other"):
+        service.add_member(member, member)
+        service.store.set_member_token(member, member + "-secret")
+    session = service.create_session("solo", current_member_id="owner")
+    task_id = service.store.create_task(session["session_id"], "private", "owner")
+    http_api.ApiHandler.service = service
+    server = http_api.ThreadingHTTPServer(("127.0.0.1", 0), http_api.ApiHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        req = urlrequest.Request(f"http://127.0.0.1:{server.server_address[1]}/api/tasks/{task_id}/{action}", data=json.dumps(body).encode(), headers={"Content-Type": "application/json", "X-Butian-Member": "other", "X-Butian-Token": "other-secret"}, method="POST")
+        with pytest.raises(HTTPError) as denied:
+            urlrequest.urlopen(req, timeout=3)
+        assert denied.value.code == 403
+        assert json.loads(denied.value.read())["error"] == "task_access_denied"
+        assert service.store.db.execute("SELECT revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()["revision"] == 1
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+        service.close()

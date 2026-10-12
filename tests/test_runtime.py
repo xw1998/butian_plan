@@ -34,3 +34,39 @@ def test_question_and_handoff_require_structure(tmp_path):
     # 空证据交接可以入账（供审核参考），但不能让任务进入 done
     service.submit_handoff({"task_id": task, "task_revision": 6, "member_id": "m1", "status": "done", "summary": "已确认", "evidence_ids": [], "next_action": "review", "confidence": 0.8})
     service.close()
+
+
+def test_user_answer_preserves_goal_instruction_and_environment(tmp_path):
+    import json
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("m1", "Worker")
+        session = service.create_session("solo", current_member_id="m1")
+        original = {"goal": "goal", "instruction": "instruction", "environment": {"dataset": "v1"}}
+        task_id = service.store.create_task(session["session_id"], "question", "m1", payload=original)
+        for revision, status in enumerate(["ready", "claimed", "running"], 1):
+            service.store.transition_task(task_id, revision, status, f"question-state-{revision}")
+        question_id = service.ask_user(task_id, 4, "m1", "scope?")
+        service.answer_user(question_id, "all")
+        row = service.store.db.execute("SELECT status,payload FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        payload = json.loads(row["payload"])
+        assert all(payload.get(key) == value for key, value in original.items())
+        assert payload["answer"] == "all"
+        assert row["status"] == "ready"
+    finally:
+        service.close()
+
+
+def test_rejected_question_does_not_leave_open_question(tmp_path):
+    import pytest
+    service = ButianService(tmp_path)
+    service.add_member("owner", "Owner")
+    session = service.create_session("solo", current_member_id="owner")
+    task_id = service.store.create_task(session["session_id"], "scope", "owner")
+    try:
+        with pytest.raises(ValueError):
+            service.ask_user(task_id, 99, "owner", "stale question")
+        assert service.store.db.execute("SELECT COUNT(*) FROM questions WHERE task_id=?", (task_id,)).fetchone()[0] == 0
+        assert service.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()["status"] == "todo"
+    finally:
+        service.close()

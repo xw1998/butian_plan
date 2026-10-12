@@ -33,11 +33,12 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     ebatch = experiments.add_parser("batch"); ebatch.add_argument("name"); ebatch.add_argument("task_package"); ebatch.add_argument("dataset_version"); ebatch.add_argument("code_commit"); ebatch.add_argument("variants"); ebatch.add_argument("--configuration", default="{}"); ebatch.add_argument("--repeats", type=int, default=1)
     ecompare = experiments.add_parser("compare"); ecompare.add_argument("experiment_ids"); ecompare.add_argument("metrics")
     source = sub.add_parser("source").add_subparsers(dest="source_command", required=True)
-    sadd = source.add_parser("add"); sadd.add_argument("source_type"); sadd.add_argument("locator"); sadd.add_argument("title"); sadd.add_argument("content_hash")
-    scap = source.add_parser("capture"); scap.add_argument("url"); scap.add_argument("--title"); scap.add_argument("--source-type", default="web"); scap.add_argument("--timeout", type=float, default=10); scap.add_argument("--max-bytes", type=int, default=1000000)
-    source.add_parser("runs")
+    sadd = source.add_parser("add"); sadd.add_argument("source_type"); sadd.add_argument("locator"); sadd.add_argument("title"); sadd.add_argument("content_hash"); sadd.add_argument("--member-id", required=True)
+    scap = source.add_parser("capture"); scap.add_argument("url"); scap.add_argument("--member-id", required=True); scap.add_argument("--title"); scap.add_argument("--source-type", default="web"); scap.add_argument("--timeout", type=float, default=10); scap.add_argument("--max-bytes", type=int, default=1000000)
+    sruns = source.add_parser("runs"); sruns.add_argument("--member-id", required=True)
     claim = sub.add_parser("claim").add_subparsers(dest="claim_command", required=True)
-    cadd = claim.add_parser("add"); cadd.add_argument("source_id"); cadd.add_argument("claim"); cadd.add_argument("--confidence", type=float, default=0.0)
+    cadd = claim.add_parser("add"); cadd.add_argument("source_id"); cadd.add_argument("claim"); cadd.add_argument("--member-id", required=True); cadd.add_argument("--confidence", type=float, default=0.0)
+    cprep = claim.add_parser("prepare-practice"); cprep.add_argument("claim_id"); cprep.add_argument("description"); cprep.add_argument("--member-id", required=True); cprep.add_argument("--kind", default="practice_hypothesis"); cprep.add_argument("--cost", type=float, default=1.0); cprep.add_argument("--risk", type=float, default=0.0); cprep.add_argument("--information-gain", type=float, default=1.0)
     evidence = sub.add_parser("evidence").add_subparsers(dest="evidence_command", required=True)
     erecord = evidence.add_parser("record"); erecord.add_argument("path")
     memory = sub.add_parser("memory").add_subparsers(dest="memory_command", required=True)
@@ -131,12 +132,14 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
                     experiments.close()
             if args.command == "source":
                 if args.source_command == "capture":
-                    result = service.learning.capture_url(args.url, title=args.title, source_type=args.source_type, timeout=args.timeout, max_bytes=args.max_bytes); result.pop("content", None); emit(result); return 0
+                    result = service.learning.capture_url(args.url, owner_member_id=args.member_id, title=args.title, source_type=args.source_type, timeout=args.timeout, max_bytes=args.max_bytes); result.pop("content", None); emit(result); return 0
                 if args.source_command == "runs":
-                    emit({"runs": service.learning.list_learning_runs()}); return 0
-                source_id = service.learning.add_source(args.source_type, args.locator, args.title, args.content_hash); emit({"source_id": source_id}); return 0
+                    emit({"runs": service.learning.list_learning_runs(owner_member_id=args.member_id)}); return 0
+                source_id = service.learning.add_source(args.source_type, args.locator, args.title, args.content_hash, owner_member_id=args.member_id); emit({"source_id": source_id}); return 0
             if args.command == "claim":
-                claim_id = service.learning.add_claim(args.source_id, args.claim, confidence=args.confidence); emit({"claim_id": claim_id}); return 0
+                if args.claim_command == "prepare-practice":
+                    emit(service.prepare_claim_practice(args.claim_id, owner_member_id=args.member_id, description=args.description, kind=args.kind, cost=args.cost, risk=args.risk, information_gain=args.information_gain)); return 0
+                claim_id = service.learning.add_claim(args.source_id, args.claim, owner_member_id=args.member_id, confidence=args.confidence); emit({"claim_id": claim_id}); return 0
             if args.command == "evidence":
                 evidence_id = service.record_evidence(args.path); emit({"evidence_id": evidence_id}); return 0
             if args.command == "memory" and args.memory_command == "recall":

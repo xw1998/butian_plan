@@ -235,22 +235,27 @@ def test_shared_tool_accept_trial_archive_restore(tmp_path):
     service = make_service(tmp_path)
     try:
         tool_id = propose(service)["tool_id"]
-        service.add_tool_version("m1", tool_id, "tool", MANIFEST)
+        service.add_tool_version("m1", tool_id, "import sys; print(sys.stdin.read())", {**MANIFEST, "permissions": ["cpu", "execute"], "risk_level": "low"})
         assert service.tools._tool(tool_id)["status"] == "draft"
         with pytest.raises(ValueError, match="only_active"):
             service.share_tool("m1", tool_id, "m2")
-        return
-        share = service.share_tool("m1", tool_id, "m2")
+        for key in ("activate-a", "activate-b", "activate-c", "activate-d"):
+            run = service.execute_tool("m1", tool_id, 1, "activation", verification_only=True)
+            service.verify_tool("m1", tool_id, 1, "success", independent_key=key, task_id=key, environment={"kind": key}, execution_id=run["execution_id"], input_hash=run["input_hash"], expected_output=run["expected_output"], evidence_ids=[key])
+        assert service.tools._tool(tool_id)["status"] == "active"
+        share = service.share_tool("m1", tool_id, "m2", permission="team_execute")
         accepted = service.accept_tool_share("m2", share["share_id"])
         assert accepted["status"] == "trial"
-        trial = service.trial_tool("m2", share["share_id"], "success", independent_key="trial-a")
-        assert trial["status"] == "active"
+        trial_run = service.execute_tool("m2", tool_id, 1, "trial", share_id=share["share_id"])
+        trial = service.trial_tool("m2", share["share_id"], "success", independent_key="trial-a", task_id="trial-a", environment={"kind": "trial"}, evidence_ids=["trial-evidence"], execution_id=trial_run["execution_id"], input_hash=trial_run["input_hash"], expected_output=trial_run["expected_output"])
+        assert trial["status"] == "trial"
         archived = service.archive_tool("m1", tool_id, reason="cold")
         assert archived["status"] == "archived"
         restored = service.restore_tool("m1", tool_id)
         assert restored["status"] == "candidate"
-        service.verify_tool("m1", tool_id, 1, "success", independent_key="restore-a")
-        service.verify_tool("m1", tool_id, 1, "success", independent_key="restore-b")
+        for index, key in enumerate(("restore-a", "restore-b", "restore-c", "restore-d")):
+            restore_run = service.execute_tool("m1", tool_id, 1, "restore", verification_only=index == 0)
+            service.verify_tool("m1", tool_id, 1, "success", independent_key=key, task_id=key, environment={"kind": key}, evidence_ids=[key], execution_id=restore_run["execution_id"], input_hash=restore_run["input_hash"], expected_output=restore_run["expected_output"])
         assert service.list_tools("m1")[0]["status"] == "active"
     finally:
         service.close()
@@ -1217,6 +1222,70 @@ def test_unavailable_backend_fails_closed_before_execution(tmp_path, monkeypatch
         service.close()
 
 
+def test_cancel_terminates_real_descendant_process(tmp_path):
+    import os
+    import threading
+    import time
+
+    service = make_service(tmp_path)
+    try:
+        manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "text"},
+                    "permissions": ["execute"], "entrypoint": ["python", "tool.py"]}
+        tool_id = service.propose_tool("m1", "后代清理探针", "验证取消会终止真实子进程", reuse_lower=3, manual_cost_upper=10,
+                                       call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
+                                       risk_cost_upper=1)["tool_id"]
+        pid_file = tmp_path / "descendant.pid"
+        source = f"import pathlib, subprocess, sys, time\nchild = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\npathlib.Path({str(pid_file)!r}).write_text(str(child.pid))\ntime.sleep(30)\n"
+        service.add_tool_version("m1", tool_id, source, manifest)
+        result = {}
+        worker = threading.Thread(target=lambda: result.update(service.execute_tool("m1", tool_id, 1, {}, verification_only=True, timeout_seconds=60)))
+        worker.start()
+        execution_id = None
+        for _ in range(100):
+            running = service.list_running_tool_executions("m1")
+            if running:
+                execution_id = running[0]["execution_id"]
+                break
+            time.sleep(0.02)
+        assert execution_id is not None
+        deadline = time.time() + 3
+        child_pid = None
+        while time.time() < deadline:
+            if pid_file.exists():
+                child_pid = int(pid_file.read_text())
+                break
+            time.sleep(0.02)
+        assert child_pid is not None
+        cancelled = service.cancel_tool_execution("m1", execution_id, reason="descendant probe")
+        assert cancelled["status"] in {"cancelled", "unknown"}
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        audit = service.store.db.execute("SELECT status, termination_reason FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+        assert tuple(audit) in {("cancelled", "cancelled_by_actor"), ("unknown", "cancel_unconfirmed")}
+        import ctypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+        kernel32.OpenProcess.restype = ctypes.c_void_p
+        kernel32.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32)]
+        kernel32.GetExitCodeProcess.restype = ctypes.c_int
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        kernel32.CloseHandle.restype = ctypes.c_int
+        for _ in range(50):
+            handle = kernel32.OpenProcess(0x1000, 0, child_pid)
+            alive = False
+            if handle:
+                code = ctypes.c_uint32()
+                alive = bool(kernel32.GetExitCodeProcess(handle, ctypes.byref(code)) and code.value == 259)
+                kernel32.CloseHandle(handle)
+            if not alive:
+                break
+            time.sleep(0.05)
+        else:
+            assert tuple(audit) == ("unknown", "cancel_unconfirmed")
+    finally:
+        service.close()
+
+
 def test_running_execution_can_be_cancelled_and_audited(tmp_path):
     import threading
     import time
@@ -1248,5 +1317,27 @@ def test_running_execution_can_be_cancelled_and_audited(tmp_path):
         audit = service.list_tool_executions("m1", tool_id=tool_id)[0]
         assert audit["status"] == "cancelled"
         assert audit["termination_reason"] == "cancelled_by_actor"
+    finally:
+        service.close()
+
+
+def test_execution_guard_blocks_real_process_side_effect(tmp_path):
+    service = make_service(tmp_path)
+    marker = tmp_path / 'must-not-exist.txt'
+    try:
+        tool_id = propose(service)['tool_id']
+        service.add_tool_version('m1', tool_id, f'from pathlib import Path\nPath({str(marker)!r}).write_text("started")\nprint("ok")', {**MANIFEST, 'permissions': ['execute']})
+        checks = []
+        def invalid_execution():
+            checks.append(True)
+            raise ValueError('provider_execution_revision_conflict')
+        try:
+            result = service.tools.execute('m1', tool_id, 1, 'valid input', verification_only=True, execution_guard=invalid_execution)
+        except ValueError as exc:
+            assert str(exc) == 'provider_execution_revision_conflict'
+        else:
+            assert result['status'] != 'success'
+        assert checks == [True]
+        assert not marker.exists()
     finally:
         service.close()
