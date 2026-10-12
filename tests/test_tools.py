@@ -1148,3 +1148,30 @@ def test_context_recall_report_separates_candidates_and_reliability_rejections(t
         assert service.tools.context_cards("m1", "通用分析", limit=10) == []
     finally:
         service.close()
+
+
+def test_host_trusted_backend_records_real_runtime_identity(tmp_path):
+    service = make_service(tmp_path)
+    try:
+        manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "object"},
+                    "permissions": ["execute"], "isolation": {"profile": "host_trusted"},
+                    "entrypoint": ["python", "tool.py"]}
+        tool_id = service.propose_tool("m1", "宿主工具", "真实宿主执行", reuse_lower=3, manual_cost_upper=10,
+                                       call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2,
+                                       risk_cost_upper=1)["tool_id"]
+        service.add_tool_version("m1", tool_id, "print('{\"ok\": true}')", manifest)
+        result = service.execute_tool("m1", tool_id, 1, {}, verification_only=True)
+        assert result["status"] == "success"
+        audit = service.list_tool_executions("m1", tool_id=tool_id)[0]
+        assert audit["runtime_backend"] == "host_trusted"
+        assert audit["isolation_level"] == "same_account_host"
+        capabilities = json.loads(audit["isolation_capabilities"])
+        assert capabilities["host_trusted"] is True
+        assert capabilities["same_account_no_os_isolation"] is True
+        assert capabilities["argv"] == [sys.executable, "-I", capabilities["source_path"]]
+        assert capabilities["cwd"]
+        assert capabilities["interpreter"] == sys.executable
+        assert len(capabilities["content_hash"]) == 64
+        assert len(capabilities["manifest_hash"]) == 64
+    finally:
+        service.close()

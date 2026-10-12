@@ -590,7 +590,8 @@ class ToolStore:
             raise ValueError("tool_isolation_requirements_invalid")
         if required_isolation:
             raise ValueError("tool_isolation_backend_unavailable:python_host:" + ",".join(sorted(set(required_isolation))))
-        if isolation.get("profile", "low_risk_host") != "low_risk_host":
+        runtime_profile = isolation.get("profile", "low_risk_host")
+        if runtime_profile not in {"low_risk_host", "host_trusted"}:
             raise ValueError("tool_isolation_profile_unsupported")
         assertions = manifest.get("business_assertions", [])
         if not isinstance(assertions, list) or any(not isinstance(item, dict) or not isinstance(item.get("path"), str) or "expected" not in item for item in assertions):
@@ -625,9 +626,11 @@ class ToolStore:
 
         started = time.time()
 
-        runtime_capabilities = {"filesystem_isolation": False, "network_isolation": False, "subprocess_isolation": False, "memory_limit": False, "file_size_limit": False, "process_tree_control": False, "working_directory": "temporary_only_not_a_security_boundary", "timeout": True, "output_limit": True, "active_cancellation": False}
+        runtime_backend = "host_trusted" if runtime_profile == "host_trusted" else "python_host"
+        isolation_level = "same_account_host" if runtime_profile == "host_trusted" else "host_process"
+        runtime_capabilities = {"filesystem_isolation": False, "network_isolation": False, "subprocess_isolation": False, "memory_limit": False, "file_size_limit": False, "process_tree_control": False, "working_directory": "temporary_only_not_a_security_boundary", "timeout": True, "output_limit": True, "active_cancellation": False, "host_trusted": runtime_profile == "host_trusted", "same_account_no_os_isolation": runtime_profile == "host_trusted", "interpreter": sys.executable, "content_hash": actual_hash, "manifest_hash": manifest_digest, "source_path": str(source)}
         business_assertions = manifest.get("business_assertions", [])
-        common = {"execution_id": execution_id, "tool_id": tool_id, "version": version, "actor_member_id": actor_member_id, "task_id": task_id, "input_hash": input_hash, "permissions": permissions, "runtime_backend": "python_host", "isolation_level": "host_process", "isolation_capabilities": runtime_capabilities, "business_assertions": business_assertions, "verification_only": bool(verification_only)}
+        common = {"execution_id": execution_id, "tool_id": tool_id, "version": version, "actor_member_id": actor_member_id, "task_id": task_id, "input_hash": input_hash, "permissions": permissions, "runtime_backend": runtime_backend, "isolation_level": isolation_level, "isolation_capabilities": runtime_capabilities, "business_assertions": business_assertions, "verification_only": bool(verification_only)}
 
         if dry_run:
 
@@ -635,7 +638,8 @@ class ToolStore:
 
             self._event(tool_id, version, "execution_dry_run", {"execution_id": execution_id, "actor_member_id": actor_member_id, "permissions": permissions}, f"tool:execution:{execution_id}")
 
-            return {**common, "status": "dry_run", "argv": [sys.executable, "-I", str(source)], "permissions": permissions}
+            common["argv"] = [sys.executable, "-I", str(source)]
+            return {**common, "status": "dry_run", "argv": common["argv"], "permissions": permissions}
 
         current = self.store.db.execute("SELECT status, current_version, owner_member_id FROM tool_assets WHERE tool_id=?", (tool_id,)).fetchone()
         repair_version_access = bool(repair_trial and share and share["version"] == version and share["issue_id"])
@@ -658,7 +662,10 @@ class ToolStore:
 
             with tempfile.TemporaryDirectory(prefix="butian-tool-") as work:
 
-                proc = subprocess.Popen([sys.executable, "-I", str(source)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work, env={"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}, shell=False)
+                argv = [sys.executable, "-I", str(source)]
+                runtime_capabilities["argv"] = argv
+                runtime_capabilities["cwd"] = work
+                proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work, env={"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}, shell=False)
 
                 captured: dict[str, bytes] = {"stdout": b"", "stderr": b""}
                 overflow = threading.Event()
@@ -738,8 +745,7 @@ class ToolStore:
 
         finished = time.time()
 
-        self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, result_status, exit_code, stdout, stderr, reason, json.dumps(permissions), started, finished, "python_host", "host_process", json.dumps(runtime_capabilities), json.dumps(business_assertions)))
-
+        self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, result_status, exit_code, stdout, stderr, reason, json.dumps(permissions), started, finished, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
         self._event(tool_id, version, "execution", {"execution_id": execution_id, "actor_member_id": actor_member_id, "status": result_status, "reason": reason}, f"tool:execution:{execution_id}")
 
         if result_status in {"failed", "cancelled"}:
