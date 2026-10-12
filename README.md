@@ -1,6 +1,6 @@
 # 补天计划（Butian Plan）
 
-当前发布：**0.1.1rc1 审计修复候选版**。完整产品验收仍有未验证项，详见 [发布验证与限制](docs/发布验证-20261013.md)。
+当前发布：**0.1.1rc2 通用 MCP 接入与审计修复版**。支持宿主 AI 通过标准输入输出 MCP 调用，不依赖 Ollama 或本地模型。验证范围与剩余限制见 [补充发布记录](docs/发布补充验证-20261013.md)。
 
 补天计划是一个与具体 AI 对话工具解耦的多 Agent 协作运行时。
 
@@ -114,6 +114,12 @@ python -m butian.cli serve --host 127.0.0.1 --port 8765
 # 4) 以 MCP 服务方式接入（JSON-RPC over stdin/stdout）
 python -m butian.cli mcp
 ```
+
+### 接入 AI 应用
+
+宿主应用支持 stdio MCP 时，配置命令 `python`、参数 `["-m", "butian.cli", "mcp"]`，工作目录设为仓库目录，环境变量 `BUTIAN_HOME` 指向你的数据目录。Python 应使用已安装本项目的解释器。不同客户端配置字段不同，详细流程见 [通用 AI 应用接入](docs/通用AI应用接入.md)。
+
+宿主 AI 自己负责理解目标和生成结果，调用补天的任务、上下文、证据、审核与记忆工具；这条路径无需 providers.json、模型 API Key 或 Ollama。补天主动启动独立子 Agent 时，才配置可选 Provider。没有 MCP/API/进程接口的应用只能人工交接。
 
 ### 控制台视图
 

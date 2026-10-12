@@ -554,3 +554,26 @@ def test_team_question_wait_does_not_consume_previous_execution(tmp_path):
         assert 'new-input' in latest['prompt']
     finally:
         service.close()
+
+
+def test_partial_team_start_failure_returns_recoverable_goal(tmp_path, monkeypatch):
+    (tmp_path / 'providers.json').write_text(json.dumps({'providers': [{'type': 'local-command', 'command': [sys.executable, '-c', 'print("verified")']}]}), encoding='utf-8')
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('dispatcher', 'Dispatcher')
+        for worker in ('worker-a', 'worker-b'):
+            service.add_member(worker, worker, provider_id='local-command')
+        original = service.start_provider_task
+        def start(member, *args, **kwargs):
+            if member == 'worker-b':
+                raise RuntimeError('startup unavailable')
+            return original(member, *args, **kwargs)
+        monkeypatch.setattr(service, 'start_provider_task', start)
+        goal = service.submit_goal('partial dispatch', mode='team', member_id='dispatcher', member_ids=['worker-a', 'worker-b'])
+        assert goal['status'] == 'partial_dispatch'
+        children = service.store.db.execute('SELECT * FROM tasks WHERE parent_id=? ORDER BY rowid', (goal['task_id'],)).fetchall()
+        assert [row['status'] for row in children] == ['running', 'unknown']
+        assert children[1]['lease_id'] is None
+        assert service.run_team_goal(goal['task_id'])['status'] == 'blocked'
+    finally:
+        service.close()

@@ -411,3 +411,54 @@ def test_revision_change_during_stream_rejects_late_output(tmp_path):
         assert store.db.execute('SELECT status FROM tasks WHERE task_id=?', (task,)).fetchone()[0] == 'waiting_user'
     finally:
         store.close()
+
+
+def test_cancel_ack_does_not_overwrite_concurrent_completion(tmp_path):
+    from butian.runtime.service import ButianService
+    from butian.adapters.base import ProviderResult
+    service = ButianService(tmp_path)
+    sid = service.store.create_provider_session('worker', 'cancel-probe', prompt='work')
+    class Provider:
+        provider_id = 'cancel-probe'
+        def cancel(self, remote):
+            service.store.finish_provider_session(sid, 'completed')
+            return ProviderResult('cancelled')
+    service.providers.register(Provider())
+    try:
+        result = service.cancel_provider_task(sid)
+        assert result['status'] == 'completed'
+        assert service.store.provider_session(sid)['status'] == 'completed'
+    finally:
+        service.close()
+
+
+def test_process_death_releases_provider_consumption_lock(tmp_path):
+    import subprocess
+    import sys
+    from butian.runtime.provider_runtime import ProviderRuntime
+    from butian.adapters.base import ProviderEvent
+    store = Store(tmp_path / 'runtime.db')
+    sid = store.create_provider_session('worker', 'probe', prompt='persisted')
+    code = '''import os, sys
+from butian.runtime.store import Store
+from butian.runtime.provider_runtime import ProviderRuntime
+class Dies:
+    def stream(self, *args):
+        os._exit(23)
+        yield
+store = Store(sys.argv[1])
+ProviderRuntime(store).consume(sys.argv[2], Dies())
+'''
+    class Resume:
+        def stream(self, remote, prompt):
+            assert prompt == 'persisted'
+            yield ProviderEvent('resumed-output', 'output', text='recovered')
+            yield ProviderEvent('resumed-done', 'status', status='completed')
+    try:
+        child = subprocess.run([sys.executable, '-c', code, str(store.path), sid], timeout=10)
+        assert child.returncode == 23
+        result = ProviderRuntime(store).consume(sid, Resume())
+        assert result['status'] == 'completed'
+        assert result['text'] == 'recovered'
+    finally:
+        store.close()

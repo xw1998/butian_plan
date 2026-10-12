@@ -313,8 +313,12 @@ class ButianService:
             return {"provider_session_id": provider_session_id, "status": session["status"], "reason": session.get("reason")}
         provider = self.providers.get(session["provider_id"])
         result = provider.cancel(session.get("remote_session_id") or provider_session_id)
-        if result.status in {"cancelled", "provider_lost", "unknown", "cancelling"}:
-            self.store.finish_provider_session(provider_session_id, result.status, result.reason)
+        with self.store._write_lock:
+            current = self.store.provider_session(provider_session_id)
+            if current["status"] in terminal:
+                return {"provider_session_id": provider_session_id, "status": current["status"], "reason": current.get("reason")}
+            if result.status in {"cancelled", "provider_lost", "unknown", "cancelling"} and result.status != current["status"]:
+                self.store.finish_provider_session(provider_session_id, result.status, result.reason)
         return {"provider_session_id": provider_session_id, "status": result.status, "reason": result.reason}
 
     def cancel_task(self, task_id: str, revision: int, operation_key: str | None = None) -> dict[str, Any]:
@@ -657,10 +661,19 @@ class ButianService:
             self.store.transition_task(child_id, 1, "ready", f"goal:{root_id}:ready:{child_id}")
             lease = self.store.claim_task(child_id, worker, lease_seconds=300, internal=True)
             self.store.transition_task(child_id, lease["revision"], "running", f"goal:{root_id}:running:{child_id}")
-            execution = self.start_provider_task(worker, instruction, task_id=child_id, environment=environment)
+            try:
+                execution = self.start_provider_task(worker, instruction, task_id=child_id, environment=environment)
+            except Exception as exc:
+                reason = f"provider_start_error:{type(exc).__name__}:{exc}"
+                with self.store._write_lock:
+                    current_child = self.store.db.execute("SELECT status,revision,lease_id FROM tasks WHERE task_id=?", (child_id,)).fetchone()
+                    if current_child["status"] == "running" and current_child["revision"] == lease["revision"] + 1 and current_child["lease_id"] == lease["lease_id"]:
+                        self.store.transition_task(child_id, current_child["revision"], "unknown", f"team:{root_id}:start-failed:{child_id}:{current_child['revision']}", payload={"reason": reason})
+                execution = {"status": "unknown", "reason": reason}
             children.append({"task_id": child_id, "member_id": worker, "instruction": instruction, "execution": execution})
         self.store.append_event(root_id, "team_goal_dispatched", {"worker_count": len(children), "child_task_ids": [x["task_id"] for x in children]}, f"goal:{root_id}:dispatched")
-        return {"session": session, "task_id": root_id, "assignee_id": assignee, "mode": "team", "children": children, "status": "dispatched"}
+        status = "partial_dispatch" if any(item["execution"].get("status") != "running" for item in children) else "dispatched"
+        return {"session": session, "task_id": root_id, "assignee_id": assignee, "mode": "team", "children": children, "status": status}
 
     def run_team_goal(self, task_id: str) -> dict[str, Any]:
         root = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
@@ -795,7 +808,7 @@ class ButianService:
             aggregate = json.loads(current_root["payload"] or "{}").get("results", [])
             return {"task_id": task_id, "status": "review", "children": results, "aggregate": aggregate}
         child_states = [row["status"] for row in self.store.db.execute("SELECT status FROM tasks WHERE parent_id=?", (task_id,)).fetchall()]
-        return {"task_id": task_id, "status": "awaiting_child_reviews" if any(state == "review" for state in child_states) else current_root["status"], "children": results}
+        return {"task_id": task_id, "status": "awaiting_child_reviews" if current_root["status"] != "blocked" and any(state == "review" for state in child_states) else current_root["status"], "children": results}
 
     def _team_workers(self, dispatcher: str, member_ids: list[str] | None) -> list[str]:
         if member_ids is not None and (not isinstance(member_ids, list) or not member_ids or any(not isinstance(mid, str) or not mid.strip() for mid in member_ids)):

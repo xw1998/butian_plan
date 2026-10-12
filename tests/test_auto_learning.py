@@ -80,3 +80,50 @@ def test_review_creates_audited_candidate_once(tmp_path):
         assert service.store.db.execute("SELECT COUNT(*) FROM member_memory_outbox WHERE memory_id=?", (learning["memory_id"],)).fetchone()[0] == 1
     finally:
         service.close()
+
+
+def test_real_task_candidate_reuse_counterevidence_and_restart(tmp_path):
+    import sys
+    (tmp_path / 'providers.json').write_text(json.dumps({'providers': [{'type': 'local-command', 'command': [sys.executable, '-c', 'import sys; text=sys.stdin.read(); print("calibration evidence verified")'] }]}), encoding='utf-8')
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('worker', 'Worker', provider_id='local-command')
+        goal = service.submit_goal('calibration', member_id='worker')
+        result = service.consume_provider_task(goal['execution']['provider_session_id'])
+        assert result['status'] == 'completed'
+        task = service.store.db.execute('SELECT * FROM tasks WHERE task_id=?', (goal['task_id'],)).fetchone()
+        learning = service.review_task(task['task_id'], task['revision'], 'approve', reviewer_member_id='worker')['learning']
+        mid = learning['memory_id']
+        memory = service.memory('worker')
+        try:
+            item = memory.get(mid)
+            assert item['status'] == 'candidate'
+            content = item['content']
+        finally:
+            memory.close()
+        composed, report = service.compose_context('worker', 'calibration')
+        assert mid in report.recalled_memory_ids
+        assert 'candidate' in composed
+        for key in ('independent-a', 'independent-b'):
+            service.record_practice_outcome('worker', memory_id=mid, kind='task_review_candidate', content=content, outcome='success', independent_key=key, evidence_ref=learning['event_id'])
+        memory = service.memory('worker')
+        try:
+            assert memory.get(mid)['status'] == 'warm'
+            memory.record_usage_feedback(mid, outcome='harmful', evidence_ref='counterexample-real-fixture')
+            assert memory.get(mid)['status'] == 'disputed'
+            memory.put(mid, 'task_review_candidate', content + ' revised preconditions', status='candidate', change_reason='counterevidence_revision', source_event_ids=[learning['event_id']])
+        finally:
+            memory.close()
+    finally:
+        service.close()
+    service = ButianService(tmp_path)
+    try:
+        chain = service.memory_versions('worker', mid)
+        assert chain['chain']['valid']
+        assert len(chain['versions']) >= 2
+        composed, report = service.compose_context('worker', 'calibration')
+        assert mid in report.recalled_memory_ids
+        assert 'revised preconditions' in composed
+        assert service.store.db.execute('SELECT status FROM tasks WHERE task_id=?', (goal['task_id'],)).fetchone()[0] == 'done'
+    finally:
+        service.close()

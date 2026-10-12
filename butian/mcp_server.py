@@ -106,20 +106,50 @@ TOOLS.extend([
 ])
 
 
+# Host AI applications execute work themselves; these tools do not need a model Provider.
+for _name, _description, _fields, _required in [
+    ("butian_context_compose", "Compose member context for work performed by the host AI", {"instruction": {"type": "string"}, "task_id": {"type": "string"}, "environment": {"type": "object"}, "budgets": {"type": "object"}, "include_tools": {"type": "boolean"}}, ["instruction"]),
+    ("butian_evidence_record", "Register an existing local evidence file owned by the authenticated member", {"path": {"type": "string"}}, ["path"]),
+    ("butian_task_handoff", "Submit host-produced task handoff at the current revision; evidence remains required for approval", {"task_id": {"type": "string"}, "task_revision": {"type": "integer"}, "status": {"type": "string"}, "summary": {"type": "string"}, "evidence_ids": {"type": "array", "items": {"type": "string"}}, "next_action": {"type": "string"}, "confidence": {"type": "number"}}, ["task_id", "task_revision", "status", "summary", "evidence_ids", "next_action", "confidence"]),
+]:
+    _fields.update({field: {"type": "string"} for field in ("member_id", "actor_member_id", "token")})
+    TOOLS.append({"name": _name, "description": _description, "inputSchema": {"type": "object", "properties": _fields, "required": ["member_id", "actor_member_id", "token", *_required]}})
+
 def run(home=None):
     service = ButianService(home)
-    for line in sys.stdin:
-        try:
-            req = json.loads(line); method = req.get("method"); params = req.get("params", {})
-            if method == "initialize": result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": "0.1.1rc1"}}
-            elif method == "notifications/initialized": continue
-            elif method == "tools/list": result = {"tools": TOOLS}
-            elif method == "tools/call": result = call_tool(service, params.get("name"), params.get("arguments", {}))
-            else: result = {}
-            if "id" in req: print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}, ensure_ascii=False), flush=True)
-        except Exception as exc:
-            print(json.dumps({"jsonrpc": "2.0", "id": req.get("id"), "error": {"code": -32000, "message": str(exc)}}, ensure_ascii=False), flush=True)
-    service.close()
+    try:
+        for line in sys.stdin:
+            req = None
+            try:
+                req = json.loads(line)
+                if not isinstance(req, dict) or req.get("jsonrpc") != "2.0" or not isinstance(req.get("method"), str):
+                    raise ValueError("invalid_jsonrpc_request")
+                method = req["method"]
+                params = req.get("params", {})
+                if not isinstance(params, dict):
+                    raise ValueError("invalid_jsonrpc_params")
+                if method == "initialize":
+                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": "0.1.1rc2"}}
+                elif method.startswith("notifications/"):
+                    continue
+                elif method == "tools/list":
+                    result = {"tools": TOOLS}
+                elif method == "tools/call":
+                    result = call_tool(service, params.get("name"), params.get("arguments", {}))
+                else:
+                    if "id" in req:
+                        print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": "method_not_found"}}), flush=True)
+                    continue
+                if "id" in req:
+                    print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}, ensure_ascii=False), flush=True)
+            except Exception as exc:
+                if isinstance(req, dict) and "id" not in req:
+                    continue
+                code = -32700 if isinstance(exc, json.JSONDecodeError) else (-32600 if not isinstance(req, dict) else -32000)
+                request_id = req.get("id") if isinstance(req, dict) else None
+                print(json.dumps({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": str(exc)}}, ensure_ascii=False), flush=True)
+    finally:
+        service.close()
 
 # Keep the public MCP contract aligned with the member boundary enforced below.
 _MEMBER_TOOL_PREFIXES = ("butian_memory_", "butian_evolution_", "butian_dream_")
@@ -200,6 +230,7 @@ def call_tool(service, name, args):
         raise ValueError("historical_identity_migration_out_of_scope")
     if name == "butian_status": return {"ok": True, "service": "butian"}
     member_tools = {tool["name"] for tool in TOOLS if tool["name"].startswith(("butian_memory_", "butian_evolution_", "butian_dream_"))}
+    member_tools.update({"butian_context_compose", "butian_evidence_record", "butian_task_handoff"})
     member_tools.update({"butian_tool_issue_report", "butian_tool_issues", "butian_tool_issue_repair", "butian_tool_repair_confirm", "butian_tool_security_review", "butian_tool_issue_triage", "butian_tool_issue_request_information", "butian_tool_issue_provide_information", "butian_tool_issue_link_duplicate", "butian_tool_issue_expire", "butian_tool_issue_pair", "butian_tool_issue_statistics", "butian_tool_circuit_breaker_open", "butian_tool_circuit_breaker_recover", "butian_tool_issue_escalations", "butian_tool_issue_escalation_claim", "butian_tool_issue_escalation_resolve"})
     member_tools |= {"butian_tool_propose", "butian_tool_version_add", "butian_tool_verify", "butian_tool_share", "butian_tool_execute", "butian_tool_executions", "butian_tool_list", "butian_tool_accept", "butian_tool_trial", "butian_tool_archive", "butian_tool_restore", "butian_provider_start", "butian_provider_consume", "butian_task_list", "butian_task_tree", "butian_task_review", "butian_task_create", "butian_task_transition", "butian_task_claim", "butian_task_release", "butian_task_heartbeat", "butian_strategy_compose", "butian_strategy_assign", "butian_strategy_step", "butian_strategy_steps", "butian_user_question", "butian_user_answer", "butian_evidence_verify", "butian_knowledge_source_add", "butian_knowledge_source_verify", "butian_knowledge_source_capture", "butian_knowledge_claim_add", "butian_hypothesis_from_claim", "butian_claim_prepare_practice", "butian_hypothesis_action_authorize", "butian_hypothesis_action_grant", "butian_hypothesis_action_start", "butian_hypothesis_get", "butian_hypothesis_observe", "butian_peer_ask", "butian_peer_answer", "butian_peer_verify", "butian_peer_list", "butian_host_authorization_grant", "butian_host_authorization_list", "butian_host_authorization_revoke", "butian_tool_executions_running", "butian_tool_execution_cancel"}
     admin_tools = {"butian_dispatcher_set", "butian_session_create", "butian_session_switch_mode", "butian_session_list", "butian_strategy_recommend", "butian_experiment_create", "butian_experiment_event", "butian_experiment_batch", "butian_experiment_compare"}
@@ -274,6 +305,22 @@ def call_tool(service, name, args):
     if name == "butian_tool_trial": return service.trial_tool(args["member_id"], args["share_id"], args["outcome"], independent_key=args["independent_key"], task_id=args.get("task_id"), environment=args.get("environment"), evidence_ids=args.get("evidence_ids"), execution_id=args.get("execution_id"), input_hash=args.get("input_hash"), expected_output=args.get("expected_output"))
     if name == "butian_tool_archive": return service.archive_tool(args["member_id"], args["tool_id"], reason=args.get("reason", "maintenance"))
     if name == "butian_tool_restore": return service.restore_tool(args["member_id"], args["tool_id"])
+    if name == "butian_context_compose":
+        from dataclasses import asdict
+        context, report = service.compose_context(args["member_id"], args["instruction"], task_id=args.get("task_id"), environment=args.get("environment"), budgets=args.get("budgets"), include_tools=args.get("include_tools", False))
+        return {"context": context, "report": asdict(report)}
+    if name == "butian_evidence_record":
+        return {"evidence_id": service.record_evidence(args["path"], owner_member_id=args["member_id"], actor_member_id=args["actor_member_id"], token=args.get("token"))}
+    if name == "butian_task_handoff":
+        with service.store._write_lock:
+            task = service.store.db.execute("SELECT assignee_id,status FROM tasks WHERE task_id=?", (args["task_id"],)).fetchone()
+            if not task or task["assignee_id"] != args["member_id"] or task["status"] not in {"running", "review"}:
+                raise ValueError("handoff_task_not_owned_or_active")
+            for evidence_id in args["evidence_ids"]:
+                if service.verify_evidence(evidence_id, actor_member_id=args["member_id"])["status"] != "valid":
+                    raise ValueError("handoff_evidence_invalid")
+            handoff = {key: args[key] for key in ("task_id", "task_revision", "member_id", "status", "summary", "evidence_ids", "next_action", "confidence")}
+            return {"ok": service.submit_handoff(handoff)}
     if name == "butian_provider_start": return service.start_provider_task(args["member_id"], args["prompt"], task_id=args.get("task_id"), provider_id=args.get("provider_id"), model=args.get("model"))
     if name == "butian_provider_consume": return service.consume_provider_task(args["provider_session_id"], args.get("prompt"), actor_member_id=args.get("actor_member_id"))
     if name == "butian_task_list":

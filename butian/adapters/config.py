@@ -81,7 +81,7 @@ def _build_provider(entry: dict[str, Any]) -> Any:
     command = entry.get("command")
     if not isinstance(command, list) or not command:
         raise ValueError("command_required")
-    return McpProvider([str(item) for item in command], timeout=float(entry.get("timeout", 30.0)))
+    return McpProvider([str(item) for item in command], timeout=float(entry.get("timeout", 30.0)), context_window=_context_window(entry))
 
 
 def load_provider_config(path: str | Path | None) -> list[dict[str, Any]]:
