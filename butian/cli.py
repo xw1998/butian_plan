@@ -69,17 +69,18 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     mimport = migrate.add_parser("import"); mimport.add_argument("source_path"); mimport.add_argument("--roles-dir"); mimport.add_argument("--update-existing", action="store_true"); mimport.add_argument("--no-memories", action="store_true")
     migrate.add_parser("runs")
     args = parser.parse_args(argv)
-    path = home() / "team.db"
+    runtime_home = Path(home_dir) if home_dir is not None else home()
+    path = runtime_home / "team.db"
     if args.command == "init":
         Store(path).close(); emit({"initialized": str(path)}); return 0
     if args.command == "serve":
         from .runtime.http_api import serve as run_server
-        run_server(home(), args.host, args.port); return 0
+        run_server(runtime_home, args.host, args.port); return 0
     if args.command == "mcp":
         from .mcp_server import run
-        run(home()); return 0
+        run(runtime_home); return 0
     if args.command in {"hypothesis", "source", "claim", "evidence", "memory", "experiment", "evolution", "migrate", "session", "task", "dispatcher", "tool-issue"}:
-        service = ButianService(Path(home_dir) if home_dir else home())
+        service = ButianService(runtime_home)
         try:
             if args.command == "session" and args.session_command == "create":
                 emit(service.create_session(args.mode, args.dispatcher, args.requested_model, None, current_member_id=args.current_member)); return 0
