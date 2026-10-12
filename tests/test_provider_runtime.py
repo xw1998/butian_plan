@@ -241,14 +241,33 @@ def test_openai_compatible_provider_emits_tool_call_event(monkeypatch):
         def __exit__(self, exc_type, exc, tb):
             return False
         def read(self):
-            return (b'{"model":"gpt-test","choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"tool-1","arguments":"{\\"x\\":1}"}}]}}]}')
+            return (b'{"model":"gpt-test","choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"butian_tool_execute","arguments":"{\\"tool_id\\":\\"tool-1\\",\\"version\\":7,\\"input\\":{\\"x\\":1}}"}}]}}]}')
 
     monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Response())
     provider = OpenAICompatibleProvider("http://provider", model="gpt-test")
     session = provider.create_child_session("member", "prompt").provider_event_id
+    provider.set_session_tools(session, [{"tool_id": "tool-1", "version": 7, "permission": "owner_execute", "description": "demo", "input_contract": {"type": "object", "properties": {"x": {}}, "required": ["x"]}}])
     events = list(provider.stream(session, "prompt"))
     assert events[0].kind == "tool_call"
-    assert events[0].metadata == {"call_id": "call-1", "tool_id": "tool-1", "version": 1, "input": {"x": 1}}
+    assert events[0].metadata == {"call_id": "call-1", "tool_id": "tool-1", "version": 7, "input": {"x": 1}, "share_id": None}
+
+
+def test_openai_compatible_provider_resolves_generic_tool_envelope(monkeypatch):
+    from butian.adapters.http import OpenAICompatibleProvider
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc, tb): return False
+        def read(self):
+            return b'{"model":"gpt-test","choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"butian_tool_execute","arguments":"{\\"tool_id\\":\\"tool-1\\",\\"version\\":7,\\"input\\":{\\"x\\":1}}"}}]}}]}'
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Response())
+    provider = OpenAICompatibleProvider("http://provider", model="gpt-test")
+    session = provider.create_child_session("member", "prompt").provider_event_id
+    provider.set_session_tools(session, [{"tool_id": "tool-1", "version": 7, "permission": "team_execute", "share_id": "share-1"}])
+    event = list(provider.stream(session, "prompt"))[0]
+    assert event.kind == "tool_call"
+    assert event.metadata == {"call_id": "call-1", "tool_id": "tool-1", "version": 7, "input": {"x": 1}, "share_id": "share-1"}
 
 
 def test_openai_compatible_provider_rejects_malformed_tool_arguments(monkeypatch):
@@ -260,11 +279,12 @@ def test_openai_compatible_provider_rejects_malformed_tool_arguments(monkeypatch
         def __exit__(self, exc_type, exc, tb):
             return False
         def read(self):
-            return (b'{"choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"tool-1","arguments":"not-json"}}]}}]}')
+            return (b'{"choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"butian_tool_execute","arguments":"not-json"}}]}}]}')
 
     monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Response())
     provider = OpenAICompatibleProvider("http://provider", model="gpt-test")
     session = provider.create_child_session("member", "prompt").provider_event_id
+    provider.set_session_tools(session, [{"tool_id": "tool-1", "version": 1, "permission": "owner_execute"}])
     events = list(provider.stream(session, "prompt"))
     assert events[-1].kind == "status"
     assert events[-1].status == "unknown"
@@ -314,4 +334,101 @@ def test_executor_typeerror_is_not_retried_with_legacy_signature(tmp_path):
     result = ProviderRuntime(store).consume(session_id, OneCall(), tool_executor=executor)
     assert result["status"] == "unknown"
     assert len(calls) == 1
+    store.close()
+
+
+def test_openai_provider_empty_tools_and_session_bound_tool_flow(monkeypatch, tmp_path):
+    from butian.adapters.http import OpenAICompatibleProvider
+    from butian.runtime.service import ButianService
+
+    provider = OpenAICompatibleProvider("http://provider", model="gpt-test")
+    service = ButianService(tmp_path / "home")
+    try:
+        service.providers.register(provider)
+        member = service.store.db.execute("SELECT member_id FROM members ORDER BY member_id LIMIT 1").fetchone()[0]
+        prompt = "unrelated prompt"
+        started = service.provider_runtime.start(member, prompt, provider_id=provider.provider_id, model="gpt-test")
+        local_id = started["provider_session_id"]
+        remote_id = service.store.provider_session(local_id)["remote_session_id"]
+        captured = []
+
+        class Response:
+            def __init__(self, body): self.body = body
+            def __enter__(self): return self
+            def __exit__(self, exc_type, exc, tb): return False
+            def read(self): return self.body
+
+        def fake_urlopen(request, timeout=None):
+            body = json.loads(request.data.decode("utf-8"))
+            captured.append(body)
+            if not body["tools"]:
+                return Response(b'{"model":"gpt-test","choices":[{"message":{"content":"no tools"}}]}')
+            if not any(message.get("role") == "tool" for message in body["messages"]):
+                return Response(b'{"model":"gpt-test","choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"butian_tool_execute","arguments":"{\\"tool_id\\":\\"tool-1\\",\\"version\\":7,\\"input\\":{\\"x\\":1}}"}}]}}]}')
+            return Response(b'{"model":"gpt-test","choices":[{"message":{"content":"done"}}]}')
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        empty = list(provider.stream(remote_id, "unrelated prompt"))
+        assert empty[-1].status == "completed"
+        assert captured[-1]["tools"] == []
+        captured.clear()
+
+        executed = []
+        service.tools.context_cards = lambda member_id, instruction, limit=32: [{"tool_id": "tool-1", "name": "demo", "description": "demo", "version": 7, "permission": "team_execute", "share_id": "share-server", "input_contract": {"type": "object", "properties": {"x": {"type": "integer"}}, "required": ["x"]}}]
+        service.execute_tool = lambda member_id, tool_id, version, data, **kwargs: executed.append((member_id, tool_id, version, data, kwargs.get("share_id"))) or {"ok": True}
+        result = service.consume_provider_task(local_id)
+        assert result["status"] == "completed"
+        assert result["text"] == "done"
+        assert captured[0]["tools"][0]["function"]["name"] == "butian_tool_execute"
+        assert executed == [(member, "tool-1", 7, {"x": 1}, "share-server")]
+        assert any(message.get("role") == "tool" for message in captured[1]["messages"])
+    finally:
+        service.close()
+
+
+def test_openai_provider_rejects_unbound_or_version_tampered_tool(monkeypatch):
+    from butian.adapters.http import OpenAICompatibleProvider
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, exc_type, exc, tb): return False
+        def read(self):
+            return b'{"choices":[{"message":{"content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"butian_tool_execute","arguments":"{\\"tool_id\\":\\"tool-1\\",\\"version\\":8,\\"input\\":{}}"}}]}}]}'
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda request, timeout: Response())
+    provider = OpenAICompatibleProvider("http://provider", model="gpt-test")
+    session = provider.create_child_session("member", "prompt").provider_event_id
+    provider.set_session_tools(session, [
+        {"tool_id": "tool-1", "version": 7, "permission": "team_execute", "share_id": "share-1"},
+        {"tool_id": "readonly-tool", "version": 1, "permission": "team_readonly"},
+    ])
+    events = list(provider.stream(session, "prompt"))
+    assert events[-1].kind == "status"
+    assert events[-1].reason == "provider_tool_not_authorized"
+    assert len(provider._session_tools[session]) == 1
+
+
+def test_provider_runtime_sends_standard_tool_message_and_bound_share(tmp_path):
+    from butian.adapters.base import ProviderEvent
+    store = Store(tmp_path / "generic-tool.db")
+    calls = []
+
+    class GenericProvider(ScriptedProvider):
+        provider_id = "generic"
+        def stream(self, provider_session_id, prompt):
+            if prompt == "initial":
+                yield ProviderEvent("call", "tool_call", metadata={"call_id": "call-1", "tool_id": "tool-1", "version": 7, "input": {"x": 1}, "share_id": "share-1"})
+            else:
+                history = json.loads(prompt)
+                assert history[1]["tool_calls"][0]["function"]["name"] == "butian_tool_execute"
+                assert json.loads(history[1]["tool_calls"][0]["function"]["arguments"]) == {"tool_id": "tool-1", "version": 7, "input": {"x": 1}}
+                assert history[2]["role"] == "tool" and history[2]["tool_call_id"] == "call-1"
+                yield ProviderEvent("done", "output", text="done")
+                yield ProviderEvent("finish", "status", status="completed")
+
+    provider = GenericProvider()
+    session = store.create_provider_session("member", "generic", remote_session_id="remote-1", prompt="initial")
+    result = ProviderRuntime(store).consume(session, provider, "initial", tool_executor=lambda *args: calls.append(args) or {"ok": True})
+    assert result["status"] == "completed"
+    assert calls == [("member", "tool-1", 7, {"x": 1}, "share-1")]
     store.close()

@@ -70,7 +70,13 @@ class ProviderRuntime:
                             pending_calls.clear()
                             break
                         seen_calls.add(call_id)
-                        pending_calls.append((call_id, tool_id, version, input_data))
+                        share_id = call.get("share_id")
+                        if share_id is not None and (not isinstance(share_id, str) or not share_id):
+                            final_status, reason = "unknown", "provider_tool_call_invalid"
+                            pending_calls.clear()
+                            batch_invalid = True
+                            break
+                        pending_calls.append((call_id, tool_id, version, input_data, share_id))
                         round_had_tool_call = True
                         continue
                     elif event.kind == "status":
@@ -84,11 +90,11 @@ class ProviderRuntime:
                     if tool_rounds + 1 > max_tool_rounds:
                         final_status, reason = "unknown", "provider_tool_round_limit_exceeded"
                     else:
-                        assistant_calls = [{"id": call_id, "type": "function", "function": {"name": tool_id, "arguments": json.dumps(input_data, ensure_ascii=False)}} for call_id, tool_id, version, input_data in pending_calls]
+                        assistant_calls = [{"id": call_id, "type": "function", "function": {"name": "butian_tool_execute", "arguments": json.dumps({"tool_id": tool_id, "version": version, "input": input_data}, ensure_ascii=False)}} for call_id, tool_id, version, input_data, share_id in pending_calls]
                         message_history.append({"role": "assistant", "tool_calls": assistant_calls})
                         tool_rounds += 1
                         tool_calls += len(pending_calls)
-                        for call_id, tool_id, version, input_data in pending_calls:
+                        for call_id, tool_id, version, input_data, share_id in pending_calls:
                             self.store.append_event(
                                 provider_session_id,
                                 "provider_tool_call",
@@ -96,7 +102,7 @@ class ProviderRuntime:
                                 f"provider-tool-call:{provider_session_id}:{call_id}",
                             )
                             try:
-                                result = tool_executor(session["member_id"], tool_id, version, input_data, None)
+                                result = tool_executor(session["member_id"], tool_id, version, input_data, share_id)
                             except Exception as exc:
                                 self.store.append_event(
                                     provider_session_id,

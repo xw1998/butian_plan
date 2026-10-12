@@ -176,7 +176,8 @@ class ButianService:
         session = self.store.provider_session(provider_session_id)
         provider = self.providers.get(session["provider_id"])
         if hasattr(provider, "set_session_tools"):
-            provider.set_session_tools(provider_session_id, self.tools.context_cards(session["member_id"], prompt or session.get("prompt") or "", limit=32))
+            cards = self.tools.context_cards(session["member_id"], prompt or session.get("prompt") or "", limit=32)
+            provider.set_session_tools(session.get("remote_session_id") or provider_session_id, cards)
         result = self.provider_runtime.consume(
             provider_session_id,
             provider,

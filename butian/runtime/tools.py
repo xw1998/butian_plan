@@ -1571,11 +1571,13 @@ class ToolStore:
             text = " ".join((row["name"], row["description"], json.dumps(contract, ensure_ascii=False))).casefold()
             matched_by = [term for term in sorted(terms) if term in text]
             score = len(matched_by)
-            card = {"tool_id": row["tool_id"], "name": row["name"], "description": row["description"], "version": row["current_version"], **contract, "matched_by": matched_by, "confidence": min(1.0, score / max(1, len(terms)))}
+            card = {"tool_id": row["tool_id"], "name": row["name"], "description": row["description"], "version": row["current_version"], **contract, "matched_by": matched_by, "confidence": min(1.0, score / max(1, len(terms))), "permission": "owner_execute" if own else "team_readonly"}
             if not own:
                 share = self.store.db.execute("SELECT share_id, permission FROM tool_shares WHERE tool_id=? AND version=? AND recipient_member_id=? AND status IN ('trial','active')", (row["tool_id"], row["current_version"], member_id)).fetchone()
-                if share and share["permission"] == "team_execute":
-                    card["share_id"] = share["share_id"]
+                if share:
+                    card["permission"] = share["permission"]
+                    if share["permission"] == "team_execute":
+                        card["share_id"] = share["share_id"]
             candidate = {"card": card, "score": score, "owner": own}
             candidates.append(candidate)
             if reject_reason is None and score == 0:

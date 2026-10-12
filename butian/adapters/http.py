@@ -21,6 +21,7 @@ class OpenAICompatibleProvider:
         self._session_models: dict[str, str | None] = {}
         self._session_messages: dict[str, list[dict]] = {}
         self._session_tools: dict[str, list[dict]] = {}
+        self._session_tool_bindings: dict[str, dict[tuple[str, int], str | None]] = {}
 
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(can_create_child_session=True, can_stream_output=False, can_cancel_output=False, context_window=self.context_window)
@@ -39,11 +40,31 @@ class OpenAICompatibleProvider:
         session_id = f"http_{uuid.uuid4().hex}"
         self._session_models[session_id] = effective
         self._session_messages[session_id] = [{"role": "user", "content": prompt}]
-        self._session_tools[session_id] = [{"type": "function", "function": {"name": "butian_tool_execute", "description": "Execute an authorized Butian tool", "parameters": {"type": "object", "properties": {"tool_id": {"type": "string"}, "version": {"type": "integer"}, "input": {}}, "required": ["tool_id", "version", "input"]}}}]
+        self._session_tools[session_id] = []
+        self._session_tool_bindings[session_id] = {}
         return ProviderResult("accepted", provider_event_id=session_id, model=effective)
 
     def set_session_tools(self, provider_session_id: str, tools: list[dict]) -> None:
-        self._session_tools[provider_session_id] = [tool for tool in tools if isinstance(tool, dict)]
+        schemas = []
+        bindings: dict[tuple[str, int], str | None] = {}
+        for card in tools:
+            if not isinstance(card, dict):
+                continue
+            share_id = card.get("share_id")
+            if share_id is not None and (not isinstance(share_id, str) or not share_id):
+                continue
+            if card.get("permission") not in {"owner_execute", "team_execute"}:
+                continue
+            tool_id, version = card.get("tool_id"), card.get("version")
+            if not isinstance(tool_id, str) or not tool_id or isinstance(version, bool) or not isinstance(version, int) or version < 0:
+                continue
+            bindings[(tool_id, version)] = share_id
+            parameters = card.get("input_contract")
+            if not isinstance(parameters, dict) or parameters.get("type") != "object":
+                parameters = {"type": "object", "properties": {"input": {}}, "required": ["input"]}
+            schemas.append({"type": "function", "function": {"name": "butian_tool_execute", "description": str(card.get("description") or card.get("name") or "Execute an authorized Butian tool"), "parameters": {"type": "object", "properties": {"tool_id": {"type": "string", "enum": [tool_id]}, "version": {"type": "integer", "enum": [version]}, "input": parameters}, "required": ["tool_id", "version", "input"], "additionalProperties": False}}})
+        self._session_tools[provider_session_id] = schemas
+        self._session_tool_bindings[provider_session_id] = bindings
 
     def stream(self, provider_session_id: str, prompt: str) -> Iterable[ProviderEvent]:
         request_model = self._session_models.get(provider_session_id)
@@ -89,21 +110,32 @@ class OpenAICompatibleProvider:
                     if not isinstance(call_id, str) or not isinstance(function, dict) or function.get("type") not in {None, "function"}:
                         yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid")
                         return
-                    tool_id = function.get("name")
+                    function_name = function.get("name")
                     arguments = function.get("arguments")
-                    if not isinstance(tool_id, str) or not isinstance(arguments, str):
+                    if function_name != "butian_tool_execute" or not isinstance(arguments, str):
                         yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid")
                         return
                     try:
-                        input_data = json.loads(arguments)
+                        envelope = json.loads(arguments)
                     except (TypeError, json.JSONDecodeError):
                         yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid_arguments")
+                        return
+                    if not isinstance(envelope, dict):
+                        yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid_arguments")
+                        return
+                    tool_id, version, input_data = envelope.get("tool_id"), envelope.get("version"), envelope.get("input")
+                    if not isinstance(tool_id, str) or not tool_id or isinstance(version, bool) or not isinstance(version, int) or version < 0 or not isinstance(input_data, (dict, list, str, int, float, bool, type(None))):
+                        yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_call_invalid_arguments")
+                        return
+                    share_id = self._session_tool_bindings.get(provider_session_id, {}).get((tool_id, version), "__not_authorized__")
+                    if share_id == "__not_authorized__":
+                        yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="provider_tool_not_authorized")
                         return
                     yield ProviderEvent(
                         f"{provider_session_id}:tool_call:{index}",
                         "tool_call",
                         model=model,
-                        metadata={"call_id": call_id, "tool_id": tool_id, "version": int(function.get("version", 1)), "input": input_data},
+                        metadata={"call_id": call_id, "tool_id": tool_id, "version": version, "input": input_data, "share_id": share_id},
                     )
                 return
             text = message.get("content")

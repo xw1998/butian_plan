@@ -935,7 +935,7 @@ def test_context_cards_include_only_authorized_current_contracts(tmp_path):
         service.accept_tool_share("m2", readonly["share_id"])
         shared_cards = service.tools.context_cards("m2", "分析", limit=10)
         assert [card["tool_id"] for card in shared_cards] == [tool_id]
-        assert set(shared_cards[0]) == {"tool_id", "name", "description", "version", "input_contract", "output_contract", "permissions", "failure_conditions"}
+        assert set(shared_cards[0]) == {"tool_id", "name", "description", "version", "input_contract", "output_contract", "permissions", "failure_conditions", "permission"}
         assert secret not in json.dumps(shared_cards, ensure_ascii=False)
         assert "MANIFEST_SECRET" not in json.dumps(shared_cards, ensure_ascii=False)
         assert "entrypoint" not in json.dumps(shared_cards, ensure_ascii=False)
