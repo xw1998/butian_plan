@@ -218,3 +218,39 @@ def test_external_claim_prepare_failure_leaves_no_partial_resources(tmp_path):
         assert service.hypotheses.db.execute("SELECT COUNT(*) FROM claim_practice_preparations WHERE owner_member_id='m1'").fetchone()[0] == 0
     finally:
         service.close()
+
+
+def test_claim_preparation_failure_rolls_back_all_team_rows(tmp_path, monkeypatch):
+    import pytest
+    from butian.runtime.service import ButianService
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('m', 'M')
+        sid = service.learning.add_source('manual', 'local://proof', 'Claim source', 'a' * 64, owner_member_id='m')
+        cid = service.learning.add_claim(sid, 'check input', owner_member_id='m')
+        original = service.hypotheses.authorize
+        def interrupted(*args, **kwargs):
+            original(*args, **kwargs)
+            raise RuntimeError('prepare_interrupted')
+        monkeypatch.setattr(service.hypotheses, 'authorize', interrupted)
+        with pytest.raises(RuntimeError, match='prepare_interrupted'):
+            service.prepare_claim_practice(cid, owner_member_id='m', description='execute input check')
+        for table in ('prior_knowledge', 'practice_hypotheses', 'hypothesis_actions', 'claim_practice_preparations'):
+            assert service.store.db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0] == 0
+    finally:
+        service.close()
+
+@pytest.mark.parametrize('field', ['cost', 'risk', 'information_gain'])
+@pytest.mark.parametrize('value', [float('nan'), float('inf'), float('-inf')])
+def test_verification_metrics_must_be_finite(tmp_path, field, value):
+    service = ButianService(tmp_path)
+    try:
+        assessment = service.hypotheses.assess(['skill'])
+        hypothesis = service.hypotheses.propose('practice_hypothesis', 'finite metrics', rationale='validation', assessment=assessment)
+        metrics = dict(cost=1.0, risk=0.1, information_gain=1.0)
+        metrics[field] = value
+        with pytest.raises(ValueError, match='invalid_verification_metrics'):
+            service.hypotheses.authorize(hypothesis, 'verify', **metrics)
+        assert service.store.db.execute('SELECT COUNT(*) FROM hypothesis_actions').fetchone()[0] == 0
+    finally:
+        service.close()

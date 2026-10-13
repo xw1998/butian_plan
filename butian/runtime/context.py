@@ -250,6 +250,10 @@ class ContextComposer:
             if total_chars > window:
                 raise ValueError("context_budget_too_small")
 
+        visible_memories = selected if memories and layer_values["L3"] is not None else []
+        report.recalled_memory_ids = [item["memory_id"] for item in visible_memories]
+        report.memory_omitted = len(memories) - len(visible_memories)
+
         for key, value in layer_values.items():
             if value is not None:
                 report.layers[key] = len(value)

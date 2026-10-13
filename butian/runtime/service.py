@@ -37,6 +37,9 @@ class ButianService:
         # Provider 从 BUTIAN_PROVIDERS_FILE 或 <home>/providers.json 加载；无效条目记录错误、不静默丢弃
         self.providers, self.provider_config_errors, self.provider_config_path = load_registry_from_env(self.home)
         self.provider_runtime = ProviderRuntime(self.store, self.providers)
+        self.startup_recovery["peer_verifications"] = self.recover_peer_verifications()
+        self.startup_recovery["review_learning"] = self.recover_review_learning()
+        self.startup_recovery["member_memory_outbox"] = self.drain_member_memory_outbox()
         self._maintenance_stop = threading.Event()
         self._maintenance_interval = max(1.0, float(os.environ.get("BUTIAN_MAINTENANCE_INTERVAL", "3600")))
         self._maintenance_enabled = os.environ.get("BUTIAN_MAINTENANCE_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
@@ -76,6 +79,9 @@ class ButianService:
 
     def maintenance_tick(self):
         """Run bounded, evidence-preserving maintenance for every member."""
+        self.recover_peer_verifications()
+        self.recover_review_learning()
+        outbox_results = self.drain_member_memory_outbox()
         results = []
         rows = self.store.db.execute("SELECT member_id FROM members ORDER BY member_id").fetchall()
         for row in rows:
@@ -103,7 +109,7 @@ class ButianService:
         except Exception as exc:
             external_learning = None
             learning_error = type(exc).__name__ + ":" + str(exc)
-        return {"status": "completed", "members": results, "issue_escalations": escalation_result, "external_learning": "authorized_url_queue", "external_learning_result": external_learning, "external_learning_error": learning_error}
+        return {"status": "completed", "members": results, "member_memory_outbox": outbox_results, "issue_escalations": escalation_result, "external_learning": "authorized_url_queue", "external_learning_result": external_learning, "external_learning_error": learning_error}
 
     def _maintain_member_memories(self, member_id: str) -> dict[str, Any]:
         """Assess active memories and schedule review for cold ones without inventing evidence."""
@@ -369,8 +375,15 @@ class ButianService:
     def prepare_claim_practice(self, claim_id: str, *, owner_member_id: str, description: str, kind: str = "practice_hypothesis", cost: float = 1.0, risk: float = 0.0, information_gain: float = 1.0):
         if not owner_member_id or not description.strip():
             raise ValueError("member_and_description_required")
-        with self._claim_practice_lock:
-            return self._prepare_claim_practice_locked(claim_id, owner_member_id=owner_member_id, description=description, kind=kind, cost=cost, risk=risk, information_gain=information_gain)
+        with self._claim_practice_lock, self.store._write_lock:
+            self.store.db.execute("BEGIN IMMEDIATE")
+            try:
+                result = self._prepare_claim_practice_locked(claim_id, owner_member_id=owner_member_id, description=description, kind=kind, cost=cost, risk=risk, information_gain=information_gain)
+                self.store.db.commit()
+                return result
+            except BaseException:
+                self.store.db.rollback()
+                raise
 
     def _prepare_claim_practice_locked(self, claim_id: str, *, owner_member_id: str, description: str, kind: str, cost: float, risk: float, information_gain: float):
         if kind not in self.hypotheses.KINDS or cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
@@ -378,18 +391,17 @@ class ButianService:
         existing = self.store.db.execute("SELECT * FROM claim_practice_preparations WHERE claim_id=? AND owner_member_id=?", (claim_id, owner_member_id)).fetchone()
         if existing:
             return {"claim_id": claim_id, "prior_id": existing["prior_id"], "hypothesis_id": existing["hypothesis_id"], "action_id": existing["action_id"], "status": "awaiting_authorization", "idempotent": True}
-        with self.store.db:
-            claim = self.learning.get_claim(claim_id, owner_member_id=owner_member_id)
-            prior_payload = self.learning.claim_as_prior(claim_id, owner_member_id=owner_member_id)
-            prior_id = self.hypotheses.add_prior(**{key: prior_payload[key] for key in ("source_kind", "title", "claim", "environment", "source_refs", "reliability")}, owner_member_id=owner_member_id)
-            assessment = self.hypotheses.assess([prior_payload["source_kind"]], environment_match=1.0)
-            hypothesis_id = self.hypotheses.propose(kind, claim["claim"], prior_ids=[prior_id], rationale="external claim requires explicit practice verification", conditions=claim["conditions"], predictions=claim["predictions"], falsifiers=claim["falsifiers"], assessment=assessment, owner_member_id=owner_member_id)
-            action_id = self.hypotheses.authorize(hypothesis_id, description, cost=cost, risk=risk, information_gain=information_gain, owner_member_id=owner_member_id)
-            try:
-                self.store.db.execute("INSERT INTO claim_practice_preparations VALUES (?,?,?,?,?,?,?)", (claim_id, owner_member_id, prior_id, hypothesis_id, action_id, description, time.time()))
-            except sqlite3.IntegrityError:
-                existing = self.store.db.execute("SELECT * FROM claim_practice_preparations WHERE claim_id=? AND owner_member_id=?", (claim_id, owner_member_id)).fetchone()
-                return {"claim_id": claim_id, "prior_id": existing["prior_id"], "hypothesis_id": existing["hypothesis_id"], "action_id": existing["action_id"], "status": "awaiting_authorization", "idempotent": True}
+        claim = self.learning.get_claim(claim_id, owner_member_id=owner_member_id)
+        prior_payload = self.learning.claim_as_prior(claim_id, owner_member_id=owner_member_id)
+        prior_id = self.hypotheses.add_prior(**{key: prior_payload[key] for key in ("source_kind", "title", "claim", "environment", "source_refs", "reliability")}, owner_member_id=owner_member_id)
+        assessment = self.hypotheses.assess([prior_payload["source_kind"]], environment_match=1.0)
+        hypothesis_id = self.hypotheses.propose(kind, claim["claim"], prior_ids=[prior_id], rationale="external claim requires explicit practice verification", conditions=claim["conditions"], predictions=claim["predictions"], falsifiers=claim["falsifiers"], assessment=assessment, owner_member_id=owner_member_id)
+        action_id = self.hypotheses.authorize(hypothesis_id, description, cost=cost, risk=risk, information_gain=information_gain, owner_member_id=owner_member_id)
+        try:
+            self.store.db.execute("INSERT INTO claim_practice_preparations VALUES (?,?,?,?,?,?,?)", (claim_id, owner_member_id, prior_id, hypothesis_id, action_id, description, time.time()))
+        except sqlite3.IntegrityError:
+            existing = self.store.db.execute("SELECT * FROM claim_practice_preparations WHERE claim_id=? AND owner_member_id=?", (claim_id, owner_member_id)).fetchone()
+            return {"claim_id": claim_id, "prior_id": existing["prior_id"], "hypothesis_id": existing["hypothesis_id"], "action_id": existing["action_id"], "status": "awaiting_authorization", "idempotent": True}
         return {"claim_id": claim_id, "prior_id": prior_id, "hypothesis_id": hypothesis_id, "action_id": action_id, "status": "awaiting_authorization", "idempotent": False}
 
     def authorize_hypothesis(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float, owner_member_id: str | None = None):
@@ -443,7 +455,19 @@ class ButianService:
             try:
                 memory = self.memory(item["member_id"])
                 existing = memory.get(item["memory_id"])
-                if existing is None:
+                if item["kind"] == "review_method_practice":
+                    observation = json.loads(item["content"])
+                    key = item["observation_id"]
+                    applied = memory.db.execute("SELECT 1 FROM practice_observations WHERE memory_id=? AND independent_key=?", (item["memory_id"], key)).fetchone()
+                    if not applied:
+                        if existing is None:
+                            raise ValueError("method_memory_not_found")
+                        proof = self.store.verify_evidence(observation["evidence_id"], actor_member_id=item["member_id"])
+                        if proof["status"] != "valid":
+                            raise ValueError("practice_evidence_not_valid")
+                        memory.record_practice_outcome(memory_id=item["memory_id"], kind=existing["kind"], content=existing["content"], outcome=observation["outcome"], independent_key=key, evidence_ref=observation["evidence_id"], evidence_digest=proof["sha256"], source_event_ids=json.loads(item["source_event_ids"]))
+                    version_id = memory.list_versions(item["memory_id"])[-1]["version_id"]
+                elif existing is None:
                     version_id = memory.put(item["memory_id"], item["kind"], item["content"], confidence=0.2, weight=0.2, environment=json.loads(item["environment"]), source_event_ids=json.loads(item["source_event_ids"]), status="candidate", knowledge_source="verified_hypothesis")
                 else:
                     version_id = memory.list_versions(item["memory_id"])[-1]["version_id"]
@@ -516,9 +540,17 @@ class ButianService:
             memory.close()
 
     def record_practice_outcome(self, member_id: str, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None):
+        evidence_digest = None
+        if outcome == "success" and not evidence_ref:
+            raise ValueError("practice_success_evidence_required")
+        if evidence_ref:
+            proof = self.store.verify_evidence(evidence_ref, actor_member_id=member_id)
+            if proof["status"] != "valid":
+                raise ValueError("practice_evidence_not_valid")
+            evidence_digest = proof["sha256"]
         memory = self.memory(member_id)
         try:
-            result = memory.record_practice_outcome(memory_id=memory_id, kind=kind, content=content, outcome=outcome, independent_key=independent_key, evidence_ref=evidence_ref, environment=environment, source_event_ids=source_event_ids)
+            result = memory.record_practice_outcome(memory_id=memory_id, kind=kind, content=content, outcome=outcome, independent_key=independent_key, evidence_ref=evidence_ref, environment=environment, source_event_ids=source_event_ids, evidence_digest=evidence_digest)
             self.store.append_event(member_id, "practice_observed", {**result, "outcome": outcome, "independent_key": independent_key}, f"practice_{member_id}_{memory_id}_{independent_key}")
             return result
         finally:
@@ -542,15 +574,34 @@ class ButianService:
                 raise ValueError("feedback_memory_not_in_recall")
             if (useful or harmful) and not evidence_ref:
                 raise ValueError("usage_feedback_evidence_required")
-            with memory.db:
+            digest = None
+            if evidence_ref:
+                proof = self.store.verify_evidence(evidence_ref, actor_member_id=member_id)
+                if proof["status"] != "valid":
+                    raise ValueError("usage_feedback_evidence_not_valid")
+                digest = proof["sha256"]
+            payload = json.dumps({"used": sorted(used), "useful": sorted(useful), "harmful": sorted(harmful), "missed": bool(missed), "evidence_digest": digest}, sort_keys=True)
+            memory.db.execute("BEGIN IMMEDIATE")
+            try:
+                prior = memory.db.execute("SELECT payload FROM recall_feedback_commits WHERE recall_id=?", (recall_id,)).fetchone()
+                if prior:
+                    if prior["payload"] != payload:
+                        raise ValueError("recall_feedback_conflict")
+                    memory.db.commit()
+                    return True
                 memory.db.execute("UPDATE memory_recall_log SET used=0 WHERE decision_id=? AND query=?", (row["decision_id"], row["query"]))
                 for memory_id in used:
                     memory.db.execute("UPDATE memory_recall_log SET used=1 WHERE decision_id=? AND memory_id=? AND query=?", (row["decision_id"], memory_id, row["query"]))
                 for memory_id in useful:
-                    memory.record_usage_feedback(memory_id, outcome="useful", evidence_ref=evidence_ref)
+                    memory.record_usage_feedback(memory_id, outcome="useful", evidence_ref=evidence_ref, evidence_digest=digest)
                 for memory_id in harmful:
-                    memory.record_usage_feedback(memory_id, outcome="harmful", evidence_ref=evidence_ref)
+                    memory.record_usage_feedback(memory_id, outcome="harmful", evidence_ref=evidence_ref, evidence_digest=digest)
                 memory.db.execute("UPDATE memory_recall_decisions SET outcome=?, missed=? WHERE recall_id=?", ("missed" if missed else "complete", int(missed), recall_id))
+                memory.db.execute("INSERT INTO recall_feedback_commits VALUES (?,?)", (recall_id, payload))
+                memory.db.commit()
+            except BaseException:
+                memory.db.rollback()
+                raise
             return True
         finally:
             memory.close()
@@ -910,6 +961,19 @@ class ButianService:
         learning = self._record_review_learning(task, revision, "rework", notes, handoff)
         return {"task_id": task_id, "verdict": "rework", "status": execution["status"], "rework_count": rework_count, "rework_limit": rework_limit, "execution": execution, "learning": learning}
 
+    def recover_review_learning(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        results = []
+        # Committed review transitions are the authority, not guessed task state.
+        rows = self.store.db.execute("SELECT e.aggregate_id,e.idempotency_key,e.payload,h.revision,h.payload AS handoff_payload FROM events e JOIN handoffs h ON h.task_id=e.aggregate_id AND h.revision=json_extract(e.payload,'$.revision')-1 WHERE e.event_type='task_transition' AND e.commit_state='committed' AND (e.idempotency_key LIKE 'review_approve_%' OR e.idempotency_key LIKE 'review_rework_%') AND (NOT EXISTS (SELECT 1 FROM member_memory_outbox o WHERE o.observation_id=('review-learning:' || e.aggregate_id || ':' || h.revision || ':' || CASE WHEN e.idempotency_key LIKE 'review_approve_%' THEN 'approve' ELSE 'rework' END)) OR EXISTS (SELECT 1 FROM json_each(h.payload,'$.method_uses') u WHERE NOT EXISTS (SELECT 1 FROM member_memory_outbox o WHERE o.observation_id=('review-learning:' || e.aggregate_id || ':' || h.revision || ':' || CASE WHEN e.idempotency_key LIKE 'review_approve_%' THEN 'approve' ELSE 'rework' END || ':method:' || json_extract(u.value,'$.memory_id'))))) ORDER BY e.created_at LIMIT ?", (limit,)).fetchall()
+        for row in rows:
+            verdict = "approve" if row["idempotency_key"].startswith("review_approve_") else "rework"
+            try:
+                result = self._record_review_learning({"task_id": row["aggregate_id"]}, row["revision"], verdict, "Recovered from committed review transition", {"payload": row["handoff_payload"]})
+                results.append({"task_id": row["aggregate_id"], **result})
+            except Exception as exc:
+                results.append({"task_id": row["aggregate_id"], "status": "pending", "error": type(exc).__name__ + ":" + str(exc)})
+        return results
+
     def _record_review_learning(self, task: dict[str, Any], revision: int, verdict: str, notes: str, handoff_row) -> dict[str, Any]:
         """Turn an audited review into a deduplicated candidate; never promotes it."""
         if not handoff_row:
@@ -927,6 +991,10 @@ class ButianService:
         memory_id = f"mem_review_{task['task_id']}_{revision}_{verdict}"
         content = json.dumps({"task_id": task["task_id"], "task_revision": revision, "summary": handoff.get("summary", ""), "review_verdict": verdict, "review_notes": notes, "evidence_ids": evidence_ids, "verification_required": True}, ensure_ascii=False)
         outbox_id = self.store.enqueue_member_memory(operation_key, member_id, memory_id, "task_review_candidate", content, {"source": "review", "verdict": verdict, "evidence_ids": evidence_ids}, [event_id])
+        for use in handoff.get("method_uses", []):
+            use_key = operation_key + ":method:" + use["memory_id"]
+            outcome = use["outcome"] if verdict == "approve" else "unknown"
+            self.store.enqueue_member_memory(use_key, member_id, use["memory_id"], "review_method_practice", json.dumps({"outcome": outcome, "evidence_id": use["evidence_id"]}), {}, [event_id])
         self.drain_member_memory_outbox()
         row = next(item for item in self.store.list_member_memory_outbox() if item["outbox_id"] == outbox_id)
         return {"status": row["status"], "memory_id": memory_id, "candidate": True, "event_id": event_id}
@@ -1129,38 +1197,119 @@ class ButianService:
         return {"learning_id": learning_id, "candidate_memory_id": candidate_id, "status": "candidate"}
 
     def verify_peer_learning(self, learning_id: str, *, success: bool, evidence_ids: list[str] | None = None, notes: str = ""):
+        # SQLite's writer lock fences validation plus registration across processes.
+        with self.store._write_lock:
+            self.store.db.execute("BEGIN IMMEDIATE")
+            try:
+                row = self.store.db.execute("SELECT * FROM peer_learning WHERE learning_id=?", (learning_id,)).fetchone()
+                if not row or row["status"] not in ("candidate", "verified", "rejected", "inconclusive"):
+                    raise ValueError("peer_learning_not_candidate")
+                if not isinstance(success, bool):
+                    raise ValueError("peer_success_must_be_boolean")
+                status = "verified" if success else "rejected"
+                evidence_ids = list(dict.fromkeys(evidence_ids or []))
+                if success and not evidence_ids:
+                    raise ValueError("evidence_required_for_success")
+                prior_evidence = set(json.loads(row["evidence_ids"] or "[]"))
+                for verification in self.store.db.execute("SELECT evidence_ids FROM memory_verifications WHERE memory_id=?", (row["candidate_memory_id"],)):
+                    prior_evidence.update(json.loads(verification["evidence_ids"]))
+                if success and prior_evidence.intersection(evidence_ids):
+                    raise ValueError("independent_evidence_required")
+                current_hashes = set()
+                for evidence_id in evidence_ids:
+                    proof = self.store.verify_evidence(evidence_id, actor_member_id=row["asker_id"])
+                    if proof["status"] != "valid":
+                        raise ValueError("peer_evidence_not_valid")
+                    current_hashes.add(proof["sha256"])
+                prior_hashes = set()
+                for evidence_id in prior_evidence:
+                    proof_row = self.store.db.execute("SELECT sha256 FROM evidence WHERE evidence_id=?", (evidence_id,)).fetchone()
+                    if proof_row:
+                        prior_hashes.add(proof_row["sha256"])
+                if success and current_hashes & prior_hashes:
+                    raise ValueError("independent_evidence_required")
+                operation_key = f"{learning_id}:verification:{hashlib.sha256(json.dumps(evidence_ids, sort_keys=True).encode()).hexdigest()}"
+                if self.store.db.execute("SELECT 1 FROM memory_verifications WHERE operation_key=?", (operation_key,)).fetchone():
+                    raise ValueError("duplicate_peer_verification")
+                self.store.record_verification(row["candidate_memory_id"], operation_key, "success" if success else "failure", evidence_ids, {"peer_learning_id": learning_id, "notes": notes}, actor_member_id=row["asker_id"])
+                self.store.db.commit()
+            except BaseException:
+                self.store.db.rollback()
+                raise
+        self.recover_peer_verifications(learning_id=learning_id, raise_errors=True)
         row = self.store.db.execute("SELECT * FROM peer_learning WHERE learning_id=?", (learning_id,)).fetchone()
-        if not row or row["status"] not in ("candidate", "verified", "rejected", "inconclusive"):
-            raise ValueError("peer_learning_not_candidate")
-        status = "verified" if success else "rejected"
-        evidence_ids = list(dict.fromkeys(evidence_ids or []))
-        if success and not evidence_ids:
-            raise ValueError("evidence_required_for_success")
-        prior_evidence = set(json.loads(row["evidence_ids"] or "[]"))
-        if success and prior_evidence.intersection(evidence_ids):
-            raise ValueError("independent_evidence_required")
-        operation_key = f"{learning_id}:verification:{hashlib.sha256(json.dumps(evidence_ids, sort_keys=True).encode()).hexdigest()}"
-        self.store.record_verification(row["candidate_memory_id"], operation_key, "success" if success else "failure", evidence_ids, {"peer_learning_id": learning_id})
         memory = self.memory(row["asker_id"])
         try:
-            mem = memory.db.execute("SELECT * FROM memories WHERE memory_id=?", (row["candidate_memory_id"],)).fetchone()
-            if mem:
-                successful = memory.db.execute("SELECT COUNT(*) FROM memory_events WHERE memory_id=? AND event_type='verification_success'", (row["candidate_memory_id"],)).fetchone()[0]
-                if success:
-                    memory.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"mev_{uuid.uuid4().hex}", row["candidate_memory_id"], "verification_success", json.dumps({"learning_id": learning_id, "evidence_ids": evidence_ids or []}), time.time()))
-                    successful += 1
-                else:
-                    memory.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"mev_{uuid.uuid4().hex}", row["candidate_memory_id"], "verification_failure", json.dumps({"learning_id": learning_id, "evidence_ids": evidence_ids or []}), time.time()))
-                new_status = "warm" if successful >= 2 else "candidate"
-                new_weight = min(5.0, float(mem["weight"]) + (0.5 if success else -0.2))
-                new_confidence = min(1.0, float(mem["confidence"]) + (0.1 if success else 0.0))
-                memory.db.execute("UPDATE memories SET status=?, weight=?, confidence=?, updated_at=? WHERE memory_id=?", (new_status, new_weight, new_confidence, time.time(), row["candidate_memory_id"]))
+            mem = memory.get(row["candidate_memory_id"])
+            return {"learning_id": learning_id, "status": row["status"], "candidate_memory_id": row["candidate_memory_id"], "memory_status": mem["status"]}
         finally:
             memory.close()
-        ids = evidence_ids or json.loads(row["evidence_ids"])
-        with self.store.db:
-            self.store.db.execute("UPDATE peer_learning SET status=?, evidence_ids=?, verified_at=?, comparison=? WHERE learning_id=?", (status, json.dumps(ids), time.time(), json.dumps({**json.loads(row["comparison"]), "verification_notes": notes, "success": success}, ensure_ascii=False), learning_id))
-        return {"learning_id": learning_id, "status": status, "candidate_memory_id": row["candidate_memory_id"], "memory_status": new_status if 'new_status' in locals() else "candidate"}
+
+    def recover_peer_verifications(self, *, learning_id: str | None = None, raise_errors: bool = False):
+        results = []
+        peers = self.store.db.execute("SELECT * FROM peer_learning WHERE candidate_memory_id IS NOT NULL" + (" AND learning_id=?" if learning_id else ""), (learning_id,) if learning_id else ()).fetchall()
+        for peer in peers:
+            memory = None
+            try:
+                # Serialize replay and projection against new registrations.
+                with self.store._write_lock:
+                    self.store.db.execute("BEGIN IMMEDIATE")
+                    try:
+                        rows = self.store.db.execute("SELECT * FROM memory_verifications WHERE memory_id=? ORDER BY created_at,verification_id", (peer["candidate_memory_id"],)).fetchall()
+                        rows = [v for v in rows if json.loads(v["environment"]).get("peer_learning_id") == peer["learning_id"]]
+                        if not rows:
+                            self.store.db.commit()
+                            continue
+                        memory = self.memory(peer["asker_id"])
+                        memory.db.execute("BEGIN IMMEDIATE")
+                        try:
+                            for verification in rows:
+                                event_id = "peer_" + verification["verification_id"]
+                                if memory.db.execute("SELECT 1 FROM memory_events WHERE event_id=?", (event_id,)).fetchone():
+                                    continue
+                                mem = memory.get(peer["candidate_memory_id"])
+                                if mem is None:
+                                    raise ValueError("peer_candidate_memory_missing")
+                                success = verification["outcome"] == "success"
+                                evidence_ids = json.loads(verification["evidence_ids"])
+                                # Pre-replay releases used random event IDs. A matching
+                                # version proves the old event and member write completed.
+                                legacy = memory.db.execute("SELECT event_id FROM memory_events WHERE memory_id=? AND event_type=? AND json_extract(payload,'$.learning_id')=? AND json_extract(payload,'$.evidence_ids')=? AND event_id NOT LIKE 'peer_%'", (mem["memory_id"], "verification_success" if success else "verification_failure", peer["learning_id"], json.dumps(evidence_ids, separators=(",", ":")))).fetchone()
+                                reason = "peer_verification_success" if success else "peer_counterevidence"
+                                versions = memory.db.execute("SELECT evidence_refs FROM memory_versions WHERE memory_id=? AND change_reason=?", (mem["memory_id"], reason)).fetchall()
+                                version = any(set(evidence_ids).issubset(json.loads(v["evidence_refs"])) for v in versions)
+                                if legacy and version:
+                                    memory.db.execute("UPDATE memory_events SET event_id=? WHERE event_id=?", (event_id, legacy["event_id"]))
+                                    continue
+                                successful = memory.db.execute("SELECT COUNT(*) FROM memory_events WHERE memory_id=? AND event_type='verification_success'", (mem["memory_id"],)).fetchone()[0] - int(bool(legacy) and success)
+                                if legacy:
+                                    memory.db.execute("UPDATE memory_events SET event_id=? WHERE event_id=?", (event_id, legacy["event_id"]))
+                                else:
+                                    memory.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (event_id, mem["memory_id"], "verification_success" if success else "verification_failure", json.dumps({"learning_id": peer["learning_id"], "evidence_ids": evidence_ids}), verification["created_at"]))
+                                new_status = ("disputed" if mem["status"] in {"warm", "hot", "disputed"} else "candidate") if not success else ("disputed" if mem["status"] == "disputed" else ("warm" if successful + 1 >= 2 else "candidate"))
+                                memory.put(mem["memory_id"], mem["kind"], mem["content"], status=new_status, weight=max(0.0, min(5.0, float(mem["weight"]) + (0.5 if success else -0.2))), confidence=max(0.0, min(1.0, float(mem["confidence"]) + (0.1 if success else -0.1))), environment=json.loads(mem["environment"]), source_event_ids=list(dict.fromkeys(json.loads(mem["source_event_ids"]) + evidence_ids)), change_reason="peer_verification_success" if success else "peer_counterevidence")
+                            memory.db.commit()
+                        except BaseException:
+                            memory.db.rollback()
+                            raise
+                        latest = rows[-1]
+                        ids = sorted({eid for v in rows for eid in json.loads(v["evidence_ids"])})
+                        comparison = json.loads(peer["comparison"])
+                        comparison.update(verification_notes=json.loads(latest["environment"]).get("notes", ""), success=latest["outcome"] == "success")
+                        self.store.db.execute("UPDATE peer_learning SET status=?, evidence_ids=?, verified_at=?, comparison=? WHERE learning_id=?", ("verified" if latest["outcome"] == "success" else "rejected", json.dumps(ids), latest["created_at"], json.dumps(comparison, ensure_ascii=False), peer["learning_id"]))
+                        self.store.db.commit()
+                    except BaseException:
+                        self.store.db.rollback()
+                        raise
+                results.append({"learning_id": peer["learning_id"], "status": "committed"})
+            except Exception as exc:
+                if raise_errors:
+                    raise
+                results.append({"learning_id": peer["learning_id"], "status": "pending", "error": str(exc)})
+            finally:
+                if memory:
+                    memory.close()
+        return results
 
     def list_peer_learning(self, *, status: str | None = None, member_id: str | None = None):
         sql = "SELECT * FROM peer_learning WHERE 1=1"; args: list[Any] = []
@@ -1188,6 +1337,26 @@ class ButianService:
             raise ValueError("handoff_evidence_ids_must_be_list")
         if not isinstance(handoff["confidence"], (int, float)):
             raise ValueError("handoff_confidence_must_be_number")
+        uses = handoff.get("method_uses", [])
+        if not isinstance(uses, list):
+            raise ValueError("method_uses_must_be_list")
+        seen = set()
+        memory = self.memory(handoff["member_id"])
+        try:
+            for use in uses:
+                if not isinstance(use, dict) or use.get("outcome") not in {"success", "failure", "unknown"}:
+                    raise ValueError("invalid_method_use")
+                mid = use.get("memory_id")
+                if mid in seen or not memory.get(mid):
+                    raise ValueError("method_memory_missing_or_duplicate")
+                seen.add(mid)
+                if use.get("evidence_id") not in handoff["evidence_ids"]:
+                    raise ValueError("method_evidence_not_in_handoff")
+                proof = self.store.verify_evidence(use["evidence_id"], actor_member_id=handoff["member_id"])
+                if proof["status"] != "valid":
+                    raise ValueError("practice_evidence_not_valid")
+        finally:
+            memory.close()
         self.store.db.execute("INSERT OR REPLACE INTO handoffs VALUES (?,?,?,?,?,?)", (task_id, handoff["task_revision"], handoff["member_id"], handoff["status"], json.dumps(handoff, ensure_ascii=False), time.time()))
         return True
 

@@ -41,3 +41,33 @@ def test_recall_feedback_rejects_unrecalled_and_missing_evidence(tmp_path):
     else:
         raise AssertionError("feedback without evidence accepted")
     service.close()
+
+
+def test_recall_feedback_rejects_fake_proof_and_is_idempotent(tmp_path):
+    import pytest
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('m', 'M')
+        memory = service.memory('m')
+        memory.put('method', 'lesson', 'input feedback', status='warm', source_event_ids=['source'])
+        memory.close()
+        packet = service.recall_for_decision('m', 'input feedback', decision_id='run')
+        args = dict(used_memory_ids=['method'], harmful_memory_ids=['method'], missed=False)
+        with pytest.raises(ValueError, match='evidence_not_found'):
+            service.record_recall_outcome('m', packet['recall_id'], evidence_ref='invented-proof', **args)
+        proof = tmp_path / 'feedback.txt'
+        proof.write_text('input method failed on actual execution', encoding='utf-8')
+        eid = service.store.record_evidence(proof, owner_member_id='m', actor_member_id='m')
+        service.record_recall_outcome('m', packet['recall_id'], evidence_ref=eid, **args)
+        service.record_recall_outcome('m', packet['recall_id'], evidence_ref=eid, **args)
+        memory = service.memory('m')
+        try:
+            assert memory.get('method')['harmful_count'] == 1
+            assert memory.get('method')['status'] == 'disputed'
+            assert memory.list_versions('method')[-1]['change_reason'] == 'usage_harmful'
+        finally:
+            memory.close()
+        with pytest.raises(ValueError, match='recall_feedback_conflict'):
+            service.record_recall_outcome('m', packet['recall_id'], used_memory_ids=[], missed=True)
+    finally:
+        service.close()

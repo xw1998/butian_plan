@@ -91,9 +91,20 @@ def test_real_stdio_host_without_model_provider_and_restart(tmp_path):
             evidence_file.write_text("Measured calibration result: 12.5", encoding="utf-8")
             evidence_id = call("butian_evidence_record", path=str(evidence_file))["evidence_id"]
             call("butian_task_transition", task_id=task["task_id"], expected_revision=current_task()["revision"], target="review", operation_key="host-review")
-            call("butian_task_handoff", task_id=task["task_id"], task_revision=current_task()["revision"], status="completed", summary="Calibration measured", evidence_ids=[evidence_id], next_action="Review measurement", confidence=0.9)
+            call("butian_memory_practice", memory_id="host-method", kind="lesson", content="calibration needs evidence", outcome="unknown", independent_key="seed-method")
+            call("butian_task_handoff", task_id=task["task_id"], task_revision=current_task()["revision"], status="completed", summary="Calibration measured", evidence_ids=[evidence_id], next_action="Review measurement", confidence=0.9, method_uses=[{"memory_id": "host-method", "outcome": "success", "evidence_id": evidence_id}])
             call("butian_task_review", task_id=task["task_id"], revision=current_task()["revision"], verdict="approve", reviewer_member_id="host-member")
             assert current_task()["status"] == "done"
+            check = ButianService(home)
+            try:
+                memory = check.memory("host-member")
+                try:
+                    assert memory.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id='host-method' AND outcome='success'").fetchone()[0] == 1
+                    assert memory.db.execute("SELECT 1 FROM skill_states WHERE skill_domain='practice:lesson'").fetchone()
+                finally:
+                    memory.close()
+            finally:
+                check.close()
             call("butian_memory_practice", memory_id="host-memory", kind="experience", content="calibration requires measured evidence", outcome="unknown", independent_key="host-observation")
             assert call("butian_memory_search", query="calibration")["memories"]
         finally:

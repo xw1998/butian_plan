@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import time
 import uuid
@@ -107,7 +108,7 @@ class HypothesisStore:
     def authorize(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float, owner_member_id: str | None = None) -> str:
         if not self.db.execute("SELECT 1 FROM practice_hypotheses WHERE hypothesis_id=? AND owner_member_id IS ?", (hypothesis_id, owner_member_id)).fetchone():
             raise ValueError("hypothesis_not_found")
-        if cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
+        if not all(math.isfinite(value) for value in (cost, risk, information_gain)) or cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
             raise ValueError("invalid_verification_metrics")
         action_id = f"act_{uuid.uuid4().hex}"
         self.db.execute("INSERT INTO hypothesis_actions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (action_id, hypothesis_id, description, cost, risk, information_gain, "", "awaiting_authorization", time.time(), None, None, owner_member_id))

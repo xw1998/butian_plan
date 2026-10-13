@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS skill_states (skill_domain TEXT PRIMARY KEY, phase TE
 CREATE TABLE IF NOT EXISTS skill_events (event_id TEXT PRIMARY KEY, skill_domain TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, created_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS memory_degradation (memory_id TEXT PRIMARY KEY, base_weight REAL NOT NULL, base_confidence REAL NOT NULL, base_status TEXT NOT NULL, score REAL NOT NULL, freshness REAL NOT NULL, state TEXT NOT NULL, reasons TEXT NOT NULL, model_version TEXT NOT NULL, assessed_at REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS practice_observations (observation_id TEXT PRIMARY KEY, memory_id TEXT NOT NULL, independent_key TEXT NOT NULL, outcome TEXT NOT NULL, evidence_ref TEXT, environment TEXT NOT NULL, created_at REAL NOT NULL, UNIQUE(memory_id, independent_key));
+CREATE TABLE IF NOT EXISTS practice_evidence (memory_id TEXT NOT NULL, evidence_digest TEXT NOT NULL, independent_key TEXT NOT NULL, PRIMARY KEY(memory_id,evidence_digest));
+CREATE TABLE IF NOT EXISTS recall_feedback_commits (recall_id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS usage_feedback_evidence (memory_id TEXT NOT NULL, evidence_digest TEXT NOT NULL, outcome TEXT NOT NULL, PRIMARY KEY(memory_id,evidence_digest));
 '''
 
 class MemoryStore:
@@ -69,7 +72,8 @@ class MemoryStore:
             raise ValueError("invalid_memory_source_events")
         now = time.time()
         version_id = f"ver_{uuid.uuid4().hex}"
-        with self.db:
+        from contextlib import nullcontext
+        with (nullcontext() if self.db.in_transaction else self.db):
             previous = self.db.execute("SELECT content FROM memories WHERE memory_id=?", (memory_id,)).fetchone()
             latest = self.db.execute("SELECT version, version_id FROM memory_versions WHERE memory_id=? ORDER BY version DESC LIMIT 1", (memory_id,)).fetchone()
             if parent_version_id is None and latest:
@@ -202,52 +206,90 @@ class MemoryStore:
                 item["last_recalled_at"] = now
         return result
 
-    def record_practice_outcome(self, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None):
-        """把一次真实实践写成候选经验/教训；两次独立有证据成功后才升 warm。"""
+    def record_practice_outcome(self, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None, evidence_digest: str | None = None):
+        """Record independent evidence; contradictions remain disputed pending revision."""
         if outcome not in {"success", "failure", "unknown"}:
             raise ValueError("invalid_practice_outcome")
         if not independent_key.strip():
             raise ValueError("independent_key_required")
         if outcome == "success" and not evidence_ref:
             raise ValueError("practice_success_evidence_required")
-        row = self.get(memory_id)
-        if not row:
-            self.put(memory_id, kind, content, confidence=0.2, weight=0.5, environment=environment, source_event_ids=list(source_event_ids or []), status="candidate", change_reason="practice_observation")
+        self.db.execute("BEGIN IMMEDIATE")
         try:
-            with self.db:
-                self.db.execute("INSERT INTO practice_observations VALUES (?,?,?,?,?,?,?)", (f"obs_{uuid.uuid4().hex}", memory_id, independent_key, outcome, evidence_ref, json.dumps(environment or {}, ensure_ascii=False), time.time()))
-        except sqlite3.IntegrityError:
-            raise ValueError("duplicate_independent_observation")
-        successes = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='success' AND evidence_ref IS NOT NULL", (memory_id,)).fetchone()[0]
-        failures = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='failure'", (memory_id,)).fetchone()[0]
-        if successes >= 2:
-            self.db.execute("UPDATE memories SET status='warm', confidence=MIN(1.0, confidence+0.1), weight=MIN(5.0, weight+0.25), updated_at=? WHERE memory_id=? AND status IN ('candidate','pending_validation')", (time.time(), memory_id))
-        elif failures:
-            self.db.execute("UPDATE memories SET status='candidate', weight=MAX(0.1, weight-0.1), updated_at=? WHERE memory_id=?", (time.time(), memory_id))
-        return {"memory_id": memory_id, "status": self.get(memory_id)["status"], "successes": successes, "failures": failures}
+            if self.db.execute("SELECT 1 FROM practice_observations WHERE memory_id=? AND independent_key=?", (memory_id, independent_key)).fetchone():
+                raise ValueError("duplicate_independent_observation")
+            if outcome == "success" and self.db.execute("SELECT 1 FROM practice_observations WHERE memory_id=? AND evidence_ref=? AND outcome='success'", (memory_id, evidence_ref)).fetchone():
+                raise ValueError("independent_evidence_required")
+            if evidence_digest:
+                if self.db.execute("SELECT 1 FROM practice_evidence WHERE memory_id=? AND evidence_digest=?", (memory_id, evidence_digest)).fetchone():
+                    raise ValueError("independent_evidence_required")
+                self.db.execute("INSERT INTO practice_evidence VALUES (?,?,?)", (memory_id, evidence_digest, independent_key))
+            row = self.get(memory_id)
+            if not row:
+                self.put(memory_id, kind, content, confidence=0.2, weight=0.5, environment=environment, source_event_ids=list(source_event_ids or []), status="candidate", change_reason="practice_observation")
+                row = self.get(memory_id)
+            self.db.execute("INSERT INTO practice_observations VALUES (?,?,?,?,?,?,?)", (f"obs_{uuid.uuid4().hex}", memory_id, independent_key, outcome, evidence_ref, json.dumps(environment or {}, ensure_ascii=False), time.time()))
+            successes = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='success' AND evidence_ref IS NOT NULL", (memory_id,)).fetchone()[0]
+            failures = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='failure'", (memory_id,)).fetchone()[0]
+            status, confidence, weight = row["status"], float(row["confidence"]), float(row["weight"])
+            if outcome == "failure":
+                status = "disputed" if status in {"warm", "hot", "disputed"} else "candidate"
+                confidence, weight = max(0.0, confidence - 0.1), max(0.0, weight - 0.1)
+            elif outcome == "success" and successes >= 2 and not failures and status in {"candidate", "pending_validation"}:
+                status, confidence, weight = "warm", min(1.0, confidence + 0.1), min(5.0, weight + 0.25)
+            refs = list(dict.fromkeys(json.loads(row["source_event_ids"]) + list(source_event_ids or []) + ([evidence_ref] if evidence_ref else [])))
+            self.put(memory_id, row["kind"], row["content"], status=status, confidence=confidence, weight=weight, environment=json.loads(row["environment"]), source_event_ids=refs, change_reason="practice_" + outcome)
+            domain = "practice:" + row["kind"]
+            old_skill = self.db.execute("SELECT level FROM skill_states WHERE skill_domain=?", (domain,)).fetchone()
+            domain_counts = self.db.execute("SELECT SUM(p.outcome='success'), SUM(p.outcome='failure') FROM practice_observations p JOIN memories m ON m.memory_id=p.memory_id WHERE m.kind=?", (row["kind"],)).fetchone()
+            domain_successes, domain_failures = int(domain_counts[0] or 0), int(domain_counts[1] or 0)
+            level = domain_successes / (domain_successes + domain_failures + 5)
+            marginal = max(0.0, level - (float(old_skill[0]) if old_skill else 0.0))
+            self.update_skill(domain, level=level, marginal=marginal, contradiction=outcome == "failure", independent_successes=domain_successes, regression_evidence=outcome == "failure")
+            self.db.commit()
+            return {"memory_id": memory_id, "status": status, "successes": successes, "failures": failures, "skill_domain": domain}
+        except Exception:
+            self.db.rollback()
+            raise
 
-    def record_usage_feedback(self, memory_id: str, *, outcome: str, evidence_ref: str | None = None):
+    def record_usage_feedback(self, memory_id: str, *, outcome: str, evidence_ref: str | None = None, evidence_digest: str | None = None):
         if outcome not in {"useful", "harmful", "unused", "unknown"}:
             raise ValueError("invalid_memory_usage_outcome")
         if outcome in {"useful", "harmful"} and not evidence_ref:
             raise ValueError("usage_feedback_evidence_required")
-        row = self.get(memory_id)
-        if not row:
-            raise ValueError("memory_not_found")
-        now = time.time()
-        with self.db:
-            if outcome == "useful":
-                weight = min(5.0, float(row["weight"]) + 0.1)
-                status = "warm" if row["status"] == "cold" else row["status"]
-                self.db.execute("UPDATE memories SET useful_count=useful_count+1,last_used_at=?,weight=?,status=?,updated_at=? WHERE memory_id=?", (now, weight, status, now, memory_id))
-            elif outcome == "harmful":
-                weight = max(0.0, float(row["weight"]) - 0.25)
-                status = "disputed" if row["status"] in {"warm", "hot"} else row["status"]
-                self.db.execute("UPDATE memories SET harmful_count=harmful_count+1,last_used_at=?,weight=?,status=?,updated_at=? WHERE memory_id=?", (now, weight, status, now, memory_id))
+        own_transaction = not self.db.in_transaction
+        if own_transaction:
+            self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.get(memory_id)
+            if not row:
+                raise ValueError("memory_not_found")
+            if evidence_digest and outcome in {"useful", "harmful"}:
+                prior = self.db.execute("SELECT outcome FROM usage_feedback_evidence WHERE memory_id=? AND evidence_digest=?", (memory_id, evidence_digest)).fetchone()
+                if prior:
+                    if prior["outcome"] != outcome:
+                        raise ValueError("usage_feedback_evidence_conflict")
+                    if own_transaction:
+                        self.db.commit()
+                    return row
+                self.db.execute("INSERT INTO usage_feedback_evidence VALUES (?,?,?)", (memory_id, evidence_digest, outcome))
+            now = time.time()
+            if outcome in {"useful", "harmful"}:
+                weight = min(5.0, float(row["weight"]) + 0.1) if outcome == "useful" else max(0.0, float(row["weight"]) - 0.25)
+                status = ("warm" if row["status"] == "cold" else row["status"]) if outcome == "useful" else ("disputed" if row["status"] in {"warm", "hot"} else row["status"])
+                self.put(memory_id, row["kind"], row["content"], status=status, weight=weight, confidence=row["confidence"], environment=json.loads(row["environment"]), source_event_ids=list(dict.fromkeys(json.loads(row["source_event_ids"]) + [evidence_ref])), change_reason="usage_" + outcome)
+                column = "useful_count" if outcome == "useful" else "harmful_count"
+                self.db.execute(f"UPDATE memories SET {column}={column}+1,last_used_at=? WHERE memory_id=?", (now, memory_id))
             elif outcome == "unused":
                 self.db.execute("UPDATE memories SET last_used_at=? WHERE memory_id=?", (now, memory_id))
             self.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"evt_{uuid.uuid4().hex}", memory_id, "usage_feedback", json.dumps({"outcome": outcome, "evidence_ref": evidence_ref}, ensure_ascii=False), now))
-        return self.get(memory_id)
+            if own_transaction:
+                self.db.commit()
+            return self.get(memory_id)
+        except BaseException:
+            if own_transaction:
+                self.db.rollback()
+            raise
 
     def record_decision_recall(self, recall_id: str, decision_id: str, query: str, outcome: str, missed: bool):
         self.db.execute("INSERT INTO memory_recall_decisions VALUES (?,?,?,?,?,?)", (recall_id, decision_id, query, outcome, int(missed), time.time()))
@@ -279,7 +321,8 @@ class MemoryStore:
         row = self.db.execute("SELECT * FROM skill_states WHERE skill_domain=?", (domain,)).fetchone()
         old = SkillState(SkillPhase(row["phase"]), row["level"], row["abstraction_level"], row["marginal_gain"], row["plateau_score"], row["activation_count"]) if row else SkillState()
         state = transition_phase(SkillState(old.phase, min(1.0, max(0.0, level)), old.abstraction_level, old.marginal_gain, old.plateau_score, old.activation_count), marginal=marginal, contradiction=contradiction, novel_environment=novel_environment, independent_successes=independent_successes, composition_successes=composition_successes, regression_evidence=regression_evidence)
-        with self.db:
+        from contextlib import nullcontext
+        with (nullcontext() if self.db.in_transaction else self.db):
             self.db.execute("INSERT OR REPLACE INTO skill_states VALUES (?,?,?,?,?,?,?,?)", (domain, state.phase.value, state.level, state.abstraction_level, state.marginal_gain, state.plateau_score, state.activation_count, time.time()))
             if state.phase != old.phase:
                 event_type = "memory_phase_regressed" if list(SkillPhase).index(state.phase) < list(SkillPhase).index(old.phase) else "memory_phase_advanced"

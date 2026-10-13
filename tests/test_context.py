@@ -232,3 +232,20 @@ def test_recent_events_are_oldest_to_newest(tmp_path):
         assert [event["payload"]["index"] for event in events] == [0, 1, 2]
     finally:
         service.close()
+
+
+def test_trimmed_memory_is_not_reported_as_visible(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('trim-member', 'Member')
+        memory = service.memory('trim-member')
+        try:
+            memory.put('trim-method', 'lesson', 'calibration ' * 80, status='candidate')
+        finally:
+            memory.close()
+        text, report = service.compose_context('trim-member', 'calibration', budgets={'L3': 1})
+        assert 'trim-method' not in text
+        assert report.recalled_memory_ids == []
+        assert report.memory_omitted == 1
+    finally:
+        service.close()

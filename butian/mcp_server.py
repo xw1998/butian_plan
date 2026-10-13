@@ -110,7 +110,7 @@ TOOLS.extend([
 for _name, _description, _fields, _required in [
     ("butian_context_compose", "Compose member context for work performed by the host AI", {"instruction": {"type": "string"}, "task_id": {"type": "string"}, "environment": {"type": "object"}, "budgets": {"type": "object"}, "include_tools": {"type": "boolean"}}, ["instruction"]),
     ("butian_evidence_record", "Register an existing local evidence file owned by the authenticated member", {"path": {"type": "string"}}, ["path"]),
-    ("butian_task_handoff", "Submit host-produced task handoff at the current revision; evidence remains required for approval", {"task_id": {"type": "string"}, "task_revision": {"type": "integer"}, "status": {"type": "string"}, "summary": {"type": "string"}, "evidence_ids": {"type": "array", "items": {"type": "string"}}, "next_action": {"type": "string"}, "confidence": {"type": "number"}}, ["task_id", "task_revision", "status", "summary", "evidence_ids", "next_action", "confidence"]),
+    ("butian_task_handoff", "Submit host-produced task handoff at the current revision; evidence remains required for approval", {"method_uses": {"type": "array", "items": {"type": "object", "required": ["memory_id", "outcome", "evidence_id"], "properties": {"memory_id": {"type": "string"}, "outcome": {"type": "string", "enum": ["success", "failure", "unknown"]}, "evidence_id": {"type": "string"}}}}, "task_id": {"type": "string"}, "task_revision": {"type": "integer"}, "status": {"type": "string"}, "summary": {"type": "string"}, "evidence_ids": {"type": "array", "items": {"type": "string"}}, "next_action": {"type": "string"}, "confidence": {"type": "number"}}, ["task_id", "task_revision", "status", "summary", "evidence_ids", "next_action", "confidence"]),
 ]:
     _fields.update({field: {"type": "string"} for field in ("member_id", "actor_member_id", "token")})
     TOOLS.append({"name": _name, "description": _description, "inputSchema": {"type": "object", "properties": _fields, "required": ["member_id", "actor_member_id", "token", *_required]}})
@@ -129,7 +129,7 @@ def run(home=None):
                 if not isinstance(params, dict):
                     raise ValueError("invalid_jsonrpc_params")
                 if method == "initialize":
-                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": "0.1.1rc2"}}
+                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": "0.1.1"}}
                 elif method.startswith("notifications/"):
                     continue
                 elif method == "tools/list":
@@ -320,6 +320,8 @@ def call_tool(service, name, args):
                 if service.verify_evidence(evidence_id, actor_member_id=args["member_id"])["status"] != "valid":
                     raise ValueError("handoff_evidence_invalid")
             handoff = {key: args[key] for key in ("task_id", "task_revision", "member_id", "status", "summary", "evidence_ids", "next_action", "confidence")}
+            if "method_uses" in args:
+                handoff["method_uses"] = args["method_uses"]
             return {"ok": service.submit_handoff(handoff)}
     if name == "butian_provider_start": return service.start_provider_task(args["member_id"], args["prompt"], task_id=args.get("task_id"), provider_id=args.get("provider_id"), model=args.get("model"))
     if name == "butian_provider_consume": return service.consume_provider_task(args["provider_session_id"], args.get("prompt"), actor_member_id=args.get("actor_member_id"))
