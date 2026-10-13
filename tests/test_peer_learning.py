@@ -239,3 +239,70 @@ finally:
             memory.close()
     finally:
         service.close()
+
+def test_legacy_random_peer_event_is_not_reapplied(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('a', 'A')
+        service.add_member('b', 'B')
+        lid = service.ask_peer('a', 'b', 'method?')
+        mid = service.answer_peer(lid, 'check', method='input')['candidate_memory_id']
+        p = tmp_path / 'legacy-proof.txt'
+        p.write_text('legacy measured result', encoding='utf-8')
+        eid = service.store.record_evidence(p)
+        service.verify_peer_learning(lid, success=True, evidence_ids=[eid])
+        memory = service.memory('a')
+        try:
+            memory.db.execute("UPDATE memory_events SET event_id='legacy_random_id' WHERE memory_id=? AND event_type='verification_success'", (mid,))
+            versions = len(memory.list_versions(mid))
+            weight = memory.get(mid)['weight']
+        finally:
+            memory.close()
+    finally:
+        service.close()
+    service = ButianService(tmp_path)
+    try:
+        memory = service.memory('a')
+        try:
+            assert len(memory.list_versions(mid)) == versions
+            assert memory.get(mid)['weight'] == weight
+            assert memory.db.execute("SELECT COUNT(*) FROM memory_events WHERE event_id LIKE 'peer_%' AND memory_id=?", (mid,)).fetchone()[0] == 1
+        finally:
+            memory.close()
+    finally:
+        service.close()
+
+def test_legacy_peer_event_without_completed_version_recovers_once(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('a', 'A')
+        service.add_member('b', 'B')
+        lid = service.ask_peer('a', 'b', 'method?')
+        mid = service.answer_peer(lid, 'check input')['candidate_memory_id']
+        p = tmp_path/'legacy-partial.txt'
+        p.write_text('actual partial legacy execution', encoding='utf-8')
+        eid = service.store.record_evidence(p)
+        service.verify_peer_learning(lid, success=True, evidence_ids=[eid])
+        memory = service.memory('a')
+        try:
+            versions = memory.list_versions(mid)
+            candidate = versions[0]
+            memory.db.execute("UPDATE memory_events SET event_id='legacy_partial' WHERE memory_id=? AND event_id LIKE 'peer_%'", (mid,))
+            memory.db.execute("DELETE FROM memory_versions WHERE memory_id=? AND change_reason='peer_verification_success'", (mid,))
+            memory.db.execute("UPDATE memories SET status='candidate',weight=0.2,confidence=0.2,source_event_ids=? WHERE memory_id=?", (candidate['evidence_refs'],mid))
+        finally:
+            memory.close()
+    finally:
+        service.close()
+    for _ in range(2):
+        service = ButianService(tmp_path)
+        try:
+            memory = service.memory('a')
+            try:
+                assert len(memory.list_versions(mid)) == 2
+                assert memory.get(mid)['weight'] == 0.7
+                assert memory.db.execute("SELECT COUNT(*) FROM memory_events WHERE memory_id=? AND event_type='verification_success'", (mid,)).fetchone()[0] == 1
+            finally:
+                memory.close()
+        finally:
+            service.close()

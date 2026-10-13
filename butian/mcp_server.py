@@ -129,13 +129,14 @@ def run(home=None):
                 if not isinstance(params, dict):
                     raise ValueError("invalid_jsonrpc_params")
                 if method == "initialize":
-                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": "0.1.1"}}
+                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": "0.1.2"}}
                 elif method.startswith("notifications/"):
                     continue
                 elif method == "tools/list":
                     result = {"tools": TOOLS}
                 elif method == "tools/call":
-                    result = call_tool(service, params.get("name"), params.get("arguments", {}))
+                    payload = call_tool(service, params.get("name"), params.get("arguments", {}))
+                    result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": False}
                 else:
                     if "id" in req:
                         print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": "method_not_found"}}), flush=True)

@@ -127,11 +127,17 @@ class HypothesisStore:
             raise ValueError("authorization_actor_not_found")
         now = time.time()
         auth_id = f"auth_{uuid.uuid4().hex}"
-        with self.db:
+        self.db.execute("SAVEPOINT grant_hypothesis_authorization")
+        try:
             self.db.execute("INSERT INTO hypothesis_authorizations VALUES (?,?,?,?,?,?,?)", (auth_id, row["hypothesis_id"], actor_member_id, "approved" if authorized else "denied", reason, now, owner_member_id))
             updated = self.db.execute("UPDATE hypothesis_actions SET authorization=?,status=? WHERE action_id=? AND status='awaiting_authorization' AND owner_member_id IS ?", (auth_id, "queued" if authorized else "denied", action_id, owner_member_id)).rowcount
             if updated != 1:
                 raise ValueError("verification_action_not_awaiting_authorization")
+            self.db.execute("RELEASE SAVEPOINT grant_hypothesis_authorization")
+        except Exception:
+            self.db.execute("ROLLBACK TO SAVEPOINT grant_hypothesis_authorization")
+            self.db.execute("RELEASE SAVEPOINT grant_hypothesis_authorization")
+            raise
 
     @serialized_write
     def start(self, action_id: str, *, owner_member_id: str | None = None) -> None:

@@ -19,7 +19,8 @@ def _svc():
 
 
 def _make_task_ready(svc, session_id, title="t"):
-    task_id = svc.store.create_task(session_id, title)
+    owner = svc.store.db.execute("SELECT dispatcher_member_id FROM sessions WHERE session_id=?", (session_id,)).fetchone()[0]
+    task_id = svc.store.create_task(session_id, title, owner)
     svc.store.transition_task(task_id, 1, "ready", f"op_ready_{task_id}")
     svc.store.transition_task(task_id, 2, "claimed", f"op_claim_{task_id}")
     svc.store.transition_task(task_id, 3, "running", f"op_run_{task_id}")

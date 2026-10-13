@@ -254,3 +254,76 @@ def test_verification_metrics_must_be_finite(tmp_path, field, value):
         assert service.store.db.execute('SELECT COUNT(*) FROM hypothesis_actions').fetchone()[0] == 0
     finally:
         service.close()
+
+def test_authorization_failure_rolls_back_ledger(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('m', 'M')
+        assessment = service.hypotheses.assess(['skill'])
+        h = service.hypotheses.propose('practice_hypothesis', 'atomic authorization', rationale='check', assessment=assessment)
+        a = service.hypotheses.authorize(h, 'verify', cost=1, risk=0, information_gain=1)
+        service.store.db.execute("CREATE TRIGGER fail_authorization_update BEFORE UPDATE ON hypothesis_actions BEGIN SELECT RAISE(ABORT, 'authorization_interrupted'); END")
+        with pytest.raises(Exception, match='authorization_interrupted'):
+            service.hypotheses.grant_authorization(a, actor_member_id='m', reason='approve', authorized=True)
+        assert service.store.db.execute('SELECT COUNT(*) FROM hypothesis_authorizations').fetchone()[0] == 0
+        assert service.store.db.execute('SELECT status FROM hypothesis_actions WHERE action_id=?', (a,)).fetchone()[0] == 'awaiting_authorization'
+    finally:
+        service.close()
+
+def test_hypothesis_support_and_counterevidence_update_stable_memory(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('m', 'M')
+        h = service.hypotheses.propose('practice_hypothesis', 'method works under measured conditions', rationale='verify', assessment=service.hypotheses.assess(['skill']))
+        memory_ids = []
+        for i, outcome in enumerate(('supported', 'supported', 'rejected')):
+            a = service.hypotheses.authorize(h, 'experiment', cost=1, risk=0, information_gain=1)
+            service.hypotheses.grant_authorization(a, actor_member_id='m', reason='approved experiment', authorized=True)
+            service.hypotheses.start(a)
+            proof = tmp_path / f'proof-{i}.txt'
+            proof.write_text(f'experiment {i}: {outcome}', encoding='utf-8')
+            eid = service.store.record_evidence(proof, owner_member_id='m', actor_member_id='m')
+            result = service.observe_hypothesis(a, outcome, [eid], independent_key=f'run-{i}', actor_member_id='m', member_id='m')
+            memory_ids.append(result['candidate_memory_id'])
+            assert result['memory_status'] == ('candidate', 'warm', 'disputed')[i]
+        assert len(set(memory_ids)) == 1
+        memory = service.memory('m')
+        try:
+            assert memory.db.execute('SELECT COUNT(*) FROM practice_observations WHERE memory_id=?', (memory_ids[0],)).fetchone()[0] == 3
+        finally:
+            memory.close()
+    finally:
+        service.close()
+
+def test_stable_hypothesis_member_failure_recovers_once(tmp_path, monkeypatch):
+    from butian.runtime.memory import MemoryStore
+    service = ButianService(tmp_path)
+    service.add_member('m', 'M')
+    h = service.hypotheses.propose('practice_hypothesis', 'recover measured method', rationale='verify', assessment=service.hypotheses.assess(['skill']))
+    a = service.hypotheses.authorize(h, 'experiment', cost=1, risk=0, information_gain=1)
+    service.hypotheses.grant_authorization(a, actor_member_id='m', reason='approved', authorized=True)
+    service.hypotheses.start(a)
+    p = tmp_path / 'recovery-proof.txt'
+    p.write_text('actual recovery experiment', encoding='utf-8')
+    eid = service.store.record_evidence(p, owner_member_id='m', actor_member_id='m')
+    original = MemoryStore.record_practice_outcome
+    def interrupted(*args, **kwargs):
+        raise RuntimeError('member_interrupted')
+    monkeypatch.setattr(MemoryStore, 'record_practice_outcome', interrupted)
+    result = service.observe_hypothesis(a, 'supported', [eid], independent_key='recover', actor_member_id='m', member_id='m')
+    assert result['memory_status'] == 'pending'
+    service.store.db.execute("UPDATE member_memory_outbox SET lease_until=0 WHERE status='processing'")
+    service.close()
+    monkeypatch.setattr(MemoryStore, 'record_practice_outcome', original)
+    service = ButianService(tmp_path)
+    try:
+        service.drain_member_memory_outbox()
+        memory = service.memory('m')
+        try:
+            assert memory.get(result['candidate_memory_id'])['status'] == 'candidate'
+            assert memory.db.execute('SELECT COUNT(*) FROM practice_observations').fetchone()[0] == 1
+        finally:
+            memory.close()
+        assert service.store.list_member_memory_outbox()[0]['status'] == 'committed'
+    finally:
+        service.close()

@@ -65,7 +65,10 @@ def test_real_stdio_host_without_model_provider_and_restart(tmp_path):
             assert "error" not in response, response
             return response["result"]
         def call(name, **args):
-            return request("tools/call", {"name": name, "arguments": dict(auth, **args)})
+            result = request("tools/call", {"name": name, "arguments": dict(auth, **args)})
+            assert result["isError"] is False
+            assert result["content"][0]["type"] == "text"
+            return json.loads(result["content"][0]["text"])
         try:
             assert request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "generic-host-test", "version": "1"}})["capabilities"]["tools"] == {}
             proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")

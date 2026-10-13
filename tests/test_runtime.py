@@ -31,8 +31,10 @@ def test_question_and_handoff_require_structure(tmp_path):
         raise AssertionError("stale handoff should be rejected")
     except ValueError as exc:
         assert "stale" in str(exc)
+    service.store.transition_task(task, 6, "claimed", "resume-claim")
+    service.store.transition_task(task, 7, "running", "resume-run")
     # 空证据交接可以入账（供审核参考），但不能让任务进入 done
-    service.submit_handoff({"task_id": task, "task_revision": 6, "member_id": "m1", "status": "done", "summary": "已确认", "evidence_ids": [], "next_action": "review", "confidence": 0.8})
+    service.submit_handoff({"task_id": task, "task_revision": 8, "member_id": "m1", "status": "done", "summary": "已确认", "evidence_ids": [], "next_action": "review", "confidence": 0.8})
     service.close()
 
 

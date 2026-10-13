@@ -1,6 +1,7 @@
 from __future__ import annotations
 import hashlib
 import json
+import math
 import os
 import sqlite3
 import threading
@@ -386,11 +387,14 @@ class ButianService:
                 raise
 
     def _prepare_claim_practice_locked(self, claim_id: str, *, owner_member_id: str, description: str, kind: str, cost: float, risk: float, information_gain: float):
-        if kind not in self.hypotheses.KINDS or cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
+        if kind not in self.hypotheses.KINDS or not all(math.isfinite(v) for v in (cost, risk, information_gain)) or cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
             raise ValueError("invalid_verification_metrics")
         existing = self.store.db.execute("SELECT * FROM claim_practice_preparations WHERE claim_id=? AND owner_member_id=?", (claim_id, owner_member_id)).fetchone()
         if existing:
-            return {"claim_id": claim_id, "prior_id": existing["prior_id"], "hypothesis_id": existing["hypothesis_id"], "action_id": existing["action_id"], "status": "awaiting_authorization", "idempotent": True}
+            action = self.store.db.execute("SELECT status FROM hypothesis_actions WHERE action_id=? AND owner_member_id=?", (existing["action_id"], owner_member_id)).fetchone()
+            if not action:
+                raise ValueError("claim_practice_action_missing")
+            return {"claim_id": claim_id, "prior_id": existing["prior_id"], "hypothesis_id": existing["hypothesis_id"], "action_id": existing["action_id"], "status": action["status"], "idempotent": True}
         claim = self.learning.get_claim(claim_id, owner_member_id=owner_member_id)
         prior_payload = self.learning.claim_as_prior(claim_id, owner_member_id=owner_member_id)
         prior_id = self.hypotheses.add_prior(**{key: prior_payload[key] for key in ("source_kind", "title", "claim", "environment", "source_refs", "reliability")}, owner_member_id=owner_member_id)
@@ -417,6 +421,27 @@ class ButianService:
         return self.hypotheses.get(hypothesis_id, owner_member_id=owner_member_id)
 
     def observe_hypothesis(self, action_id: str, outcome: str, evidence_ids: list[str], *, independent_key: str, notes: str = "", environment=None, actor_member_id: str | None = None, member_id: str | None = None, owner_member_id: str | None = None):
+        with self.store._write_lock:
+            self.store.db.execute("SAVEPOINT service_hypothesis_evidence")
+            try:
+                result = self._observe_hypothesis_locked(action_id, outcome, evidence_ids, independent_key=independent_key, notes=notes, environment=environment, actor_member_id=actor_member_id, member_id=member_id, owner_member_id=owner_member_id)
+                self.store.db.execute("RELEASE SAVEPOINT service_hypothesis_evidence")
+            except Exception:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT service_hypothesis_evidence")
+                self.store.db.execute("RELEASE SAVEPOINT service_hypothesis_evidence")
+                raise
+        if result.get("candidate_memory_id"):
+            self.drain_member_memory_outbox()
+            memory = self.memory(member_id)
+            try:
+                saved = memory.get(result["candidate_memory_id"])
+                result["memory_status"] = saved["status"] if saved else "pending"
+            finally:
+                memory.close()
+        return result
+
+    def _observe_hypothesis_locked(self, action_id: str, outcome: str, evidence_ids: list[str], *, independent_key: str, notes: str = "", environment=None, actor_member_id: str | None = None, member_id: str | None = None, owner_member_id: str | None = None):
+        digests = []
         if outcome in {"supported", "rejected"}:
             if not evidence_ids:
                 raise ValueError("evidence_required_for_conclusive_outcome")
@@ -424,28 +449,35 @@ class ButianService:
                 verification = self.store.verify_evidence(evidence_id, actor_member_id=actor_member_id)
                 if verification["status"] != "valid":
                     raise ValueError("hypothesis_evidence_not_valid")
+                digests.append(verification["sha256"])
         if member_id and not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
             raise ValueError("member_not_found")
         observation_id = f"obs_{uuid.uuid4().hex}"
         outbox = None
-        if outcome == "supported" and member_id:
+        if outcome in {"supported", "rejected"} and member_id:
             action = self.store.db.execute("SELECT hypothesis_id FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
             if not action:
                 raise ValueError("verification_action_not_found")
             hypothesis = self.hypotheses.get(action["hypothesis_id"], owner_member_id=owner_member_id)
-            outbox = {"member_id": member_id, "memory_id": f"mem_hyp_{observation_id}", "kind": hypothesis["kind"], "content": hypothesis["statement"]}
+            self.store.db.execute("CREATE TABLE IF NOT EXISTS hypothesis_member_evidence (hypothesis_id TEXT NOT NULL, member_id TEXT NOT NULL, digest TEXT NOT NULL, observation_id TEXT NOT NULL, PRIMARY KEY(hypothesis_id,member_id,digest))")
+            memory = self.memory(member_id)
+            try:
+                mid = f"mem_hyp_{action['hypothesis_id']}_{member_id}"
+                for digest in dict.fromkeys(digests):
+                    if memory.db.execute("SELECT 1 FROM practice_evidence WHERE memory_id=? AND evidence_digest=?", (mid, digest)).fetchone():
+                        raise ValueError("independent_evidence_required")
+                    try:
+                        self.store.db.execute("INSERT INTO hypothesis_member_evidence VALUES (?,?,?,?)", (action["hypothesis_id"], member_id, digest, observation_id))
+                    except sqlite3.IntegrityError as exc:
+                        raise ValueError("independent_evidence_required") from exc
+            finally:
+                memory.close()
+            outbox = {"member_id": member_id, "memory_id": f"mem_hyp_{action['hypothesis_id']}_{member_id}", "kind": "hypothesis_practice", "content": json.dumps({"kind": hypothesis["kind"], "content": hypothesis["statement"], "outcome": "success" if outcome == "supported" else "failure", "evidence_id": evidence_ids[0], "evidence_ids": evidence_ids, "evidence_digests": digests}, ensure_ascii=False)}
         observation_id = self.hypotheses.observe(action_id, outcome, evidence_ids, independent_key=independent_key, notes=notes, environment=environment, outbox=outbox, observation_id=observation_id, owner_member_id=owner_member_id)
         result = {"observation_id": observation_id, "outcome": outcome}
         if outbox is not None:
             memory_id = outbox["memory_id"]
             result.update({"candidate_memory_id": memory_id, "memory_status": "pending"})
-            memory = self.memory(member_id)
-            try:
-                if memory.get(memory_id) is None:
-                    memory.put(memory_id, outbox["kind"], outbox["content"], confidence=0.2, weight=0.2, environment=environment or {}, source_event_ids=[observation_id], status="candidate", knowledge_source="verified_hypothesis")
-            finally:
-                memory.close()
-            result["memory_status"] = "candidate"
         return result
 
     def drain_member_memory_outbox(self, *, fail_after_write: bool = False) -> list[dict[str, Any]]:
@@ -455,7 +487,20 @@ class ButianService:
             try:
                 memory = self.memory(item["member_id"])
                 existing = memory.get(item["memory_id"])
-                if item["kind"] == "review_method_practice":
+                if item["kind"] == "hypothesis_practice":
+                    observation = json.loads(item["content"])
+                    applied = memory.db.execute("SELECT 1 FROM practice_observations WHERE memory_id=? AND independent_key=?", (item["memory_id"], item["observation_id"])).fetchone()
+                    if not applied:
+                        evidence_ids = observation.get("evidence_ids", [observation["evidence_id"]])
+                        proofs = [self.store.verify_evidence(eid, actor_member_id=item["member_id"]) for eid in evidence_ids]
+                        if any(proof["status"] != "valid" for proof in proofs):
+                            raise ValueError("practice_evidence_not_valid")
+                        digests = [proof["sha256"] for proof in proofs]
+                        if observation.get("evidence_digests") and digests != observation["evidence_digests"]:
+                            raise ValueError("practice_evidence_changed")
+                        memory.record_practice_outcome(memory_id=item["memory_id"], kind=observation["kind"], content=observation["content"], outcome=observation["outcome"], independent_key=item["observation_id"], evidence_ref=observation["evidence_id"], evidence_digests=digests, environment=json.loads(item["environment"]), source_event_ids=json.loads(item["source_event_ids"]) + evidence_ids)
+                    version_id = memory.list_versions(item["memory_id"])[-1]["version_id"]
+                elif item["kind"] == "review_method_practice":
                     observation = json.loads(item["content"])
                     key = item["observation_id"]
                     applied = memory.db.execute("SELECT 1 FROM practice_observations WHERE memory_id=? AND independent_key=?", (item["memory_id"], key)).fetchone()
@@ -1318,25 +1363,41 @@ class ButianService:
         return [dict(row) for row in self.store.db.execute(sql + " ORDER BY created_at DESC", args)]
 
     def submit_handoff(self, handoff: dict[str, Any]):
+        with self.store._write_lock:
+            self.store.db.execute("SAVEPOINT handoff_submission")
+            try:
+                result = self._submit_handoff_locked(handoff)
+                self.store.db.execute("RELEASE SAVEPOINT handoff_submission")
+                return result
+            except Exception:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT handoff_submission")
+                self.store.db.execute("RELEASE SAVEPOINT handoff_submission")
+                raise
+
+    def _submit_handoff_locked(self, handoff: dict[str, Any]):
         required = {"task_id", "task_revision", "member_id", "status", "summary", "evidence_ids", "next_action", "confidence"}
         missing = required - handoff.keys()
         if missing:
             raise ValueError(f"handoff_missing:{','.join(sorted(missing))}")
         task_id = handoff["task_id"]
-        task = self.store.db.execute("SELECT revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        task = self.store.db.execute("SELECT revision,assignee_id,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
         if not task:
             raise ValueError("task_not_found")
         if handoff["task_revision"] != task["revision"]:
             raise ValueError("handoff_stale_revision")
         if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (handoff["member_id"],)).fetchone():
             raise ValueError("member_not_found")
+        if task["assignee_id"] != handoff["member_id"] or task["status"] not in {"running", "review"}:
+            raise ValueError("handoff_task_not_owned_or_active")
         for field in ("status", "summary", "next_action"):
             if not str(handoff[field] or "").strip():
                 raise ValueError(f"handoff_field_empty:{field}")
         if not isinstance(handoff["evidence_ids"], list):
             raise ValueError("handoff_evidence_ids_must_be_list")
-        if not isinstance(handoff["confidence"], (int, float)):
+        if isinstance(handoff["confidence"], bool) or not isinstance(handoff["confidence"], (int, float)):
             raise ValueError("handoff_confidence_must_be_number")
+        if not math.isfinite(handoff["confidence"]) or not 0 <= handoff["confidence"] <= 1:
+            raise ValueError("handoff_confidence_out_of_range")
         uses = handoff.get("method_uses", [])
         if not isinstance(uses, list):
             raise ValueError("method_uses_must_be_list")

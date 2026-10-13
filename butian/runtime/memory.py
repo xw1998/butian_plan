@@ -206,7 +206,7 @@ class MemoryStore:
                 item["last_recalled_at"] = now
         return result
 
-    def record_practice_outcome(self, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None, evidence_digest: str | None = None):
+    def record_practice_outcome(self, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None, evidence_digest: str | None = None, evidence_digests: list[str] | None = None):
         """Record independent evidence; contradictions remain disputed pending revision."""
         if outcome not in {"success", "failure", "unknown"}:
             raise ValueError("invalid_practice_outcome")
@@ -220,10 +220,10 @@ class MemoryStore:
                 raise ValueError("duplicate_independent_observation")
             if outcome == "success" and self.db.execute("SELECT 1 FROM practice_observations WHERE memory_id=? AND evidence_ref=? AND outcome='success'", (memory_id, evidence_ref)).fetchone():
                 raise ValueError("independent_evidence_required")
-            if evidence_digest:
-                if self.db.execute("SELECT 1 FROM practice_evidence WHERE memory_id=? AND evidence_digest=?", (memory_id, evidence_digest)).fetchone():
+            for digest in dict.fromkeys(list(evidence_digests or []) + ([evidence_digest] if evidence_digest else [])):
+                if self.db.execute("SELECT 1 FROM practice_evidence WHERE memory_id=? AND evidence_digest=?", (memory_id, digest)).fetchone():
                     raise ValueError("independent_evidence_required")
-                self.db.execute("INSERT INTO practice_evidence VALUES (?,?,?)", (memory_id, evidence_digest, independent_key))
+                self.db.execute("INSERT INTO practice_evidence VALUES (?,?,?)", (memory_id, digest, independent_key))
             row = self.get(memory_id)
             if not row:
                 self.put(memory_id, kind, content, confidence=0.2, weight=0.5, environment=environment, source_event_ids=list(source_event_ids or []), status="candidate", change_reason="practice_observation")
