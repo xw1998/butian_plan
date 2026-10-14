@@ -1,0 +1,26 @@
+{
+  "execution_kind": "actual_model",
+  "capture_method": "current_agent_authored_tool_payload",
+  "host_agent_id": "current_conversation",
+  "prior_answer_exposure": true,
+  "model_calls": null,
+  "cost": null,
+  "scope": "15 nonblind single-agent manual responses; not 45 independent model calls; B2 context recall only, not complete lifecycle ablation",
+  "responses": [
+    {"case_id":"repeat-pressure-v1","variant":"B0","answer":"表压=104725−101325=3400 Pa。环境压力采用本次101325 Pa，绝对压力以真空为零点，表压以当地环境压力为零点。"},
+    {"case_id":"repeat-pressure-v1","variant":"B1","answer":"固定记忆提醒不能将绝对压力直接当表压。本次仍须使用104725−101325=3400 Pa，不把旧绝压103325 Pa当成当前输入。"},
+    {"case_id":"repeat-pressure-v1","variant":"B2","answer":"生产L3已召回pilot-memory中的既往失败和约束。本次计算104725−101325=3400 Pa；来源为当前输入，旧案例仅用于方法边界，不能替代环境读数。"},
+    {"case_id":"transfer-pressure-v1","variant":"B1","answer":"相似点是表压均为绝压减当地环境压力；差异是本次使用kPa且环境已变化。86.2−84.5=1.7 kPa=1700 Pa，不能沿用101325 Pa。"},
+    {"case_id":"transfer-pressure-v1","variant":"B2","answer":"生产L3召回旧Pa案例。迁移保留差值方法，替换量纲和环境参数：86200−84500=1700 Pa=1.7 kPa。召回记录不意味着旧环境适用。"},
+    {"case_id":"transfer-pressure-v1","variant":"B0","answer":"当前两项均为kPa，表压为86.2−84.5=1.7 kPa，即1700 Pa。与训练相比单位和环境变化，须使用当前84.5 kPa。"},
+    {"case_id":"conflict-scale-v1","variant":"B2","answer":"生产L3中的firmware1.0、scale100仅保留历史适用性。当前firmware2.0依据calibration-v2使用1000，340/1000=0.34。不平均两个系数；未知版本且无校准的探针返回unknown。尚未实际提交冲突生命周期变更。"},
+    {"case_id":"conflict-scale-v1","variant":"B0","answer":"当前2.0校准优先，340/1000=0.34。1.0的100只对旧版有效，保留历史而不平均。缺失版本和校准时unknown。"},
+    {"case_id":"conflict-scale-v1","variant":"B1","answer":"固定检索返回旧版scale100，但当前输入有2.0的calibration-v2，因此结果0.34。旧版证据保留；未知版本不猜测。固定检索未执行冲突状态更新。"},
+    {"case_id":"source-practice-v1","variant":"B0","answer":"对[1,2,3,4,5]使用未知总体方差的Student t区间：均值3，样本标准差sqrt(2.5)，df4，95%区间约[1.0367568385,4.9632431615]。单样本[3]无法估计样本标准差和t区间，均记null。NIST主张保留candidate；本轮尚无两次独立实践和生产审核，不能升级经验。"},
+    {"case_id":"source-practice-v1","variant":"B1","answer":"固定资料为外部主张候选，不能直接当本地经验。计算采用t4临界值与s/sqrt(5)，得均值3、区间[1.0367568385,4.9632431615]；n1反例区间null。生产独立实践与审核未执行，因此保持candidate。"},
+    {"case_id":"source-practice-v1","variant":"B2","answer":"生产L3召回了来源、候选和单样本约束。预测为均值3与t区间[1.0367568385,4.9632431615]；限制为独立样本和模型假设；反例是n1无可用方差。尚未完成来源提取、两次实践与状态转移，不能判完整任务通过。"},
+    {"case_id":"recovery-context-v1","variant":"B1","answer":"230/100=2.3 m/s。固定检索中的NIST材料与本任务不相关，不采用。当前revision、已确认停止、压缩前原事件和唯一有效提交均缺少实际执行证据，状态unknown，不能声称恢复成功。"},
+    {"case_id":"recovery-context-v1","variant":"B2","answer":"生产L3召回恢复约束，但没有压缩、暂停确认、重启与有效提交的执行记录。数值230/100=2.3 m/s；current-task-revision和stop acknowledgement均unknown。实际恢复验收未完成。"},
+    {"case_id":"recovery-context-v1","variant":"B0","answer":"数值为2.3 m/s。当前输入只提供scale和unit，不能证明已有当前revision或停止确认。缺少完整恢复链证据，拒绝把数值正确当成恢复通过。"}
+  ]
+}

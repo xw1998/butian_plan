@@ -1,0 +1,12 @@
+{
+  "responses": 15,
+  "independent_samples": false,
+  "blind": false,
+  "numerical_and_version_answer_assessment": "no observed difference across B0/B1/B2",
+  "source_practice_full_acceptance": "not_completed",
+  "recovery_full_acceptance": "not_completed",
+  "B2_scope": "production context recall only; not full lifecycle condition",
+  "model_calls": null,
+  "cost": null,
+  "statistical_inference": "none; descriptive pilot only"
+}

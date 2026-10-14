@@ -1,0 +1,51 @@
+{
+  "run_id": "recovery-context-v1-B2",
+  "case": {
+    "case_id": "recovery-context-v1",
+    "category": "recovery",
+    "goal": "在会话压缩、已确认暂停及新执行上下文恢复后，按当前revision完成计算并追溯所需信息。",
+    "input": {
+      "raw": 230,
+      "scale": 100,
+      "unit": "m/s",
+      "required_information_ids": [
+        "scale-calibration",
+        "output-unit",
+        "current-task-revision"
+      ],
+      "history_noise_records": 120
+    },
+    "constraints": [
+      "压缩前保存真实事件和快照",
+      "恢复只读取授权信息",
+      "拒绝旧revision提交",
+      "不能把取消请求当已确认停止"
+    ],
+    "acceptance": [
+      "恢复后计算正确",
+      "引用所需信息和原经历",
+      "任务完成且只有一次有效提交",
+      "缺口有逐项unknown记录"
+    ],
+    "risk": "low",
+    "evidence": [
+      "original_event_log",
+      "compressed_snapshot",
+      "restored_context",
+      "stop_acknowledgement",
+      "delivery",
+      "restart_database"
+    ]
+  },
+  "variant": "B2",
+  "position": 2,
+  "host_agent": "current_conversation",
+  "prior_answer_exposure": true,
+  "context_carryover": "cannot_reset",
+  "scope": "nonblind_within_agent_pilot",
+  "model_seed_controlled": false,
+  "production_recalled_memory_ids": [
+    "pilot-memory"
+  ],
+  "context_sha256": "c75340c3f4e680bd7548b580b063801b2a13fcbb2f96c8aad09bdd7fdbf31bbe"
+}

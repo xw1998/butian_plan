@@ -1,0 +1,2 @@
+No additional long-term memory supplied.
+{"raw": 230, "scale": 100, "unit": "m/s", "required_information_ids": ["scale-calibration", "output-unit", "current-task-revision"], "history_noise_records": 120}

@@ -13,3 +13,6 @@
 2026-10-15 已完成数学模型论证、机制控制实验、结果图表和论文排版。实验类型为 `mechanism_control`，实际模型运行数为 0。45 个 B0/B1/B2 同一宿主Agent输入尚未执行，因此不报告宿主模型效果、成本或跨模型泛化结论。
 
 结果目录：`experiment_results/math-controls-20261015/`。其中包含 JSON 结果、CSV 明细、300dpi PNG 和 SHA256 manifest。研究与数学专项测试：19 passed。
+
+
+2026-10-15：当前宿主 Agent 已完成五类任务各 B0/B1/B2 共15条非盲测条件回答，原始记录见 `docs/论文/experiment_results/within-agent-pilot-20261015/agent-responses.json`。结果仅作同Agent机制试跑；上下文携带、先前答案暴露、model_calls和cost已如实记录，不能当作独立样本或第三方审计。

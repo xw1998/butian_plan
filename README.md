@@ -165,3 +165,6 @@ https://gitee.com/xw19981010/butian_plan.git
 
 
 内部研究论文与复现实验见 [论文及实验索引](docs/论文/README.md)。当前完成数学论证与机制控制，同一宿主Agent B0/B1/B2 对照尚未执行。
+
+
+2026-10-15：当前宿主 Agent 已完成五类任务各 B0/B1/B2 共15条非盲测条件回答，原始记录见 `docs/论文/experiment_results/within-agent-pilot-20261015/agent-responses.json`。结果仅作同Agent机制试跑；上下文携带、先前答案暴露、model_calls和cost已如实记录，不能当作独立样本或第三方审计。

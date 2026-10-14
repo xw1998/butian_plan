@@ -1,0 +1,8 @@
+【L0 当前指令】
+将给定绝对压力读数转换为表压，并解释适用条件。 repeat-pressure-v1
+
+【身份与权限】
+{"name":"Current host Agent","role":"member","responsibilities":[],"persona":"{}","tool_policy":{},"authorization":"工具调用仍须通过运行时授权与撤销校验"}
+
+【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）
+- {"case": "repeat-pressure-v1", "training": {"absolute_pressure_pa": 103325, "ambient_pressure_pa": 101325, "previous_failure": "将绝对压力直接当作表压"}, "constraints": ["保留Pa单位", "引用实际环境压力", "提供可复算的证据"]}

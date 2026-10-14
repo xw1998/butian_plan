@@ -1,0 +1,8 @@
+【L0 当前指令】
+将公开统计资料主张转为待验证假设，进行本地数值复算和反例检查。 source-practice-v1
+
+【身份与权限】
+{"name":"Current host Agent","role":"member","responsibilities":[],"persona":"{}","tool_policy":{},"authorization":"工具调用仍须通过运行时授权与撤销校验"}
+
+【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）
+- {"case": "source-practice-v1", "training": null, "constraints": ["引文必须存在于固定快照", "使用未知总体方差的均值区间", "独立验证门槛前保留candidate", "单样本不得给零不确定性"]}

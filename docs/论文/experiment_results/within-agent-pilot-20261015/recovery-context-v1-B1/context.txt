@@ -1,0 +1,3 @@
+Fixed retrieval only; no lifecycle update.
+{"source": "NIST fixed snapshot", "status": "external claim candidate"}
+{"raw": 230, "scale": 100, "unit": "m/s", "required_information_ids": ["scale-calibration", "output-unit", "current-task-revision"], "history_noise_records": 120}

@@ -1,0 +1,44 @@
+{
+  "run_id": "repeat-pressure-v1-B2",
+  "case": {
+    "case_id": "repeat-pressure-v1",
+    "category": "repeat",
+    "goal": "将给定绝对压力读数转换为表压，并解释适用条件。",
+    "training": {
+      "absolute_pressure_pa": 103325,
+      "ambient_pressure_pa": 101325,
+      "previous_failure": "将绝对压力直接当作表压"
+    },
+    "input": {
+      "absolute_pressure_pa": 104725,
+      "ambient_pressure_pa": 101325
+    },
+    "constraints": [
+      "保留Pa单位",
+      "引用实际环境压力",
+      "提供可复算的证据"
+    ],
+    "acceptance": [
+      "数值与隐藏参考一致",
+      "明确绝对压力和表压差异",
+      "证据内容哈希有效"
+    ],
+    "risk": "low",
+    "evidence": [
+      "input_fixture",
+      "python_stdout",
+      "calculation_source"
+    ]
+  },
+  "variant": "B2",
+  "position": 3,
+  "host_agent": "current_conversation",
+  "prior_answer_exposure": true,
+  "context_carryover": "cannot_reset",
+  "scope": "nonblind_within_agent_pilot",
+  "model_seed_controlled": false,
+  "production_recalled_memory_ids": [
+    "pilot-memory"
+  ],
+  "context_sha256": "f98157ced97ce92f5f50a5518f9ec7bef54ccbbb3f81414bff51cf5e1c57afa3"
+}

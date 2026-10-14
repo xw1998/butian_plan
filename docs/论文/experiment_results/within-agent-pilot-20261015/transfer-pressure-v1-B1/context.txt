@@ -1,0 +1,3 @@
+Fixed retrieval only; no lifecycle update.
+{"absolute_pressure_pa": 103325, "ambient_pressure_pa": 101325}
+{"absolute_pressure_kpa": 86.2, "ambient_pressure_kpa": 84.5}
