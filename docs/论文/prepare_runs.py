@@ -56,11 +56,13 @@ def prepare(root, output):
     for case in package['cases']:
         write_json(output / 'scoring' / (case['case_id'] + '.json'), references[case['case_id']])
         for seed in package['seeds']:
-            for variant in package['variants']:
+            offset = package['seeds'].index(seed) % len(package['variants'])
+            ordered_variants = package['variants'][offset:] + package['variants'][:offset]
+            for variant in ordered_variants:
                 run_id = f"{case['case_id']}-{seed}-{variant}-r1"
                 run_dir = output / 'inputs' / run_id
                 model_case = {key: value for key, value in case.items() if key != 'training'}
-                payload = {'run_id': run_id, 'case': model_case, 'seed': seed, 'repeat': 1, 'variant': variant, 'max_model_calls': package['max_model_calls'], 'max_tool_calls': package['max_tool_calls'], 'allowed_tools': package['allowed_tools'], 'permissions': package['permissions'], 'memory_mode': {'B0': 'none', 'B1': 'fixed_retrieval_only', 'B2': 'production_lifecycle'}[variant], 'training_fixture': case.get('training') if variant != 'B0' else None, 'required_host_context': 'fresh_independent_context', 'source_snapshot_sha256': snapshot_hash if 'source' in case else None}
+                payload = {'run_id': run_id, 'case': model_case, 'seed': seed, 'repeat': 1, 'variant': variant, 'max_model_calls': package['max_model_calls'], 'max_tool_calls': package['max_tool_calls'], 'allowed_tools': package['allowed_tools'], 'permissions': package['permissions'], 'memory_mode': {'B0': 'none', 'B1': 'fixed_retrieval_only', 'B2': 'production_lifecycle'}[variant], 'training_fixture': case.get('training') if variant != 'B0' else None, 'required_host_context': 'same_host_agent', 'comparison_design': 'within_agent_repeated_measures', 'context_carryover': 'must_record_not_assumed_reset', 'order_policy': 'counterbalanced_by_seed', 'condition_order': ordered_variants, 'condition_position': ordered_variants.index(variant) + 1, 'model_seed_controlled': False, 'prior_answer_exposure': 'must_record', 'source_snapshot_sha256': snapshot_hash if 'source' in case else None}
                 write_json(run_dir / 'input.json', payload)
                 if 'source' in case:
                     (run_dir / 'source.html').write_bytes(snapshot_bytes)

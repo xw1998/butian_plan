@@ -164,4 +164,4 @@ https://gitee.com/xw19981010/butian_plan.git
 本项目采用 [MIT License](LICENSE) 开源协议。
 
 
-内部研究论文与复现实验见 [论文及实验索引](docs/论文/README.md)。当前完成数学论证与机制控制，独立模型 B0/B1/B2 对照尚未执行。
+内部研究论文与复现实验见 [论文及实验索引](docs/论文/README.md)。当前完成数学论证与机制控制，同一宿主Agent B0/B1/B2 对照尚未执行。

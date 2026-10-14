@@ -23,7 +23,9 @@ def test_preparation_separates_references_and_preserves_execution_unknown(tmp_pa
         assert preparation.sha256(path.read_bytes()) == run['input_sha256']
         assert run['status'] == 'pending'
         assert run['model_context_id'] is None
-        assert payload['required_host_context'] == 'fresh_independent_context'
+        assert payload['required_host_context'] == 'same_host_agent'
+        assert payload['comparison_design'] == 'within_agent_repeated_measures'
+        assert payload['context_carryover'] == 'must_record_not_assumed_reset'
         assert 'references' not in payload
         assert all('scoring' not in item for item in run['read_allowlist'])
         if payload['variant'] == 'B0':
