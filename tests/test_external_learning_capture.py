@@ -103,10 +103,10 @@ def test_authorized_queue_is_idempotent_and_stops_at_candidate_source():
             finally:
                 learning_module.build_opener = original
             assert result["processed"][0]["status"] == "completed"
-            assert result["claims_created"] == 1
+            assert result["claims_created"] == 0
             assert result["memories_created"] == 0
             assert store.list_learning_queue()[0]["status"] == "completed"
-            assert db.execute("SELECT COUNT(*) FROM source_claims").fetchone()[0] == 1
+            assert db.execute("SELECT COUNT(*) FROM source_claims").fetchone()[0] == 0
         finally:
             db.close()
 
@@ -258,12 +258,13 @@ def test_learning_queue_lost_lease_does_not_publish_claim(tmp_path):
     class FakeOpenerResponse:
         def open(self, *_args, **_kwargs): return FakeResponse()
     learning_module.build_opener = lambda *_handlers: FakeOpenerResponse()
-    original_claim = store.add_claim
-    def claim_then_fence(*args, **kwargs):
+    original_capture = store.capture_url
+    def capture_then_fence(*args, **kwargs):
+        result = original_capture(*args, **kwargs)
         db.execute("UPDATE learning_queue SET worker_id='new-worker', lease_token='new-token', lease_until=999999 WHERE queue_id=?", (queue_id,))
         db.commit()
-        return original_claim(*args, **kwargs)
-    store.add_claim = claim_then_fence
+        return result
+    store.capture_url = capture_then_fence
     try:
         result = store.process_learning_queue(worker_id="old-worker")
     finally:
@@ -404,7 +405,7 @@ def test_slow_http_queue_does_not_hold_shared_database_lock(tmp_path, monkeypatc
         service.close()
     assert not errors
     assert results[0]['processed'][0]['status'] == 'completed'
-    assert results[0]['claims_created'] == 1
+    assert results[0]['claims_created'] == 0
     assert results[0]['memories_created'] == 0
 
 

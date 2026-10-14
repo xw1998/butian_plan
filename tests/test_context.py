@@ -33,7 +33,7 @@ class ContextComposerTests(unittest.TestCase):
     def test_compose_contains_all_layers(self):
         task_id = self._make_task()
         composed, report = self.service.compose_context("m_ctx", "请实现串口驱动", task_id=task_id)
-        for marker in ("【L0 当前指令】", "【L1 当前任务】", "【L4 身份与职责】"):
+        for marker in ("【L0 当前指令】", "【L1 当前任务】", "【身份与权限】"):
             self.assertIn(marker, composed)
         self.assertIn("请实现串口驱动", composed)
         self.assertIn("实现串口驱动", composed)
@@ -89,10 +89,8 @@ class ContextComposerTests(unittest.TestCase):
 
     def test_budget_trims_only_low_layers(self):
         task_id = self._make_task(payload={"blob": "x" * 5000})
-        composed, report = self.service.compose_context("m_ctx", "做任务", task_id=task_id, budgets={"L1": 200})
-        self.assertIn("L1", report.trimmed)
-        self.assertIn("【L0 当前指令】", composed)  # L0 永不裁剪
-        self.assertIn("做任务", composed)
+        with self.assertRaisesRegex(ValueError, "context_budget_too_small"):
+            self.service.compose_context("m_ctx", "做任务", task_id=task_id, budgets={"L1": 200})
 
     def test_instruction_required(self):
         with self.assertRaises(ValueError):
@@ -124,7 +122,11 @@ class ProviderTaskContextTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_start_uses_composed_context_and_persists_it(self):
-        result = self.service.start_provider_task("m_p", "执行任务指令")
+        task_id = self.service.store.create_task(self.service.store.create_session("solo", "m_p", None, {}), "执行任务指令", assignee_id="m_p")
+        self.service.store.transition_task(task_id, 1, "ready", "context-compose-ready")
+        lease = self.service.store.claim_task(task_id, "m_p", internal=True)
+        self.service.store.transition_task(task_id, lease["revision"], "running", "context-compose-running")
+        result = self.service.start_provider_task("m_p", "执行任务指令", task_id=task_id)
         self.assertEqual(result["status"], "running")
         ctx = result["context_report"]
         self.assertEqual(ctx["member_id"], "m_p")
@@ -133,7 +135,7 @@ class ProviderTaskContextTests(unittest.TestCase):
         self.assertEqual(consumed["status"], "completed")
         self.assertIn("【L0 当前指令】", consumed["text"])
         self.assertIn("执行任务指令", consumed["text"])
-        self.assertIn("【L4 身份与职责】", consumed["text"])
+        self.assertIn("【身份与权限】", consumed["text"])
 
     def test_context_report_audited_via_event(self):
         task_id = self.service.store.create_task(self.service.store.create_session("solo", "m_p", None, {}), "标题", assignee_id="m_p")
@@ -165,7 +167,7 @@ class NaturalLanguageGoalTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_submit_goal_creates_task_and_starts_real_provider(self):
-        result = self.service.submit_goal("分析这个目标", member_id="m_goal")
+        result = self.service.submit_goal("分析这个目标", member_id="m_goal", problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         self.assertEqual(result["session"]["mode"], "solo")
         self.assertEqual(result["assignee_id"], "m_goal")
         self.assertEqual(result["execution"]["status"], "running")
@@ -186,11 +188,13 @@ def test_window_budget_preserves_instruction_and_reports_exact_characters(tmp_pa
         service.add_member("m_window", "窗口成员", role="工程师", responsibilities=["职责" * 200], persona={"persona": "人格" * 1000})
         task_id = service.store.create_task(service.store.create_session("solo", "m_window", None, {}), "任务", assignee_id="m_window", payload={"blob": "任务" * 1000})
         instruction = "保持完整指令：" + "重要" * 100
-        composed, report = service.compose_context("m_window", instruction, task_id=task_id, budgets={"WINDOW": 320, "L1": 1200, "L2": 1200, "L3": 1200, "L4": 1200, "TOOLS": 1200})
+        with pytest.raises(ValueError, match="context_budget_too_small"):
+            service.compose_context("m_window", instruction, task_id=task_id, budgets={"WINDOW": 320, "L1": 1200})
+        composed, report = service.compose_context("m_window", instruction, task_id=task_id, budgets={"WINDOW": 5000, "L1": 4000})
         assert "【L0 当前指令】\n" + instruction in composed
         assert report.budget_chars["total"] == len(composed)
         assert report.budget_chars["F"] + report.budget_chars["M"] + report.budget_chars["T"] + report.budget_chars["S"] == len(composed)
-        assert len(composed) <= 320
+        assert len(composed) <= 5000
         assert report.budget_chars["fits_window"] is True
     finally:
         service.close()
@@ -211,11 +215,12 @@ def test_json_sections_remain_valid_with_unicode_truncation(tmp_path):
     try:
         service.add_member("m_json", "中文" * 60, role="角色" * 60, responsibilities=["职责" * 60], persona={"persona": "人格" * 60})
         task_id = service.store.create_task(service.store.create_session("solo", "m_json", None, {}), "标题" * 80, assignee_id="m_json", payload={"内容": "值" * 500})
-        composed, report = service.compose_context("m_json", "指令", task_id=task_id, budgets={"L1": 80, "L4": 80})
-        for label in ("【L1 当前任务】", "【L4 身份与职责】"):
-            section = composed.split(label + "\n", 1)[1].split("\n\n", 1)[0]
-            assert json.loads(section)["truncated"] is True
-        assert {"L1", "L4"}.issubset(report.trimmed)
+        with pytest.raises(ValueError, match="context_budget_too_small"):
+            service.compose_context("m_json", "指令", task_id=task_id, budgets={"L1": 80, "L4": 80})
+        composed, report = service.compose_context("m_json", "指令", task_id=task_id, budgets={"L1": 2000, "L4": 80})
+        section = composed.split("【L1 当前任务】\n", 1)[1].split("\n\n", 1)[0]
+        assert json.loads(section)["payload"]["内容"] == "值" * 500
+        assert "L1" not in report.trimmed
     finally:
         service.close()
 

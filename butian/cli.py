@@ -18,6 +18,13 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     sub.add_parser("init")
     serve = sub.add_parser("serve"); serve.add_argument("--host", default="127.0.0.1"); serve.add_argument("--port", type=int, default=8765)
     sub.add_parser("mcp")
+    executor = sub.add_parser("executor").add_subparsers(dest="executor_command", required=True)
+    epair = executor.add_parser("pair"); epair.add_argument("--executor-id", required=True)
+    erun = executor.add_parser("serve"); erun.add_argument("--port", type=int, default=8766); erun.add_argument("--self-test", action="store_true")
+    etest = executor.add_parser("self-test"); etest.set_defaults(self_test=True)
+    budget = sub.add_parser("exploration-budget").add_subparsers(dest="budget_command", required=True)
+    bget = budget.add_parser("get"); bget.add_argument("--member-id")
+    bset = budget.add_parser("set"); bset.add_argument("--member-id"); bset.add_argument("--max-cost", type=float, required=True); bset.add_argument("--max-actions", type=int, required=True); bset.add_argument("--max-risk", type=float, required=True); bset.add_argument("--window-seconds", type=float, required=True)
     member = sub.add_parser("member").add_subparsers(dest="member_command", required=True)
     add = member.add_parser("add"); add.add_argument("member_id"); add.add_argument("name"); add.add_argument("--role", default="member"); add.add_argument("--model")
     hypothesis = sub.add_parser("hypothesis").add_subparsers(dest="hypothesis_command", required=True)
@@ -71,6 +78,9 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     args = parser.parse_args(argv)
     runtime_home = Path(home_dir) if home_dir is not None else home()
     path = runtime_home / "team.db"
+    if args.command == "executor":
+        from .runtime.executor_cli import run_executor
+        return run_executor(args, runtime_home)
     if args.command == "init":
         Store(path).close(); emit({"initialized": str(path)}); return 0
     if args.command == "serve":
@@ -79,9 +89,29 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     if args.command == "mcp":
         from .mcp_server import run
         run(runtime_home); return 0
-    if args.command in {"hypothesis", "source", "claim", "evidence", "memory", "experiment", "evolution", "migrate", "session", "task", "dispatcher", "tool-issue"}:
+    if args.command in {"exploration-budget", "hypothesis", "source", "claim", "evidence", "memory", "experiment", "evolution", "migrate", "session", "task", "dispatcher", "tool-issue"}:
         service = ButianService(runtime_home)
         try:
+            if args.command == "exploration-budget":
+                from .runtime.exploration_budget import ExplorationBudget
+                if args.member_id and not service.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (args.member_id,)).fetchone():
+                    raise ValueError("member_not_found")
+                with service.store._write_lock:
+                    db = service.store.db
+                    ledger = ExplorationBudget(db)
+                    if args.budget_command == "set":
+                        db.execute("SAVEPOINT budget_configuration")
+                        try:
+                            result = ledger.configure(max_cost=args.max_cost, max_actions=args.max_actions, max_risk=args.max_risk, window_seconds=args.window_seconds, owner=args.member_id)
+                            service.store.append_event(args.member_id or "__team__", "exploration_budget_configured", dict(result, owner=args.member_id), "budget-config:" + __import__("uuid").uuid4().hex)
+                            db.execute("RELEASE budget_configuration")
+                        except BaseException:
+                            db.execute("ROLLBACK TO budget_configuration")
+                            db.execute("RELEASE budget_configuration")
+                            raise
+                    else:
+                        result = ledger.policy(args.member_id)
+                    emit(result); return 0
             if args.command == "session" and args.session_command == "create":
                 emit(service.create_session(args.mode, args.dispatcher, args.requested_model, None, current_member_id=args.current_member)); return 0
             if args.command == "session" and args.session_command == "switch":

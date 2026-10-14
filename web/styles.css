@@ -5,3 +5,6 @@
 .result-json{white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;background:#f4f7f8;padding:14px;border:1px solid var(--line);font-size:11px}.action-form input[type=number]{font-variant-numeric:tabular-nums}
 
 .text-button{border:0;background:transparent;color:var(--blue);cursor:pointer;font:inherit;padding:4px}.text-button:hover{text-decoration:underline}
+
+/* Allow the flex content area to shrink to the viewport; wide tables scroll locally. */
+.main{min-width:0}.field{min-width:0}.field textarea{min-width:0;width:100%;max-width:100%;box-sizing:border-box}.section-title{gap:8px;flex-wrap:wrap}.task-name{min-width:0;overflow-wrap:anywhere}

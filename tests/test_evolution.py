@@ -194,3 +194,49 @@ def _run_all():
 
 if __name__ == "__main__":
     _run_all()
+
+import pytest
+
+@pytest.mark.parametrize('metrics', [{'cost': float('nan')}, {'cost': float('inf')}, {'risk': True}, {'expected_information_gain': float('inf')}, {'authorized': 1}, {'authorized': 'false'}])
+def test_dream_schedule_rejects_invalid_authorization_metrics(tmp_path, metrics):
+    service = ButianService(tmp_path)
+    try:
+        _seed(service)
+        run = service.dream_run('m1', min_fragments=1, min_interval=0)
+        hypothesis = service.dream_propose_hypothesis('m1', run['candidate_id'], 'bounded claim', prior_reliability=0.4, argument='candidate')['hypothesis_id']
+        args = dict(cost=1, risk=0.1, expected_information_gain=1, authorized=False)
+        args.update(metrics)
+        with pytest.raises(ValueError, match='invalid_verification_action_metrics'):
+            service.dream_schedule_verification('m1', hypothesis, 'bounded check', **args)
+        memory = service.memory('m1')
+        try:
+            assert memory.db.execute('SELECT COUNT(*) FROM verification_actions').fetchone()[0] == 0
+        finally:
+            memory.close()
+    finally:
+        service.close()
+
+
+def test_dream_schedule_queue_failure_rolls_back_action(tmp_path):
+    import sqlite3
+    from butian.runtime.service import ButianService
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('m1', 'Worker')
+        memory = service.memory('m1')
+        try:
+            from butian.runtime.dream import DreamRunner
+            DreamRunner(memory)
+            memory.db.execute("INSERT INTO hypotheses(hypothesis_id,candidate_id,statement,prior_reliability,argument,status,created_at,updated_at) VALUES ('atomic-hyp','candidate','bounded',0.2,'bounded','candidate',1,1)")
+            memory.db.execute("CREATE TRIGGER reject_queue BEFORE INSERT ON verification_queue BEGIN SELECT RAISE(ABORT,'queue unavailable'); END")
+        finally:
+            memory.close()
+        with pytest.raises(sqlite3.IntegrityError, match='queue unavailable'):
+            service.dream_schedule_verification('m1', 'atomic-hyp', 'bounded check', cost=1, risk=0, expected_information_gain=1, authorized=True)
+        memory = service.memory('m1')
+        try:
+            assert memory.db.execute('SELECT COUNT(*) FROM verification_actions').fetchone()[0] == 0
+        finally:
+            memory.close()
+    finally:
+        service.close()

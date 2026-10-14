@@ -1,4 +1,5 @@
 import hashlib
+import pytest
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -16,6 +17,9 @@ def test_source_hash_verification_and_claim_criteria():
             assert store.verify_source_content(source_id, content)['status'] == 'verified'
             assert store.verify_source_content(source_id, 'changed')['status'] == 'hash_mismatch'
             claim_id = store.add_claim(source_id, 'Claim A', confidence=.6, predictions=['P1'], falsifiers=['F1'])
+            with pytest.raises(ValueError, match='knowledge_source_hash_mismatch'):
+                store.claim_as_prior(claim_id)
+            assert store.verify_source_content(source_id, content)['status'] == 'verified'
             prior = store.claim_as_prior(claim_id)
             assert prior['predictions'] == ['P1'] and prior['falsifiers'] == ['F1']
             assert store.get_claim(claim_id)['status'] == 'candidate'

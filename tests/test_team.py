@@ -77,11 +77,11 @@ class TeamGoalHttpTests(unittest.TestCase):
             except urlerror.HTTPError as exc:
                 return exc.code, json.loads(exc.read())
         try:
-            status, created = post("/api/goals/submit", {"goal": "目标", "mode": "team", "member_id": "m0", "member_ids": ["m1"]})
+            status, created = post("/api/goals/submit", {"problem": {"acceptance_criteria": ["子任务须产生证据并经过审核"]}, "goal": "目标", "mode": "team", "member_id": "m0", "member_ids": ["m1"], "subtasks": ["核验目标数据并保存证据"]})
             self.assertEqual(status, 201)
             self.assertEqual(len(created["data"]["children"]), 1)
             self.assertEqual(created["data"]["children"][0]["member_id"], "m1")
-            status, created = post("/api/goals/submit", {"goal": "联合评估", "mode": "team", "member_id": "m0", "member_ids": ["m1"], "subtasks": ["验证数据"]})
+            status, created = post("/api/goals/submit", {"problem": {"acceptance_criteria": ["子任务须产生证据并经过审核"]}, "goal": "联合评估", "mode": "team", "member_id": "m0", "member_ids": ["m1"], "subtasks": ["验证数据"]})
             self.assertEqual(status, 201)
             task_id = created["data"]["task_id"]
             status, result = post("/api/goals/run-team", {"task_id": task_id, "actor_member_id": "m0"})
@@ -255,7 +255,7 @@ class NaturalLanguageTeamGoalTests(unittest.TestCase):
             svc.add_member("m0", "派活者", provider_id="local-command", model_id="local-command")
             svc.add_member("m1", "执行一", provider_id="local-command", model_id="local-command")
             svc.add_member("m2", "执行二", provider_id="local-command", model_id="local-command")
-            result = svc.submit_goal("完成联合评估", mode="team", member_id="m0", member_ids=["m1", "m2"], subtasks=["分析信号", "审核边界"])
+            result = svc.submit_goal("完成联合评估", mode="team", member_id="m0", member_ids=["m1", "m2"], subtasks=["分析信号", "审核边界"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
             self.assertEqual(result["status"], "dispatched")
             self.assertEqual([x["member_id"] for x in result["children"]], ["m1", "m2"])
             tasks = {x["task_id"]: x for x in svc.store.list_tasks()}
@@ -276,25 +276,26 @@ class NaturalLanguageTeamGoalTests(unittest.TestCase):
             svc.close()
             svc = ButianService(home)
             with self.assertRaisesRegex(ValueError, "subtasks_member_count_mismatch"):
-                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["一", "二"])
+                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["一", "二"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
             self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
             self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 0)
         finally:
             svc.close()
 
-    def test_team_goal_generates_deterministic_plan_when_omitted(self):
+    def test_team_goal_uses_dispatcher_domain_plan_when_omitted(self):
         home = Path(tempfile.mkdtemp(prefix="butian_team_goal_auto_"))
-        command = [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"]
+        command = [sys.executable, "-c", "import sys,json; sys.stdin.read(); print(json.dumps({'subtasks':['核验目标数据并保存原始证据']}))"]
         (home / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
         svc = ButianService(home)
         try:
-            svc.add_member("m0", "派活者")
+            svc.add_member("m0", "派活者", provider_id="local-command", model_id="local-command")
             svc.add_member("m1", "执行一", provider_id="local-command", model_id="local-command")
-            result = svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"])
+            result = svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
             self.assertEqual(result["status"], "dispatched")
             self.assertEqual(len(result["children"]), 1)
             child = next(task for task in svc.store.list_tasks() if task["task_id"] == result["children"][0]["task_id"])
-            self.assertIn("目标", child["title"])
+            self.assertEqual(child["title"], "核验目标数据并保存原始证据")
+            self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM events WHERE event_type='team_plan_generated'").fetchone()[0], 1)
             self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 1)
             self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 2)
         finally:
@@ -306,7 +307,7 @@ class NaturalLanguageTeamGoalTests(unittest.TestCase):
             svc.add_member("m0", "派活者")
             svc.add_member("m1", "执行一")
             with self.assertRaisesRegex(ValueError, "provider_unavailable"):
-                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["具体工作"])
+                svc.submit_goal("目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["具体工作"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
             self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0], 0)
             self.assertEqual(svc.store.db.execute("SELECT COUNT(*) FROM tasks").fetchone()[0], 0)
         finally:
@@ -320,9 +321,9 @@ class TeamGoalExecutionTests(unittest.TestCase):
         (home / "providers.json").write_text(json.dumps({"providers": [{"type": "local-command", "command": command}]}), encoding="utf-8")
         svc = ButianService(home)
         try:
-            svc.add_member("m0", "派活者")
+            svc.add_member("m0", "派活者", provider_id="local-command", model_id="local-command")
             svc.add_member("m1", "执行一", provider_id="local-command", model_id="local-command")
-            result = svc.submit_goal("联合目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["子目标甲"])
+            result = svc.submit_goal("联合目标", mode="team", member_id="m0", member_ids=["m1"], subtasks=["子目标甲"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
             run = svc.run_team_goal(result["task_id"])
             self.assertEqual(run["children"][0]["status"], "review")
             child_id = run["children"][0]["task_id"]
@@ -403,7 +404,7 @@ def test_team_goal_uses_sqlite_row_assignee_when_child_completes(tmp_path):
     try:
         service.add_member("dispatcher", "派活者", provider_id="local-command", model_id="local-command")
         service.add_member("worker", "执行者", provider_id="local-command", model_id="local-command")
-        result = service.submit_goal("团队验证", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["完成实际验证"])
+        result = service.submit_goal("团队验证", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["完成实际验证"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         child = result["children"][0]
         session = service.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=?", (child["task_id"],)).fetchone()
         output = service.run_team_goal(result["task_id"])
@@ -419,7 +420,7 @@ def test_real_provider_rework_receives_review_notes(tmp_path):
     try:
         service.add_member("dispatcher", "Dispatcher")
         service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
-        goal = service.submit_goal("review-loop", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["initial instruction"])
+        goal = service.submit_goal("review-loop", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["initial instruction"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         service.run_team_goal(goal["task_id"])
         child_id = goal["children"][0]["task_id"]
         child = next(t for t in service.store.list_tasks() if t["task_id"] == child_id)
@@ -428,7 +429,8 @@ def test_real_provider_rework_receives_review_notes(tmp_path):
         assert "REWORK_REQUIRED_unique_add_boundary_evidence" in rerun["children"][0]["text"]
         child = next(t for t in service.store.list_tasks() if t["task_id"] == child_id)
         service.review_task(child_id, child["revision"], "approve", reviewer_member_id="dispatcher")
-        assert service.run_team_goal(goal["task_id"])["status"] == "review"
+        assert service.run_team_goal(goal["task_id"])["status"] == "awaiting_external_execution"
+        assert service.store.db.execute("SELECT status FROM tasks WHERE task_id=?", (goal["task_id"],)).fetchone()[0] == "running"
     finally:
         service.close()
 
@@ -439,7 +441,7 @@ def test_real_solo_provider_error_does_not_leave_task_running(tmp_path):
     service = ButianService(tmp_path)
     try:
         service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
-        goal = service.submit_goal("failure", member_id="worker")
+        goal = service.submit_goal("failure", member_id="worker", problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         result = service.consume_provider_task(goal["execution"]["provider_session_id"])
         assert result["status"] == "unknown"
         task = service.store.db.execute("SELECT status,payload,lease_id FROM tasks WHERE task_id=?", (goal["task_id"],)).fetchone()
@@ -457,7 +459,7 @@ def test_real_team_root_rework_runs_provider_instead_of_reusing_aggregate(tmp_pa
     try:
         for member in ("dispatcher", "worker"):
             service.add_member(member, member, provider_id="local-command", model_id="local-command")
-        goal = service.submit_goal("root-review", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["child-instruction"])
+        goal = service.submit_goal("root-review", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["child-instruction"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         service.run_team_goal(goal["task_id"])
         child = next(t for t in service.store.list_tasks() if t["parent_id"] == goal["task_id"])
         service.review_task(child["task_id"], child["revision"], "approve", reviewer_member_id="dispatcher")
@@ -481,7 +483,7 @@ def test_real_team_failure_releases_lease_and_blocks_root(tmp_path):
     try:
         service.add_member("dispatcher", "Dispatcher")
         service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
-        goal = service.submit_goal("failure", mode="team", member_id="dispatcher", member_ids=["worker"])
+        goal = service.submit_goal("failure", mode="team", member_id="dispatcher", member_ids=["worker"], subtasks=["验证失败时释放执行租约"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         result = service.run_team_goal(goal["task_id"])
         child = service.store.db.execute("SELECT * FROM tasks WHERE parent_id=?", (goal["task_id"],)).fetchone()
         assert child["status"] == "unknown"
@@ -499,7 +501,7 @@ def test_terminal_provider_can_publish_persisted_output_without_reexecution(tmp_
     service = ButianService(tmp_path)
     try:
         service.add_member("worker", "Worker", provider_id="local-command", model_id="local-command")
-        goal = service.submit_goal("resume", member_id="worker")
+        goal = service.submit_goal("resume", member_id="worker", problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         pid = goal["execution"]["provider_session_id"]
         service.provider_runtime.consume(pid, service.providers.get("local-command"))
         assert service.store.provider_session(pid)["status"] == "completed"
@@ -520,11 +522,21 @@ def test_team_root_rework_without_provider_does_not_reaggregate(tmp_path):
     try:
         service.add_member('dispatcher', 'Dispatcher')
         service.add_member('worker', 'Worker', provider_id='local-command')
-        goal = service.submit_goal('root rework', mode='team', member_id='dispatcher', member_ids=['worker'])
+        goal = service.submit_goal('root rework', mode='team', member_id='dispatcher', member_ids=['worker'], subtasks=['核对原始输出并留存证据'], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         service.run_team_goal(goal['task_id'])
         child = service.store.db.execute('SELECT * FROM tasks WHERE parent_id=?', (goal['task_id'],)).fetchone()
         service.review_task(child['task_id'], child['revision'], 'approve', reviewer_member_id='dispatcher')
-        service.run_team_goal(goal['task_id'])
+        assert service.run_team_goal(goal['task_id'])['status'] == 'awaiting_external_execution'
+        package = service.export_execution(goal['task_id'], actor_member_id='dispatcher')
+        assert child['task_id'] in package['context']
+        assert '未完成' in package['context']
+        proof = tmp_path / 'dispatcher-summary.txt'
+        proof.write_text('已核对原始证据，无冲突，无未完成项', encoding='utf-8')
+        evidence = service.record_evidence(proof, owner_member_id='dispatcher', actor_member_id='dispatcher')
+        delivered = service.submit_execution(goal['task_id'], expected_revision=package['task_revision'], problem_revision=package['problem_revision'], submission_id='team-summary-1', output=proof.read_text(encoding='utf-8'), evidence_ids=[evidence], actor_member_id='dispatcher')
+        assert delivered['status'] == 'review'
+        assert service.run_team_goal(goal['task_id'])['status'] == 'review'
+        assert service.store.db.execute('SELECT COUNT(*) FROM provider_sessions WHERE task_id=?', (goal['task_id'],)).fetchone()[0] == 0
         root = service.store.db.execute('SELECT * FROM tasks WHERE task_id=?', (goal['task_id'],)).fetchone()
         service.review_task(root['task_id'], root['revision'], 'rework', reviewer_member_id='dispatcher', notes='new evidence required')
         result = service.run_team_goal(goal['task_id'])
@@ -542,7 +554,7 @@ def test_team_question_wait_does_not_consume_previous_execution(tmp_path):
     try:
         service.add_member('dispatcher', 'Dispatcher')
         service.add_member('worker', 'Worker', provider_id='local-command')
-        goal = service.submit_goal('question wait', mode='team', member_id='dispatcher', member_ids=['worker'])
+        goal = service.submit_goal('question wait', mode='team', member_id='dispatcher', member_ids=['worker'], subtasks=['获取用户输入后完成验证'], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         child = service.store.db.execute('SELECT * FROM tasks WHERE parent_id=?', (goal['task_id'],)).fetchone()
         qid = service.ask_user(child['task_id'], child['revision'], 'worker', 'input required')
         result = service.run_team_goal(goal['task_id'])
@@ -570,11 +582,37 @@ def test_partial_team_start_failure_returns_recoverable_goal(tmp_path, monkeypat
                 raise RuntimeError('startup unavailable')
             return original(member, *args, **kwargs)
         monkeypatch.setattr(service, 'start_provider_task', start)
-        goal = service.submit_goal('partial dispatch', mode='team', member_id='dispatcher', member_ids=['worker-a', 'worker-b'])
+        goal = service.submit_goal('partial dispatch', mode='team', member_id='dispatcher', member_ids=['worker-a', 'worker-b'], subtasks=['核验证据甲', '核验证据乙'], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         assert goal['status'] == 'partial_dispatch'
         children = service.store.db.execute('SELECT * FROM tasks WHERE parent_id=? ORDER BY rowid', (goal['task_id'],)).fetchall()
         assert [row['status'] for row in children] == ['running', 'unknown']
         assert children[1]['lease_id'] is None
         assert service.run_team_goal(goal['task_id'])['status'] == 'blocked'
+    finally:
+        service.close()
+
+def test_initial_team_summary_runs_dispatcher_on_child_evidence(tmp_path):
+    command = [sys.executable, '-c', "import sys; data=sys.stdin.read(); print('DISPATCHER_SYNTHESIS:' + data)"]
+    (tmp_path / 'providers.json').write_text(json.dumps({'providers': [{'type': 'local-command', 'command': command}]}), encoding='utf-8')
+    service = ButianService(tmp_path)
+    try:
+        for member in ('dispatcher', 'worker'):
+            service.add_member(member, member, provider_id='local-command', model_id='local-command')
+        goal = service.submit_goal('综合测量与边界', mode='team', member_id='dispatcher', member_ids=['worker'], subtasks=['核对测量证据'], problem={'acceptance_criteria': ['汇总结论必须引用子任务证据与未完成项']})
+        service.run_team_goal(goal['task_id'])
+        child = next(t for t in service.store.list_tasks() if t['parent_id'] == goal['task_id'])
+        service.review_task(child['task_id'], child['revision'], 'approve', reviewer_member_id='dispatcher')
+        service.run_team_goal(goal['task_id'])
+        execution = service.store.db.execute('SELECT * FROM provider_sessions WHERE task_id=?', (goal['task_id'],)).fetchone()
+        assert execution is not None, 'parent review must follow dispatcher execution, not JSON concatenation'
+        assert execution['status'] == 'completed'
+        root = next(t for t in service.store.list_tasks() if t['task_id'] == goal['task_id'])
+        payload = json.loads(root['payload'])
+        assert root['status'] == 'review'
+        assert 'DISPATCHER_SYNTHESIS:' in payload['provider_output']
+        assert child['task_id'] in payload['provider_output']
+        assert '未完成' in payload['provider_output']
+        assert service.run_team_goal(goal['task_id'])['status'] == 'review'
+        assert service.store.db.execute('SELECT COUNT(*) FROM provider_sessions WHERE task_id=?', (goal['task_id'],)).fetchone()[0] == 1
     finally:
         service.close()

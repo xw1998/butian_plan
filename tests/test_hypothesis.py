@@ -327,3 +327,30 @@ def test_stable_hypothesis_member_failure_recovers_once(tmp_path, monkeypatch):
         assert service.store.list_member_memory_outbox()[0]['status'] == 'committed'
     finally:
         service.close()
+
+def test_grant_authorization_rejects_non_boolean(tmp_path):
+    import pytest
+    from butian.runtime.service import ButianService
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('user', 'User')
+        hypothesis = service.hypotheses.propose('hardware_hypothesis', 'bounded check', rationale='bounded', assessment=service.hypotheses.assess(['skill']), owner_member_id='user')
+        action = service.hypotheses.authorize(hypothesis, 'run check', cost=1, risk=0.1, information_gain=1, owner_member_id='user')
+        with pytest.raises(ValueError, match='authorization_must_be_bool'):
+            service.hypotheses.grant_authorization(action, actor_member_id='user', reason='bad type', authorized=1, owner_member_id='user')
+    finally:
+        service.close()
+
+
+@pytest.mark.parametrize('metrics', [dict(cost=True), dict(risk=True), dict(information_gain=True), dict(cost='1')])
+def test_authorize_rejects_non_numeric_metrics(tmp_path, metrics):
+    service = ButianService(tmp_path)
+    try:
+        hypothesis = service.hypotheses.propose('hardware_hypothesis', 'bounded claim', rationale='bounded', assessment=service.hypotheses.assess(['skill']))
+        args = dict(cost=1, risk=0.1, information_gain=1)
+        args.update(metrics)
+        with pytest.raises(ValueError, match='invalid_verification_metrics'):
+            service.hypotheses.authorize(hypothesis, 'bounded check', **args)
+        assert service.store.db.execute('SELECT COUNT(*) FROM hypothesis_actions').fetchone()[0] == 0
+    finally:
+        service.close()

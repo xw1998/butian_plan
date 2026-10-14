@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -26,6 +27,7 @@ class ContextReport:
     layers: dict[str, int] = field(default_factory=dict)
     trimmed: list[str] = field(default_factory=list)
     recalled_memory_ids: list[str] = field(default_factory=list)
+    recalled_memory_hashes: dict[str, str] = field(default_factory=dict)
     no_match: bool = True
     tools_included: int = 0
     tools_omitted: int = 0
@@ -42,6 +44,7 @@ class ContextReport:
             "layers": self.layers,
             "trimmed": self.trimmed,
             "recalled_memory_ids": self.recalled_memory_ids,
+            "recalled_memory_hashes": self.recalled_memory_hashes,
             "no_match": self.no_match,
             "tools_included": self.tools_included,
             "tools_omitted": self.tools_omitted,
@@ -71,7 +74,7 @@ class ContextComposer:
         }
 
     def task_package(self, task_id: str) -> dict[str, Any] | None:
-        row = self.store.db.execute("SELECT task_id, parent_id, session_id, title, status, assignee_id, revision, payload FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        row = self.store.db.execute("SELECT task_id, parent_id, session_id, title, status, assignee_id, revision, payload, authorization_snapshot FROM tasks WHERE task_id=?", (task_id,)).fetchone()
         if not row:
             return None
         return {
@@ -83,11 +86,12 @@ class ContextComposer:
             "assignee_id": row["assignee_id"],
             "revision": row["revision"],
             "payload": json.loads(row["payload"] or "{}"),
+            "authorization_snapshot": json.loads(row["authorization_snapshot"] or "{}"),
         }
 
     def recent_events(self, aggregate_id: str, *, limit: int = 5) -> list[dict[str, Any]]:
         rows = self.store.db.execute(
-            "SELECT event_type, payload, created_at FROM events WHERE aggregate_id=? ORDER BY seq DESC LIMIT ?",
+            "SELECT event_type, payload, created_at FROM events WHERE aggregate_id=? AND commit_state='committed' ORDER BY seq DESC LIMIT ?",
             (aggregate_id, limit),
         ).fetchall()
         return [{"event_type": row["event_type"], "payload": json.loads(row["payload"]), "created_at": row["created_at"]} for row in reversed(rows)]
@@ -171,12 +175,67 @@ class ContextComposer:
         l0 = "【L0 当前指令】\n" + instruction.strip()
         layer_values: dict[str, str | None] = {"L1": None, "L2": None, "L3": None, "L4": None}
         if task:
-            text = self._json_section("【L1 当前任务】", task)
-            layer_values["L1"] = self._compact_json_section("【L1 当前任务】", task, budget["L1"]) if len(text) > budget["L1"] else text
+            task_view = {key: value for key, value in task.items() if key != "authorization_snapshot"}
+            text = self._json_section("【L1 当前任务】", task_view)
             if len(text) > budget["L1"]:
-                report.trimmed.append("L1")
+                # Keep the current state intact; completed outputs remain recoverable
+                # through the persisted task and its artifact/evidence references.
+                payload = dict(task["payload"])
+                omitted = {}
+                for key in ("provider_output", "results", "dream_source_snapshot", "candidate_content"):
+                    if key in payload:
+                        value = payload.pop(key)
+                        encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+                        omitted[key] = {"sha256": hashlib.sha256(encoded.encode()).hexdigest(), "characters": len(encoded), "recover_from": "tasks.payload", "task_id": task_id, "recover_tool": "butian_context_recover", "payload_field": key}
+                if omitted:
+                    payload["context_omitted_fields"] = omitted
+                    text = self._json_section("【L1 当前任务】", {**task_view, "payload": payload})
+                    report.trimmed.append("L1")
+                if len(text) > budget["L1"]:
+                    raise ValueError("context_budget_too_small")
+            layer_values["L1"] = text
+        # Corrections and decisions remain authoritative after ordinary event churn.
+        # Recover them from committed storage rather than the recent-event tail.
+        protected_events = []
+        if task_id:
+            rows = self.store.db.execute(
+                "SELECT event_type,payload,created_at FROM events WHERE aggregate_id=? "
+                "AND commit_state='committed' AND event_type IN "
+                "('user_correction','problem_model_revised','decision_recorded') ORDER BY seq",
+                (task_id,),
+            ).fetchall()
+            protected_events = [{"event_type": row["event_type"], "payload": json.loads(row["payload"]), "created_at": row["created_at"]} for row in rows]
+        if task_id:
+            questions = self.store.db.execute(
+                "SELECT question_id,revision,member_id,question,created_at FROM questions WHERE task_id=? AND status='open' ORDER BY created_at,question_id",
+                (task_id,),
+            ).fetchall()
+            protected_events.extend({"event_type": "unresolved_user_question", "payload": {key: row[key] for key in ("question_id", "revision", "member_id", "question")}, "created_at": row["created_at"]} for row in questions)
+        for event in protected_events:
+            if event not in events:
+                events.append(event)
+        events.sort(key=lambda event: event["created_at"])
+        correction_events = protected_events
         if events:
             text = self._json_section("【L2 近期事件】", events)
+            if correction_events and len(text) > budget["L2"]:
+                # Required state takes precedence over ordinary event payloads.
+                # Persisted history is recoverable; never truncate a correction.
+                selected = list(correction_events)
+                history_rows = self.store.db.execute(
+                    "SELECT event_id FROM events WHERE aggregate_id=? AND commit_state='committed' ORDER BY seq DESC LIMIT 5", (task_id,)
+                ).fetchall()
+                recovery = {"recover_tool": "butian_context_recover", "task_id": task_id, "recover_from": "events", "event_ids": [row["event_id"] for row in reversed(history_rows)]}
+                def event_view(items):
+                    return self._json_section("【L2 近期事件】", {"events": sorted(items, key=lambda event: event["created_at"]), "omitted_history": recovery})
+                text = event_view(selected)
+                if len(text) > budget["L2"]:
+                    raise ValueError("context_budget_too_small")
+                for event in reversed(events):
+                    if event not in selected and len(event_view(selected + [event])) <= budget["L2"]:
+                        selected.append(event)
+                text = event_view(selected)
+                report.trimmed.append("L2")
             layer_values["L2"] = self._compact_json_section("【L2 近期事件】", {"events": events}, budget["L2"]) if len(text) > budget["L2"] else text
             if len(text) > budget["L2"]:
                 report.trimmed.append("L2")
@@ -194,9 +253,21 @@ class ContextComposer:
                 report.memory_omitted = len(memories) - len(selected)
             if selected:
                 layer_values["L3"] = self._memory_section(selected)
-        layer_values["L4"] = self._persona_section(persona, budget["L4"])
-        if len(self._json_section("【L4 身份与职责】", {key: value for key, value in persona.items() if value})) > budget["L4"]:
-            report.trimmed.append("L4")
+        policy = self.store.db.execute("SELECT tool_policy FROM members WHERE member_id=?", (member_id,)).fetchone()
+        identity = self._json_section("【身份与权限】", {**persona, "tool_policy": task["authorization_snapshot"].get("tool_policy", {}) if task else (json.loads(policy[0] or "{}") if policy else {}), "authorization": "工具调用仍须通过运行时授权与撤销校验"})
+        if task_id:
+            history = self.store.db.execute("SELECT event_id,event_type,seq,created_at FROM events WHERE aggregate_id=? AND commit_state='committed' ORDER BY seq DESC LIMIT 20 OFFSET 5", (task_id,)).fetchall()
+            entries = [{**dict(row), "recover_from": "events", "aggregate_id": task_id, "recover_tool": "butian_context_recover", "task_id": task_id} for row in reversed(history)]
+            if entries:
+                selected_history = []
+                for item in reversed(entries):
+                    candidate = [item] + selected_history
+                    if len(self._json_section("【L4 历史索引】", candidate)) > budget["L4"]:
+                        report.trimmed.append("L4")
+                        break
+                    selected_history = candidate
+                if selected_history:
+                    layer_values["L4"] = self._json_section("【L4 历史索引】", selected_history)
 
         cards = []
         if include_tools and self.tool_store is not None:
@@ -221,7 +292,7 @@ class ContextComposer:
                 report.trimmed.append("TOOLS")
 
         def assemble() -> tuple[list[str], int]:
-            sections = [l0]
+            sections = [l0, identity]
             sections.extend(value for value in (layer_values["L1"], layer_values["L2"], layer_values["L3"]) if value)
             sections.extend(header_and_cards)
             if layer_values["L4"]:
@@ -232,7 +303,7 @@ class ContextComposer:
         sections, total_chars = assemble()
         if window is not None and total_chars > window:
             # Degrade in declared low-priority order; L0 is never changed.
-            for key in ("L4", "L3", "L2", "L1", "TOOLS"):
+            for key in ("L4", "L3", "L2", "TOOLS"):
                 if total_chars <= window:
                     break
                 if key == "TOOLS":
@@ -243,6 +314,8 @@ class ContextComposer:
                         if "TOOLS" not in report.trimmed:
                             report.trimmed.append("TOOLS")
                 elif layer_values[key] is not None:
+                    if key == "L2" and correction_events:
+                        raise ValueError("context_budget_too_small")
                     layer_values[key] = None
                     if key not in report.trimmed:
                         report.trimmed.append(key)
@@ -252,16 +325,18 @@ class ContextComposer:
 
         visible_memories = selected if memories and layer_values["L3"] is not None else []
         report.recalled_memory_ids = [item["memory_id"] for item in visible_memories]
+        report.recalled_memory_hashes = {item['memory_id']: hashlib.sha256(item['content'].encode('utf-8')).hexdigest() for item in visible_memories}
         report.memory_omitted = len(memories) - len(visible_memories)
 
         for key, value in layer_values.items():
             if value is not None:
                 report.layers[key] = len(value)
         report.layers["L0"] = len(l0)
+        report.layers["IDENTITY"] = len(identity)
         report.layers["TOOLS"] = sum(len(value) for value in header_and_cards)
         separators = max(0, len(sections) - 1) * 2
         report.budget_chars = {
-            "F": len(l0),
+            "F": len(l0) + len(identity),
             "M": sum(len(value) for key, value in layer_values.items() if key != "L0" and value is not None),
             "T": report.layers["TOOLS"],
             "S": separators,

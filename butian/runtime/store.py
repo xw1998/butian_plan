@@ -6,6 +6,7 @@ import sqlite3
 import time
 import uuid
 import threading
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,8 @@ class Store:
         self._write_lock = threading.RLock()
         self.db.executescript(SCHEMA)
         self._migrate_columns()
+        from .planning_execution import initialize
+        initialize(self)
 
     def _migrate_columns(self) -> None:
         member_columns = {row[1] for row in self.db.execute("PRAGMA table_info(members)")}
@@ -67,6 +70,8 @@ class Store:
             self.db.execute("ALTER TABLE members ADD COLUMN strategy_version INTEGER NOT NULL DEFAULT 1")
             self.db.execute("ALTER TABLE members ADD COLUMN strategy_stages TEXT NOT NULL DEFAULT '[]'")
         task_columns = {row[1] for row in self.db.execute("PRAGMA table_info(tasks)")}
+        if "authorization_snapshot" not in task_columns:
+            self.db.execute("ALTER TABLE tasks ADD COLUMN authorization_snapshot TEXT NOT NULL DEFAULT '{}'")
         if "strategy_snapshot" not in task_columns:
             self.db.execute("ALTER TABLE tasks ADD COLUMN strategy_snapshot TEXT NOT NULL DEFAULT '{}'")
         provider_columns = {row[1] for row in self.db.execute("PRAGMA table_info(provider_sessions)")}
@@ -90,6 +95,8 @@ class Store:
         if "prompt" not in provider_cols:
             self.db.execute("ALTER TABLE provider_sessions ADD COLUMN prompt TEXT")
 
+        if "problem_revision" not in provider_cols:
+            self.db.execute("ALTER TABLE provider_sessions ADD COLUMN problem_revision INTEGER")
         if "task_revision" not in provider_cols:
             self.db.execute("ALTER TABLE provider_sessions ADD COLUMN task_revision INTEGER")
         task_cols = {row[1] for row in self.db.execute("PRAGMA table_info(tasks)")}
@@ -108,6 +115,10 @@ class Store:
         self.db.execute("INSERT INTO provider_sessions(provider_session_id,task_id,member_id,provider_id,model,status,last_provider_event_id,reason,created_at,updated_at,capabilities,requested_model,selection_status,remote_session_id,prompt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (session_id, task_id, member_id, provider_id, model, "running", None, None, now, now, json.dumps(capabilities or {}, ensure_ascii=False), requested_model, selection_status, remote_session_id, prompt))
         if task_id:
             self.db.execute("UPDATE provider_sessions SET task_revision=(SELECT revision FROM tasks WHERE task_id=?) WHERE provider_session_id=?", (task_id, session_id))
+        if task_id:
+            task = self.db.execute("SELECT payload FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+            model = json.loads(task["payload"]).get("problem_model", {}) if task else {}
+            self.db.execute("UPDATE provider_sessions SET problem_revision=? WHERE provider_session_id=?", (model.get("revision", 1), session_id))
         return session_id
 
     @serialized_write
@@ -180,6 +191,7 @@ class Store:
             raise ValueError("member_authentication_failed")
         lease_id = f"lease_{uuid.uuid4().hex}"; now = time.time()
         with self.db:
+            self.db.execute("BEGIN IMMEDIATE")
             row = self.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
             if not row: raise ValueError("task_not_found")
             if row["lease_until"] and row["lease_until"] > now and row["lease_id"]: raise ValueError("task_lease_held")
@@ -188,7 +200,12 @@ class Store:
                 row = self.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
             transition = __import__("butian.core.state_machine", fromlist=["transition"]).transition
             transition(__import__("butian.core.models", fromlist=["TaskStatus"]).TaskStatus(row["status"]), __import__("butian.core.models", fromlist=["TaskStatus"]).TaskStatus.CLAIMED)
-            updated = self.db.execute("UPDATE tasks SET status='claimed', assignee_id=?, lease_id=?, lease_until=?, revision=revision+1 WHERE task_id=? AND revision=?", (member_id, lease_id, now + lease_seconds, task_id, row["revision"])).rowcount
+            authorization = json.loads(row["authorization_snapshot"] or "{}")
+            # Rebinding the executor must never replace the frozen permission scope.
+            if not authorization.get("member_id"):
+                authorization = {"tool_policy": {"default": "deny", "permissions": []}, "created_at": now}
+            authorization["member_id"] = member_id
+            updated = self.db.execute("UPDATE tasks SET status='claimed', assignee_id=?, lease_id=?, lease_until=?, authorization_snapshot=?, revision=revision+1 WHERE task_id=? AND revision=?", (member_id, lease_id, now + lease_seconds, json.dumps(authorization, ensure_ascii=False), task_id, row["revision"])).rowcount
             if updated != 1:
                 raise ValueError("revision_conflict")
         return {"task_id": task_id, "lease_id": lease_id, "revision": row["revision"] + 1, "lease_until": now + lease_seconds}
@@ -278,7 +295,10 @@ class Store:
             if parent["status"] in {"done", "cancelled"}:
                 raise ValueError("parent_task_closed")
         task_id = f"task_{uuid.uuid4().hex}"
-        self.db.execute("INSERT INTO tasks(task_id,parent_id,session_id,title,status,assignee_id,revision,payload,strategy_snapshot) VALUES (?,?,?,?,?,?,?,?,?)", (task_id, parent_id, session_id, title, "todo", assignee_id, 1, json.dumps(payload or {}, ensure_ascii=False), json.dumps({}, ensure_ascii=False)))
+        owner = assignee_id or self.session(session_id)["dispatcher_member_id"]
+        member = self.db.execute("SELECT tool_policy FROM members WHERE member_id=?", (owner,)).fetchone()
+        authorization = {"member_id": owner, "tool_policy": json.loads(member[0] or "{}") if member else {}, "created_at": time.time()}
+        self.db.execute("INSERT INTO tasks(task_id,parent_id,session_id,title,status,assignee_id,revision,payload,strategy_snapshot,authorization_snapshot) VALUES (?,?,?,?,?,?,?,?,?,?)", (task_id, parent_id, session_id, title, "todo", assignee_id, 1, json.dumps(payload or {}, ensure_ascii=False), json.dumps({}, ensure_ascii=False), json.dumps(authorization, ensure_ascii=False)))
         return task_id
 
     @serialized_write
@@ -326,51 +346,86 @@ class Store:
 
     @serialized_write
     def transition_task(self, task_id: str, expected_revision: int, target: str, operation_key: str, payload: dict[str, Any] | None = None, *, question_record: tuple | None = None, rework_count: int | None = None) -> None:
+        with self._write_lock:
+            savepoint = "task_transition_" + uuid.uuid4().hex
+            self.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.db.execute("UPDATE tasks SET revision=revision WHERE 0")
+                result = self._transition_task(task_id, expected_revision, target, operation_key, payload, question_record=question_record, rework_count=rework_count)
+                self.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _transition_task(self, task_id: str, expected_revision: int, target: str, operation_key: str, payload: dict[str, Any] | None = None, *, question_record: tuple | None = None, rework_count: int | None = None) -> None:
+        request_sha256 = hashlib.sha256(json.dumps({"task_id": task_id, "expected_revision": expected_revision, "target": target, "payload": payload, "question_record": question_record, "rework_count": rework_count}, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")).hexdigest()
         existing = self.db.execute("SELECT state FROM operations WHERE idempotency_key=?", (operation_key,)).fetchone()
         if existing:
             if existing["state"] == "committed":
+                event = self.db.execute("SELECT aggregate_id,event_type,payload FROM events WHERE idempotency_key=?", (operation_key,)).fetchone()
+                event_payload = json.loads(event["payload"]) if event else {}
+                if not event or event["aggregate_id"] != task_id or event["event_type"] != "task_transition" or event_payload.get("to") != target or event_payload.get("revision") != expected_revision + 1 or event_payload.get("request_sha256") != request_sha256:
+                    raise ValueError("operation_request_conflict")
                 return
             raise ValueError("operation_incomplete_requires_recovery")
         from ..core.models import TaskStatus
         from ..core.state_machine import transition
-        row = self.db.execute("SELECT status, revision, payload FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        row = self.db.execute("SELECT status, revision, payload, parent_id, session_id, assignee_id FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if row and operation_key.startswith(('review_approve_', 'review_rework_')):
+            reviewer = (payload or {}).get('reviewer_member_id')
+            if reviewer:
+                session = self.db.execute('SELECT dispatcher_member_id FROM sessions WHERE session_id=?', (row['session_id'],)).fetchone()
+                if not self.db.execute('SELECT 1 FROM members WHERE member_id=?', (reviewer,)).fetchone():
+                    raise ValueError('reviewer_member_not_found')
+                if reviewer not in {row['assignee_id'], session['dispatcher_member_id'] if session else None}:
+                    raise ValueError('reviewer_not_authorized')
         if row:
             transition(TaskStatus(row["status"]), TaskStatus(target))
         if not row or row["revision"] != expected_revision:
             raise ValueError("revision_conflict")
+        if target in {'ready', 'claimed', 'running', 'review', 'done'}:
+            definition = json.loads(row['payload'] or '{}').get('problem_model', {})
+            if definition.get('definition_status') == 'needs_clarification':
+                raise ValueError('problem_needs_clarification')
+        if row['parent_id'] and target in {'ready', 'claimed', 'running', 'review', 'done'}:
+            child_payload = json.loads(row['payload'] or '{}')
+            if 'parent_problem_revision' in child_payload or child_payload.get('superseded_by_problem_revision'):
+                parent = self.db.execute('SELECT payload FROM tasks WHERE task_id=?', (row['parent_id'],)).fetchone()
+                parent_definition = json.loads(parent['payload'] or '{}').get('problem_model', {}) if parent else {}
+                if child_payload.get('superseded_by_problem_revision') or child_payload.get('parent_problem_revision') != parent_definition.get('revision'):
+                    raise ValueError('team_child_problem_stale')
         if target == "done":
             self._require_valid_handoff_for_done(task_id, expected_revision)
             self._require_children_done(task_id)
         operation_id = f"op_{uuid.uuid4().hex}"
         now = time.time()
-        with self._write_lock, self.db:
-            self.db.execute("BEGIN IMMEDIATE")
-            if question_record is not None:
-                if target != "waiting_user" or question_record[1:3] != (task_id, expected_revision):
-                    raise ValueError("question_transition_mismatch")
-                self.db.execute("INSERT INTO questions VALUES (?,?,?,?,?,?,?,?)", question_record)
-            if rework_count is not None:
-                if row["status"] != "review" or target != "ready":
-                    raise ValueError("rework_transition_mismatch")
-                self.db.execute("UPDATE tasks SET rework_count=? WHERE task_id=? AND revision=?", (rework_count, task_id, expected_revision))
-            self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "prepared", now, None))
-            current_payload = json.loads(row["payload"] or "{}")
-            next_payload = current_payload if payload is None else {**current_payload, **payload}
-            updated = self.db.execute("UPDATE tasks SET status=?, revision=revision+1, payload=? WHERE task_id=? AND revision=?", (target, json.dumps(next_payload, ensure_ascii=False), task_id, expected_revision)).rowcount
-            if updated != 1:
-                raise ValueError("revision_conflict")
-            if target in {"waiting_user", "review", "done", "cancelled", "failed", "unknown", "provider_lost"}:
-                self.db.execute("UPDATE tasks SET lease_id=NULL, lease_until=NULL WHERE task_id=?", (task_id,))
-            seq = self.db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events").fetchone()[0]
-            event_id = f"evt_{uuid.uuid4().hex}"
-            self.db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)", (event_id, operation_id, operation_key, task_id, "task_transition", json.dumps({"from": row["status"], "to": target, "revision": expected_revision + 1}, ensure_ascii=False), seq, now, "prepared"))
-            self.db.execute("UPDATE operations SET state='committed' WHERE operation_id=?", (operation_id,))
-            self.db.execute("UPDATE events SET commit_state='committed' WHERE operation_id=?", (operation_id,))
-            self.db.execute("COMMIT")
+        if question_record is not None:
+            if target != "waiting_user" or question_record[1:3] != (task_id, expected_revision):
+                raise ValueError("question_transition_mismatch")
+            self.db.execute("INSERT INTO questions VALUES (?,?,?,?,?,?,?,?)", question_record)
+        if rework_count is not None:
+            if row["status"] != "review" or target != "ready":
+                raise ValueError("rework_transition_mismatch")
+            self.db.execute("UPDATE tasks SET rework_count=? WHERE task_id=? AND revision=?", (rework_count, task_id, expected_revision))
+        self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "prepared", now, None))
+        current_payload = json.loads(row["payload"] or "{}")
+        next_payload = current_payload if payload is None else {**current_payload, **payload}
+        updated = self.db.execute("UPDATE tasks SET status=?, revision=revision+1, payload=? WHERE task_id=? AND revision=?", (target, json.dumps(next_payload, ensure_ascii=False), task_id, expected_revision)).rowcount
+        if updated != 1:
+            raise ValueError("revision_conflict")
+        if target in {"waiting_user", "review", "done", "cancelled", "failed", "unknown", "provider_lost"}:
+            self.db.execute("UPDATE tasks SET lease_id=NULL, lease_until=NULL WHERE task_id=?", (task_id,))
+        seq = self.db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events").fetchone()[0]
+        event_id = f"evt_{uuid.uuid4().hex}"
+        self.db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)", (event_id, operation_id, operation_key, task_id, "task_transition", json.dumps({"from": row["status"], "to": target, "revision": expected_revision + 1, "request_sha256": request_sha256, "review_binding": {key: current_payload.get(key) for key in ("memory_review_id", "memory_content_hash")} if operation_key.startswith(("review_approve_", "review_rework_")) else None}, ensure_ascii=False), seq, now, "prepared"))
+        self.db.execute("UPDATE operations SET state='committed' WHERE operation_id=?", (operation_id,))
+        self.db.execute("UPDATE events SET commit_state='committed' WHERE operation_id=?", (operation_id,))
 
     def _require_children_done(self, task_id: str) -> None:
         """父任务进入 done 前，所有未取消的子任务必须已完成。"""
-        children = self.db.execute("SELECT task_id, status FROM tasks WHERE parent_id=?", (task_id,)).fetchall()
+        children = self.db.execute("SELECT task_id, status FROM tasks WHERE parent_id=? AND COALESCE(json_extract(payload,'$.superseded_by_problem_revision'),0)=0", (task_id,)).fetchall()
         for child in children:
             if child["status"] not in {"done", "cancelled"}:
                 raise ValueError(f"children_not_done:{child['task_id']}")
@@ -401,12 +456,14 @@ class Store:
         if not event_ids:
             return False
         placeholders = ",".join("?" for _ in event_ids)
-        rows = list(self.db.execute(f"SELECT event_id, aggregate_id FROM events WHERE event_id IN ({placeholders})", event_ids))
+        rows = list(self.db.execute(f"SELECT event_id, aggregate_id FROM events WHERE commit_state='committed' AND event_id IN ({placeholders})", event_ids))
         if len(rows) != len(set(event_ids)):
             return False
         if member_id:
             for row in rows:
                 if row["aggregate_id"] == member_id:
+                    continue
+                if self.task_access(row["aggregate_id"], member_id):
                     continue
                 linked = self.db.execute("SELECT 1 FROM peer_learning WHERE learning_id=? AND (asker_id=? OR expert_id=?)", (row["aggregate_id"], member_id, member_id)).fetchone()
                 if not linked:
@@ -564,25 +621,40 @@ class Store:
 
     @serialized_write
     def append_event(self, aggregate_id: str, event_type: str, payload: dict[str, Any], operation_key: str) -> str:
-        existing = self.db.execute("SELECT event_id FROM events WHERE idempotency_key=?", (operation_key,)).fetchone()
-        if existing:
-            return existing[0]
-        event_id = f"evt_{uuid.uuid4().hex}"
-        operation_id = f"op_{uuid.uuid4().hex}"
-        seq = self.db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events").fetchone()[0]
-        self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "committed", time.time(), None))
-        self.db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)", (event_id, operation_id, operation_key, aggregate_id, event_type, json.dumps(payload, ensure_ascii=False), seq, time.time(), "committed"))
-        return event_id
+        self.db.execute("SAVEPOINT append_event")
+        try:
+            self.db.execute("UPDATE operations SET state=state WHERE 0")
+            existing = self.db.execute("SELECT event_id FROM events WHERE idempotency_key=?", (operation_key,)).fetchone()
+            if existing:
+                self.db.execute("RELEASE append_event")
+                return existing[0]
+            event_id = f"evt_{uuid.uuid4().hex}"
+            operation_id = f"op_{uuid.uuid4().hex}"
+            seq = self.db.execute("SELECT COALESCE(MAX(seq),0)+1 FROM events").fetchone()[0]
+            self.db.execute("INSERT INTO operations VALUES (?,?,?,?,?)", (operation_id, operation_key, "committed", time.time(), None))
+            self.db.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?)", (event_id, operation_id, operation_key, aggregate_id, event_type, json.dumps(payload, ensure_ascii=False), seq, time.time(), "committed"))
+            self.db.execute("RELEASE append_event")
+            return event_id
+        except BaseException:
+            self.db.execute("ROLLBACK TO append_event")
+            self.db.execute("RELEASE append_event")
+            raise
 
     @serialized_write
     def enqueue_member_memory(self, observation_id: str, member_id: str, memory_id: str, kind: str, content: str, environment: dict[str, Any], source_event_ids: list[str]) -> str:
         operation_key = f"member-memory:{observation_id}:{member_id}"
         outbox_id = f"outbox_{uuid.uuid4().hex}"
         now = time.time()
-        with self.db:
+        self.db.execute("SAVEPOINT outbox_enqueue")
+        try:
             self.db.execute("INSERT OR IGNORE INTO member_memory_outbox(outbox_id,operation_key,observation_id,member_id,memory_id,kind,content,environment,source_event_ids,status,attempts,last_error,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,'pending',0,NULL,?,?)", (outbox_id, operation_key, observation_id, member_id, memory_id, kind, content, json.dumps(environment or {}, ensure_ascii=False), json.dumps(source_event_ids, ensure_ascii=False), now, now))
             row = self.db.execute("SELECT outbox_id FROM member_memory_outbox WHERE operation_key=?", (operation_key,)).fetchone()
             self.db.execute("INSERT INTO member_memory_outbox_events VALUES (?,?,?,?,?)", (f"mmev_{uuid.uuid4().hex}", row[0], "pending", None, now))
+            self.db.execute("RELEASE outbox_enqueue")
+        except BaseException:
+            self.db.execute("ROLLBACK TO outbox_enqueue")
+            self.db.execute("RELEASE outbox_enqueue")
+            raise
         return row[0]
 
     @serialized_write
@@ -618,11 +690,18 @@ class Store:
         if status not in {"pending", "processing", "committed", "failed"}:
             raise ValueError("invalid_outbox_status")
         now = time.time()
-        with self.db:
+        self.db.execute("SAVEPOINT outbox_mark")
+        try:
             updated = self.db.execute("UPDATE member_memory_outbox SET status=?, lease_until=0, last_error=?, updated_at=? WHERE outbox_id=?", (status, error, now, outbox_id)).rowcount
             if updated != 1:
                 raise ValueError("member_memory_outbox_not_found")
             self.db.execute("INSERT INTO member_memory_outbox_events VALUES (?,?,?,?,?)", (f"mmev_{uuid.uuid4().hex}", outbox_id, status, error, now))
+            self.db.execute("RELEASE outbox_mark")
+        except BaseException:
+            self.db.execute("ROLLBACK TO outbox_mark")
+            self.db.execute("RELEASE outbox_mark")
+            raise
+
 
     @serialized_write
     def record_verification(self, memory_id: str, operation_key: str, outcome: str, evidence_ids: list[str], environment: dict[str, Any] | None = None, *, actor_member_id: str | None = None):

@@ -93,9 +93,11 @@ class ExperimentStore:
         if not values:
             return {"metric": metric, "sample_count": 0, "mean": None, "stddev": None, "ci95": None}
         mean = statistics.fmean(values)
+        if len(values) == 1:
+            return {"metric": metric, "sample_count": 1, "mean": mean, "stddev": None, "ci95": None}
         stddev = statistics.stdev(values) if len(values) > 1 else 0.0
         margin = 1.96 * stddev / math.sqrt(len(values))
-        return {"metric": metric, "sample_count": len(values), "mean": mean, "stddev": stddev, "ci95": [mean - margin, mean + margin]}
+        return {"metric": metric, "sample_count": len(values), "mean": mean, "stddev": stddev, "ci95": [mean - margin, mean + margin], "ci95_method": "normal_approximation", "ci95_small_sample": len(values) < 30}
 
     def compare(self, experiment_ids: list[str], metric: str) -> list[dict[str, Any]]:
         if not experiment_ids:
@@ -142,7 +144,10 @@ class ExperimentStore:
             mismatches["shared_configuration"] = [stable_hash(config) for config in invariant_configs]
         if mismatches:
             raise ValueError("experiment_match_mismatch:" + json.dumps(mismatches, sort_keys=True))
-        return {"experiments": experiment_ids, "metrics": {metric: self.compare(experiment_ids, metric) for metric in metrics}, "matching": {"task_package_hash": details[0]["task_package_hash"], "dataset_version": details[0]["dataset_version"], "code_commit": details[0]["code_commit"], "environment_fingerprint": details[0]["environment_fingerprint"], "shared_configuration": invariant_configs[0]}}
+        provider_strata = {}
+        for detail in details:
+            provider_strata.setdefault(detail["provider_version"], []).append(detail["experiment_id"])
+        return {"provider_strata": provider_strata, "pooled_provider_comparison": len(provider_strata) == 1, "experiments": experiment_ids, "metrics": {metric: self.compare(experiment_ids, metric) for metric in metrics}, "matching": {"task_package_hash": details[0]["task_package_hash"], "dataset_version": details[0]["dataset_version"], "code_commit": details[0]["code_commit"], "environment_fingerprint": details[0]["environment_fingerprint"], "shared_configuration": invariant_configs[0]}}
 
     def failure_samples(self, experiment_id: str) -> list[dict[str, Any]]:
         rows = self.db.execute("SELECT payload FROM experiment_events WHERE experiment_id=? AND event_type='failure' ORDER BY created_at", (experiment_id,)).fetchall()

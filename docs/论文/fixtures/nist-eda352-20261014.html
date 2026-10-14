@@ -1,0 +1,442 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+
+<HTML>
+<HEAD>
+<script async type="text/javascript"
+        id="_fed_an_ua_tag"
+        src="https://dap.digitalgov.gov/Universal-Federated-Analytics-Min.js?agency=DOC&subagency=NIST&pua=UA-37115410-50&yt=true&exts=ppsx,pps,f90,sch,rtf,wrl,txz,m1v,xlsm,msi,xsd,f,tif,eps,mpg,xml,pl,xlt,c">
+</script>
+<script type="text/javascript" id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<META NAME="GENERATOR" CONTENT="Mozilla/4.05 [en] (WinNT; U) [Netscape]">
+<TITLE>1.3.5.2. Confidence Limits for the Mean</TITLE>
+<link rel="stylesheet" href="../../nist-header-footer/css/nist-combined.css">
+<script src="../../nist-header-footer/js/jquery-1.9.0.min.js"
+        type="text/javascript" defer="defer"></script>
+<script src="../../nist-header-footer/js/nist-header-footer.js"
+        type="text/javascript" defer="defer"></script>
+</HEAD>
+
+<BODY BGCOLOR="FFFFCC">
+
+<IMG SRC="../../gifs/nvgtbr.gif" BORDER=0 VALIGN="TOP" ISMAP USEMAP="#MenuBar">
+<map name="MenuBar">
+<area shape="rect" alt="Next Page" href="eda353.htm" coords="463,27,504,45">
+<area shape="rect" alt="Previous Page" href="eda351.htm" coords="417,28,459,45">
+<area shape="rect" alt="Home" href="../../index.htm" coords="52,0,100,43">
+<area shape="rect" alt="Tools & Aids" href="../../toolaids.htm" coords="165,27,264,46">
+<area shape="rect" alt="Search Handbook" href="../../search.htm" coords="307,28,366,44">
+<area shape="default" nohref>
+</map>
+<BR>
+
+<TABLE CELLSPACING=20 CELLPADDING=0 WIDTH=540>
+
+<TR>
+<TD VALIGN=TOP COLSPAN=2>
+<FONT SIZE=-1>
+<FONT COLOR="#D60021">1.</FONT>
+<FONT COLOR="#00105A"><A HREF="../eda.htm">Exploratory Data Analysis</a></FONT>
+<BR>
+<FONT COLOR="#D60021">1.3.</FONT>
+<FONT COLOR="#00105A"><A HREF="eda3.htm">EDA Techniques</a></FONT>
+<BR>
+<FONT COLOR="#D60021">1.3.5.</FONT>
+<FONT COLOR="#00105A"><A HREF="eda35.htm">Quantitative Techniques</a></FONT>
+<BR>
+</FONT>
+<BR>
+<TABLE>
+<TR>
+<TD VALIGN=top>
+<H2><FONT COLOR="#D60021">1.3.5.2.</FONT></H2>
+</TD>
+<TD VALIGN=top>
+<H2>Confidence Limits for the Mean</H2>
+</TD>
+</TR >
+</TABLE>
+</TD>
+</TR>
+
+
+
+
+
+<!-----begin section: purpose -->
+
+<br>
+<tr>
+   <td width=15% valign=top>
+      <I>Purpose:<br>
+         Interval Estimate for Mean
+      </I>
+   </td>
+   <td width=85% valign=top>
+      Confidence limits for the mean
+      (<a href="../section4/eda43.htm#Snedecor">Snedecor and
+      Cochran, 1989</a>)
+      are an interval estimate for the
+      mean.  Interval estimates are often desirable because the
+      estimate of the mean varies from sample to sample.  Instead of
+      a single estimate for the mean, a confidence interval generates
+      a lower and upper limit for the mean.  The interval
+      estimate gives an indication of how much uncertainty there is
+      in our estimate of the true mean.  The narrower the interval,
+      the more precise is our estimate.
+      <p>
+      Confidence limits are expressed in terms of a confidence
+      coefficient.  Although the choice of confidence coefficient
+      is somewhat arbitrary, in practice 90 %, 95 %, and 99 % intervals
+      are often used, with 95 % being the most commonly used.
+      <p>
+      As a technical note, a 95 % confidence interval does <b>not</b>
+      mean that there is a 95 % probability that the interval
+      contains the true mean.  The interval computed from a given
+      sample either contains the true mean or it does not.  Instead,
+      the level of confidence is associated with the method of
+      calculating the interval.  The confidence coefficient is
+      simply the proportion of samples of a given size that may
+      be expected to contain the true mean.  That is, for a 95 %
+      confidence interval, if many samples are collected and the
+      confidence interval computed, in the long run about 95 % of these
+      intervals would contain the true mean.
+
+   </td>
+</tr>
+
+<!-----begin section: definition -->
+
+<tr>
+   <td width=15% valign=top>
+      <I>Definition: Confidence Interval
+      </I>
+   </td>
+   <td width=85% valign=top>
+      Confidence limits are defined as:
+      <UL>
+         <!--
+         <img src="eda352_e5.gif"
+              alt="YBAR +/-  t(1-alpha/2,N-1)*s/SQRT(N)">
+         -->
+         \[ \bar{Y} \pm t_{1 - \alpha/2, \, N-1} \,\, \frac{s}{\sqrt{N}} \]
+      </UL>
+      where
+      <!-- <img src="eqns/ybar.gif" alt="YBAR"> -->
+      \(\bar{Y}\)
+      is the sample mean, <B><I>s</I></B> is the sample standard
+      deviation, <i>N</i> is the sample size,
+      <!-- <img align=absmiddle src="eqns/alpha.gif" alt="alpha"> -->
+      <i>&alpha;</i> is the desired significance level, and
+      <big><i>t</i></big><sub>1-<i>&alpha;</i>/2,&thinsp;<i>N</i>-1</sub>
+      is the 100(1-<i>&alpha;</i>/2) <a href="eda3672.htm">percentile</a>
+      of the <a href="eda3664.htm"><I>t</I> distribution</a>
+      with <i>N</i> - 1 degrees of freedom.  Note that the confidence
+      coefficient is 1 - <i>&alpha;</i>.
+      <p>
+      From the formula, it is clear that the width of the interval
+      is controlled by two factors:
+      <ol>
+         <li>As <i>N</i> increases, the interval gets narrower from
+             the
+             <!-- <img src="eqns/sqrtn.gif" alt="SQRT(N)"> -->
+             \(\sqrt{N}\) term.
+             <p>
+             That is, one way to obtain more precise estimates for
+             the mean is to increase the sample size.
+             </li>
+             <p>
+         <li>The larger the sample standard deviation, the larger
+             the confidence interval.  This simply means
+             that noisy data, i.e., data with a large standard
+             deviation, are going to generate wider intervals than
+             data with a smaller standard deviation.
+             </li>
+       </ol>
+
+   </td>
+</tr>
+
+<!-- begin paragraph -->
+<TR>
+<TD WIDTH=15% VALIGN=top>
+<!-- Add marginal notes below -->
+<I>
+Definition: Hypothesis Test
+</I>
+</TD>
+<TD WIDTH=85%>
+<!-- Add main text below -->
+       To test whether the population mean has a specific value,
+       <!-- <img align=absmiddle src="eqns/mu0.gif" alt="u0">, -->
+       \(\mu_{0}\),
+       against the two-sided alternative that it does not have a value
+       <!-- <img align=absmiddle src="eqns/mu0.gif" alt="u0">, -->
+       \(\mu_{0}\),
+       the confidence interval is converted to hypothesis-test form.
+       The test is a one-sample <i>t</i>-test, and it is defined as:
+      <table>
+
+      <tr>
+         <td>
+            H<sub>0</sub>:
+         </td>
+         <td>
+            <!-- <img src="eqns/mumu0.gif" alt="u = u0"> -->
+            \( \mu = \mu_{0} \)
+         </td>
+       </tr>
+      <tr>
+         <td valign=top>
+            H<sub>a</sub>:
+         </td>
+         <td>
+            <!-- <img src="eqns/munemu0.gif" alt="u <> u0"> -->
+            \( \mu \neq \mu_{0} \)
+         </td>
+       </tr>
+      <tr>
+         <td valign=top>
+            Test Statistic:
+         </td>
+         <td>
+              <!--
+               <img src="eqns/tstat.gif"
+                    alt="T = (YBAR - u0)/(s/SQRT(N))"> -->
+               \( T = (\bar{Y} - \mu_{0})/(s/\sqrt{N}) \)
+            <br>
+            where
+            <!-- <img src="eqns/ybar.gif" alt="YBAR">, -->
+            \(\bar{Y}\), <i>N</i>, and
+            <!-- <img src="eqns/s.gif" alt="s"> -->
+            <b><i>s</i></b> are defined as above.
+         </td>
+       </tr>
+      <tr>
+         <td valign=top>
+            Significance Level:
+         </td>
+         <td valign=top>
+            <!-- <img src="eqns/alpha.gif" alt="alpha"> -->
+            <i>&alpha;</i>.  The most commonly used value for
+            <!-- <img src="eqns/alpha.gif" alt="alpha"> -->
+            <i>&alpha;</i> is 0.05.
+         </td>
+       </tr>
+      <tr>
+         <td valign=top>
+            Critical Region:
+         </td>
+         <td>
+            Reject the null hypothesis that the mean is a specified
+            value,
+            <!-- <img align=absmiddle src="eqns/mu0.gif" alt="u0">, -->
+            \(\mu_{0}\), if
+            <ul>
+            <!--
+            <img align=top src="eda352_e3.gif"
+                 alt="T < t(alpha/2,N-1)">
+            -->
+            \( T &lt; t_{\alpha/2, \, N-1} \)
+            </ul>
+            or
+            <ul>
+            <!--
+            <img align=top src="eda352_e4.gif"
+                 alt="T > t(1-alpha/2,N-1)">
+            -->
+            \( T &gt; t_{1 - \alpha/2, \, N-1} \)
+            </ul>
+         </td>
+      </tr>
+
+     </table>
+
+</TD>
+</TR>
+<!-- end paragraph -->
+
+<!-----begin section: sample output -->
+
+<br>
+<tr>
+<td width=15% valign=top>
+<I>Confidence Interval Example</I>
+</td>
+<td width=85% valign=top>
+We generated a 95 %, two-sided confidence interval for
+the <a href="../section4/eda4281.htm">ZARR13.DAT</a>
+data set based on the following information.
+<P>
+<PRE>
+N                          = 195
+MEAN                       =   9.261460
+STANDARD DEVIATION         =   0.022789
+<big><I>t</I></big><SUB>1-0.025,<i>N</i>-1</SUB>                 =   1.9723
+
+<span style="white-space: nowrap;">
+LOWER LIMIT = 9.261460 - 1.9723*0.022789/&radic;<span style="text-decoration:overline;">195</span> <br />
+UPPER LIMIT = 9.261460 + 1.9723*0.022789/&radic;<span style="text-decoration:overline;">195</span>
+</span>
+</PRE>
+Thus, a 95 % confidence interval for the mean is (9.258242, 9.264679).
+</td>
+</tr>
+
+
+<!-- begin paragraph -->
+<TR>
+<TD WIDTH=15% VALIGN=top>
+<!-- Add marginal notes below -->
+<I>t-Test Example</I>
+</TD>
+<TD WIDTH=85%>
+<!-- Add main text below -->
+We performed a two-sided, one-sample <i>t</i>-test using the
+<a href="../section4/eda4281.htm">ZARR13.DAT</a> data set
+to test the null hypothesis that the population mean is
+equal to 5.
+<P>
+<PRE>
+H<SUB>0</SUB>:  &mu; = 5
+H<SUB>a</SUB>:  &mu; &ne; 5
+
+Test statistic:  <I>T</I> = 2611.284
+Degrees of freedom:  <i>&nu;</i> = 194
+Significance level:  <i>&alpha;</i> = 0.05
+Critical value:  <big><I>t</I></big><sub>1-<i>&alpha;</i>/2,<i>&nu;</i></sub> = 1.9723
+Critical region:  Reject H<SUB>0</SUB> if |<I>T</I>| > 1.9723
+</PRE>
+<P>
+We reject the null hypotheses for our two-tailed <I>t</I>-test because
+the absolute value of the test statistic is greater than the critical
+value.  If we were to perform an upper, one-tailed test, the critical
+value would be <big><I>t</I></big><SUB>1-<i>&alpha;,&nu;</i></SUB> = 1.6527, and we
+would still reject the null hypothesis.
+<P>
+The confidence interval provides an alternative to the hypothesis test.  If
+the confidence interval contains 5, then H<SUB>0</SUB> cannot be rejected.
+In our example, the confidence interval (9.258242, 9.264679) does not
+contain 5, indicating that the population mean does not equal 5 at the
+0.05 level of significance.
+<P>
+In general, there are three possible alternative hypotheses and
+rejection regions for the one-sample <I>t</I>-test:
+<P>
+
+<table border="2" cellspacing="0" cellpadding="7">
+<tr>
+<th>Alternative Hypothesis</th>
+<th>Rejection Region</th>
+</tr>
+<tr>
+<td>H<SUB>a</SUB>:  &mu; &ne; &mu;<SUB>0</SUB></td>
+<td>|<I>T</I>| > <big><I>t</I></big><SUB>1-<i>&alpha;</i>/2,<i>&nu;</i></SUB></td>
+</tr>
+<tr>
+<td>H<SUB>a</SUB>:  &mu; > &mu;<SUB>0</SUB></td>
+<td><I>T</I> > <big><I>t</I></big><SUB>1-<i>&alpha;,&nu;</i></SUB></td>
+</tr>
+<tr>
+<td>H<SUB>a</SUB>:  &mu; < &mu;<SUB>0</SUB></td>
+<td><I>T</I> < <big><I>t</I></big><SUB><i>&alpha;,&nu;</i></SUB></td>
+</tr>
+</table>
+<P>
+The rejection regions for three posssible alternative hypotheses using
+our example data are shown in the following graphs.
+<CENTER>
+<img src="eda352_r.gif">
+</CENTER>
+</TD>
+</TR>
+<!-- end paragraph -->
+
+
+<!-----begin section: questions -->
+<tr>
+   <td width=15% valign=top>
+      <I>Questions
+      </I>
+   </td>
+   <td width=85% valign=top>
+Confidence limits for the mean can be used to answer the following
+questions:
+<OL>
+   <LI>What is a reasonable estimate for the mean?</LI>
+   <LI>How much variability is there in the estimate of the mean?</LI>
+   <LI>Does a given target value fall within the confidence
+       limits?</LI>
+</OL>
+   </td>
+</tr>
+
+<!-----begin section: related techniques -->
+
+<tr>
+   <td width=15% valign=top>
+      <I>Related Techniques</I>
+   </td>
+   <td width=85% valign=top>
+      <a href="eda353.htm">Two-Sample <i>t</i>-Test</a><br>
+      <p>
+      Confidence intervals for other location estimators such as
+      the median or mid-mean tend to be mathematically difficult or
+      intractable.  For these cases, confidence intervals can
+      be obtained using the <a href="bootplot.htm">bootstrap</a>.
+
+   </td>
+</tr>
+
+<!-----begin section: case study -->
+<tr>
+   <td width=15% valign=top>
+      <I>Case Study</I>
+   </td>
+   <td width=85% valign=top>
+      <a href="../section4/eda428.htm">Heat flow meter</a> data.
+   </td>
+</tr>
+
+<!-----begin section: Software -->
+
+<tr>
+   <td width=15% valign=top>
+      <I>Software</I>
+   </td>
+   <td width=85% valign=top>
+      Confidence limits for the mean and one-sample <I>t</I>-tests are
+      available in just about all general purpose statistical
+      software programs.  Both <a href="eda352.dp">Dataplot code</a>
+      and <a href="eda352.r">R code</a> can be used to generate the
+      analyses in this section.  These scripts use the
+      <a href="../../datasets/ZARR13.DAT">ZARR13.DAT</a> data file.
+   </td>
+</tr>
+
+<!-----end jjf----->
+
+
+
+
+
+
+</TABLE>
+
+<IMG SRC="../../gifs/nvgbrbtm.gif" BORDER=0 USEMAP="#nvbar.nvbar">
+<map name="nvbar.nvbar">
+<area shape="rect" href="http://www.nist.gov" coords="22,6,67,20">
+<area shape="rect" href="https://www.itl.nist.gov/div898/handbook" coords="3,23,92,40">
+<area shape="rect" alt="Home" href="../../index.htm" coords="114,12,165,31">
+<area shape="rect" alt="Tools & Aids" href="../../toolaids.htm" coords="190,12,290,31">
+<area shape="rect" alt="Search Handbook" href="../../search.htm" coords="318,14,376,30">
+<area shape="rect" alt="Previous Page" href="eda351.htm" coords="428,15,471,29">
+<area shape="rect" alt="Next Page" href="eda353.htm" coords="476,15,517,30">
+<area shape="default" nohref>
+</map>
+
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4a384827f065fb3',t:'MTc5MTk0ODc1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></BODY>
+
+</HTML>

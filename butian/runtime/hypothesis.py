@@ -108,7 +108,7 @@ class HypothesisStore:
     def authorize(self, hypothesis_id: str, description: str, *, cost: float, risk: float, information_gain: float, owner_member_id: str | None = None) -> str:
         if not self.db.execute("SELECT 1 FROM practice_hypotheses WHERE hypothesis_id=? AND owner_member_id IS ?", (hypothesis_id, owner_member_id)).fetchone():
             raise ValueError("hypothesis_not_found")
-        if not all(math.isfinite(value) for value in (cost, risk, information_gain)) or cost < 0 or not 0 <= risk <= 1 or information_gain < 0 or not description.strip():
+        if not isinstance(description, str) or not description.strip() or any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) for value in (cost, risk, information_gain)) or cost < 0 or not 0 <= risk <= 1 or information_gain < 0:
             raise ValueError("invalid_verification_metrics")
         action_id = f"act_{uuid.uuid4().hex}"
         self.db.execute("INSERT INTO hypothesis_actions VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (action_id, hypothesis_id, description, cost, risk, information_gain, "", "awaiting_authorization", time.time(), None, None, owner_member_id))
@@ -121,6 +121,8 @@ class HypothesisStore:
             raise ValueError("verification_action_not_found")
         if row["status"] != "awaiting_authorization":
             raise ValueError("verification_action_not_awaiting_authorization")
+        if not isinstance(authorized, bool):
+            raise ValueError("authorization_must_be_bool")
         if not actor_member_id.strip() or not reason.strip():
             raise ValueError("authorization_actor_and_reason_required")
         if not self.db.execute("SELECT 1 FROM members WHERE member_id=?", (actor_member_id,)).fetchone():
@@ -141,12 +143,24 @@ class HypothesisStore:
 
     @serialized_write
     def start(self, action_id: str, *, owner_member_id: str | None = None) -> None:
-        updated = self.db.execute("UPDATE hypothesis_actions SET status='running',started_at=? WHERE action_id=? AND status='queued' AND owner_member_id IS ?", (time.time(), action_id, owner_member_id)).rowcount
-        if updated != 1:
-            visible = self.db.execute("SELECT 1 FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
-            if not visible:
-                raise ValueError("verification_action_not_found")
-            raise ValueError("verification_action_not_authorized_or_not_queued")
+        self.db.execute("SAVEPOINT hypothesis_start_budget")
+        try:
+            from .exploration_budget import ExplorationBudget
+            action = self.db.execute("SELECT * FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
+            if action and action["status"] == "queued":
+                ExplorationBudget(self.db).reserve(action_id, owner_member_id, cost=action["cost"], risk=action["risk"])
+            updated = self.db.execute("UPDATE hypothesis_actions SET status='running',started_at=? WHERE action_id=? AND status='queued' AND owner_member_id IS ?", (time.time(), action_id, owner_member_id)).rowcount
+            if updated != 1:
+                visible = self.db.execute("SELECT 1 FROM hypothesis_actions WHERE action_id=? AND owner_member_id IS ?", (action_id, owner_member_id)).fetchone()
+                if not visible:
+                    raise ValueError("verification_action_not_found")
+                raise ValueError("verification_action_not_authorized_or_not_queued")
+
+            self.db.execute("RELEASE SAVEPOINT hypothesis_start_budget")
+        except Exception:
+            self.db.execute("ROLLBACK TO SAVEPOINT hypothesis_start_budget")
+            self.db.execute("RELEASE SAVEPOINT hypothesis_start_budget")
+            raise
 
     @serialized_write
     def observe(self, action_id: str, outcome: str, evidence_ids: list[str], *, environment=None, independent_key: str, notes: str = "", outbox: dict[str, Any] | None = None, observation_id: str | None = None, owner_member_id: str | None = None) -> str:

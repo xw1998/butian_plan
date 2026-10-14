@@ -23,11 +23,52 @@ import time
 
 import uuid
 import shutil
+import sqlite3
 
 from pathlib import Path
 
 from typing import Any
+from .execution_dispatch import ExecutionNotStarted
 
+
+
+def _work_budget_bytes() -> int | None:
+    raw = os.environ.get("BUTIAN_TOOL_WORK_BUDGET_BYTES")
+    if raw is None:
+        return None
+    if not raw or not raw.isascii() or not raw.isdecimal():
+        raise ValueError("tool_work_budget_invalid")
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError("tool_work_budget_invalid") from exc
+
+
+def _retained_work_bytes(root: Path) -> int:
+    """Measure retained regular files without following links; uncertainty blocks admission."""
+    import stat
+    total = 0
+    pending = [root]
+    try:
+        while pending:
+            directory = pending.pop()
+            info = directory.lstat()
+            if not stat.S_ISDIR(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+                raise ValueError("tool_work_budget_unverifiable")
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    info = entry.stat(follow_symlinks=False)
+                    if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+                        raise ValueError("tool_work_budget_unverifiable")
+                    if stat.S_ISDIR(info.st_mode):
+                        pending.append(Path(entry.path))
+                    elif stat.S_ISREG(info.st_mode):
+                        total += info.st_size
+                    else:
+                        raise ValueError("tool_work_budget_unverifiable")
+    except OSError as exc:
+        raise ValueError("tool_work_budget_unverifiable") from exc
+    return total
 
 
 STATUSES = {"draft", "candidate", "active", "deprecated", "quarantined", "archived", "shared_candidate"}
@@ -95,27 +136,67 @@ def _windows_process_tree(root_pid: int) -> set[int] | None:
         kernel32.CloseHandle(snapshot)
 
 
+_stop_process_lock = threading.RLock()
+
 def _terminate_process_tree(proc: subprocess.Popen[Any]) -> bool:
+    with _stop_process_lock:
+        return _terminate_process_tree_locked(proc)
+
+def _terminate_process_tree_locked(proc: subprocess.Popen[Any]) -> bool:
     """Terminate and report whether the complete process tree was confirmed gone."""
+    if getattr(proc, "_butian_stop_permission_denied", False):
+        return False
     tree = _windows_process_tree(proc.pid)
     if tree is None:
         return False
     if os.name == "nt":
         try:
-            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=5)
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+            stopped = subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=5)
+            if stopped.returncode != 0:
+                proc._butian_stop_permission_denied = True
+                proc._butian_stop_error_code = stopped.returncode
+                return False
+        except PermissionError as exc:
+            proc._butian_stop_permission_denied = True
+            proc._butian_stop_error_code = getattr(exc, "winerror", None) or getattr(exc, "errno", None)
+            proc._butian_stop_error_type = type(exc).__name__
+            return False
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            proc._butian_stop_permission_denied = True
+            proc._butian_stop_error_code = getattr(exc, "winerror", None) or getattr(exc, "errno", None)
+            proc._butian_stop_error_type = type(exc).__name__
+            return False
     if os.name == "nt":
         for pid in sorted(tree - {proc.pid}, reverse=True):
             try:
-                subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=5)
-            except (OSError, subprocess.TimeoutExpired):
-                pass
+                stopped = subprocess.run(["taskkill", "/PID", str(pid), "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=5)
+                if stopped.returncode != 0:
+                    proc._butian_stop_permission_denied = True
+                    proc._butian_stop_error_code = stopped.returncode
+                    return False
+            except PermissionError as exc:
+                proc._butian_stop_permission_denied = True
+                proc._butian_stop_error_code = getattr(exc, "winerror", None) or getattr(exc, "errno", None)
+                proc._butian_stop_error_type = type(exc).__name__
+                return False
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                proc._butian_stop_permission_denied = True
+                proc._butian_stop_error_code = getattr(exc, "winerror", None) or getattr(exc, "errno", None)
+                proc._butian_stop_error_type = type(exc).__name__
+                return False
     if proc.poll() is None:
         try:
             proc.kill()
-        except OSError:
-            pass
+        except PermissionError as exc:
+            proc._butian_stop_permission_denied = True
+            proc._butian_stop_error_code = getattr(exc, "winerror", None) or getattr(exc, "errno", None)
+            proc._butian_stop_error_type = type(exc).__name__
+            return False
+        except OSError as exc:
+            proc._butian_stop_permission_denied = True
+            proc._butian_stop_error_code = getattr(exc, "winerror", None) or getattr(exc, "errno", None)
+            proc._butian_stop_error_type = type(exc).__name__
+            return False
     deadline = time.monotonic() + 5.0
     while time.monotonic() < deadline:
         current_tree = _windows_process_tree(proc.pid)
@@ -350,8 +431,10 @@ class ToolStore:
 
         self.tools_root = self.home / "members"
 
+        self.execution_runner = None
         self.recovery_events: list[dict[str, Any]] = []
         self._active_executions: dict[str, dict[str, Any]] = {}
+        self._execution_recovery_snapshots: dict[str, dict[str, Any]] = {}
         self._active_executions_lock = threading.RLock()
         self._create_schema()
         self._recover_orphan_version_dirs()
@@ -359,8 +442,14 @@ class ToolStore:
     def wait_for_executions(self, timeout: float = 10.0) -> bool:
         """Wait until execute workers have removed their active records before DB close."""
         deadline = time.monotonic() + max(0.0, timeout)
+        if self.execution_runner is not None:
+            if not self.execution_runner.wait(timeout=min(max(0.0, timeout), max(0.0, deadline - time.monotonic()))):
+                return False
         while time.monotonic() < deadline:
             with self._active_executions_lock:
+                for execution_id, active in list(self._active_executions.items()):
+                    if active.get("worker_finished") and active["process"].poll() is not None:
+                        self._active_executions.pop(execution_id, None)
                 if not self._active_executions:
                     return True
             time.sleep(0.01)
@@ -501,6 +590,18 @@ class ToolStore:
             reason TEXT NOT NULL, created_at REAL NOT NULL, revoked_at REAL, revoke_reason TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_host_auth_tool ON host_authorizations(tool_id, version, owner_member_id, status);
+        CREATE TABLE IF NOT EXISTS host_authorization_executors (
+            authorization_id TEXT PRIMARY KEY, executor_id TEXT NOT NULL, instance_id TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS host_revocation_outbox (
+            authorization_id TEXT PRIMARY KEY, delivery_state TEXT NOT NULL,
+            attempts INTEGER NOT NULL DEFAULT 0, last_error_type TEXT,
+            created_at REAL NOT NULL, acknowledged_at REAL
+        );
+
+        INSERT OR IGNORE INTO host_revocation_outbox (authorization_id,delivery_state,created_at)
+        SELECT authorization_id,'pending',COALESCE(revoked_at,created_at)
+        FROM host_authorizations WHERE status='revoked';
 
         CREATE TABLE IF NOT EXISTS tool_circuit_breakers (
             tool_id TEXT NOT NULL, version INTEGER NOT NULL, scope TEXT NOT NULL,
@@ -549,6 +650,10 @@ class ToolStore:
                 FROM tool_issue_escalations_legacy""")
             self.store.db.execute("DROP TABLE tool_issue_escalations_legacy")
         self.store.db.execute("CREATE INDEX IF NOT EXISTS idx_tool_issue_escalations_dispatcher_status ON tool_issue_escalations(dispatcher_member_id, status)")
+        revocation_columns = {row[1] for row in self.store.db.execute('PRAGMA table_info(host_revocation_outbox)')}
+        for name in ('executor_id', 'instance_id'):
+            if name not in revocation_columns:
+                self.store.db.execute(f'ALTER TABLE host_revocation_outbox ADD COLUMN {name} TEXT')
         share_columns = {row[1] for row in self.store.db.execute("PRAGMA table_info(tool_shares)")}
         for name, definition in (("issue_id", "TEXT"), ("max_uses", "INTEGER"), ("used_count", "INTEGER NOT NULL DEFAULT 0"), ("expires_at", "REAL")):
             if name not in share_columns:
@@ -576,8 +681,30 @@ class ToolStore:
 
 
 
+    def assert_task_authorization(self, actor_member_id: str, task_id: str, permissions: list[str]) -> None:
+        row = self.store.db.execute("SELECT authorization_snapshot FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if not row or not self.store.task_access(task_id, actor_member_id):
+            raise ValueError("task_access_denied")
+        snapshot = json.loads(row[0] or "{}")
+        if snapshot.get("member_id") != actor_member_id:
+            raise ValueError("task_tool_authorization_denied")
+        current = self.store.db.execute("SELECT tool_policy FROM members WHERE member_id=?", (actor_member_id,)).fetchone()
+        for policy in (snapshot.get("tool_policy", {}), json.loads(current[0] or "{}") if current else {}):
+            allowed = set(policy.get("permissions", []))
+            if policy.get("default") in {"deny", "deny_until_authorized"} and not set(permissions).issubset(allowed):
+                raise ValueError("task_tool_authorization_denied")
+            if "permissions" in policy and not set(permissions).issubset(allowed):
+                raise ValueError("task_tool_authorization_denied")
+
     def execute(self, actor_member_id: str, tool_id: str, version: int, input_data: Any = None, *, dry_run: bool = False, verification_only: bool = False, task_id: str | None = None, timeout_seconds: float = 10.0, max_output_bytes: int = 65536, share_id: str | None = None, security_review_issue_id: str | None = None, execution_guard=None) -> dict[str, Any]:
 
+        runner = self.execution_runner
+        if runner is None and not dry_run:
+            raise ValueError("execution_backend_required")
+        if runner is not None and not dry_run:
+            runner.adapter.capabilities().require()
+            if self.store.db.in_transaction:
+                raise ValueError("execution_dispatch_requires_committed_transaction")
         tool = self._tool(tool_id)
 
         breaker = self.store.db.execute("SELECT 1 FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND status='open'", (tool_id, version)).fetchone()
@@ -664,6 +791,8 @@ class ToolStore:
 
         if len(set(permissions)) != len(permissions):
             raise ValueError("tool_permissions_duplicate")
+        if task_id:
+            self.assert_task_authorization(actor_member_id, task_id, permissions)
         unsupported = set(permissions) - {"execute", "cpu"}
 
         if unsupported:
@@ -678,7 +807,13 @@ class ToolStore:
         if not isinstance(required_isolation, list) or any(not isinstance(item, str) or item not in isolation_capability_names for item in required_isolation):
             raise ValueError("tool_isolation_requirements_invalid")
         if required_isolation:
-            raise ValueError("tool_isolation_backend_unavailable:python_host:" + ",".join(sorted(set(required_isolation))))
+            capabilities = runner.adapter.capabilities() if runner is not None else None
+            from .execution_contract import required_execution_features
+            required_features = required_execution_features(required_isolation)
+            missing = capabilities.missing(required_features) if capabilities is not None else list(required_features)
+            if missing:
+                backend = capabilities.executor_id if capabilities is not None else "unconfigured"
+                raise ValueError("tool_isolation_backend_unavailable:" + backend + ":" + ",".join(missing))
         runtime_profile = isolation.get("profile", "low_risk_host")
         if runtime_profile == "host_trusted":
             required_host_capabilities = manifest.get("host_capabilities", [])
@@ -730,15 +865,22 @@ class ToolStore:
 
         runtime_backend = "host_trusted" if runtime_profile == "host_trusted" else "python_host"
         isolation_level = "same_account_host" if runtime_profile == "host_trusted" else "host_process"
-        runtime_capabilities = {"filesystem_isolation": False, "network_isolation": False, "subprocess_isolation": False, "memory_limit": False, "file_size_limit": False, "process_tree_control": False, "working_directory": "temporary_only_not_a_security_boundary", "timeout": True, "output_limit": True, "active_cancellation": False, "host_trusted": runtime_profile == "host_trusted", "same_account_no_os_isolation": runtime_profile == "host_trusted", "interpreter": resolved_interpreter, "interpreter_kind": entrypoint[0], "content_hash": actual_hash, "manifest_hash": manifest_digest, "source_path": str(source)}
+        runtime_capabilities = {"filesystem_isolation": False, "network_isolation": False, "subprocess_isolation": False, "memory_limit": False, "file_size_limit": False, "process_tree_control": False, "working_directory": "retained_execution_directory_not_a_security_boundary", "timeout": True, "output_limit": True, "active_cancellation": False, "host_trusted": runtime_profile == "host_trusted", "same_account_no_os_isolation": runtime_profile == "host_trusted", "interpreter": resolved_interpreter, "interpreter_kind": entrypoint[0], "content_hash": actual_hash, "manifest_hash": manifest_digest, "source_path": str(source)}
         business_assertions = manifest.get("business_assertions", [])
         common = {"execution_id": execution_id, "tool_id": tool_id, "version": version, "actor_member_id": actor_member_id, "task_id": task_id, "input_hash": input_hash, "permissions": permissions, "runtime_backend": runtime_backend, "isolation_level": isolation_level, "isolation_capabilities": runtime_capabilities, "business_assertions": business_assertions, "verification_only": bool(verification_only)}
 
         if dry_run:
-
-            self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 1, "dry_run", None, "", "", "dry_run", json.dumps(permissions), started, started, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
-
-            self._event(tool_id, version, "execution_dry_run", {"execution_id": execution_id, "actor_member_id": actor_member_id, "permissions": permissions}, f"tool:execution:{execution_id}")
+            with self.store._write_lock:
+                savepoint = "execution_dry_run_" + uuid.uuid4().hex
+                self.store.db.execute("SAVEPOINT " + savepoint)
+                try:
+                    self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 1, "dry_run", None, "", "", "dry_run", json.dumps(permissions), started, started, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+                    self._event(tool_id, version, "execution_dry_run", {"execution_id": execution_id, "actor_member_id": actor_member_id, "permissions": permissions}, f"tool:execution:{execution_id}")
+                    self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                except BaseException:
+                    self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                    self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                    raise
 
             common["argv"] = [resolved_interpreter, "-I", str(source)] if entrypoint[0] == "python" else [resolved_interpreter, str(source)]
             return {**common, "status": "dry_run", "argv": common["argv"], "permissions": permissions}
@@ -756,154 +898,439 @@ class ToolStore:
                 raise ValueError("tool_trial_expired")
             if current_share["max_uses"] is not None and current_share["used_count"] >= current_share["max_uses"]:
                 raise ValueError("tool_trial_exhausted")
+        work_budget = _work_budget_bytes()
+        work_root = self.home / "tool_execution_work"
+        if work_budget is not None:
+            if work_root.is_symlink():
+                raise ValueError("tool_work_budget_unverifiable")
+            if work_root.exists() and _retained_work_bytes(work_root) > work_budget:
+                raise ValueError("tool_work_budget_exhausted")
+        runtime_capabilities["work_budget_bytes"] = work_budget
+        runtime_capabilities["work_budget_enforcement"] = "admission_and_post_execution_check"
+        runtime_capabilities["work_artifact_retention"] = "retained"
+        if runner is not None:
+            runtime_backend = "unified_executor"
+            capabilities = runner.adapter.capabilities()
+            runtime_capabilities.update(process_tree_control=not capabilities.missing(), active_cancellation=not capabilities.missing(), executor_id=capabilities.executor_id, instance_id=capabilities.instance_id)
+            common.update(runtime_backend=runtime_backend)
         result_status, exit_code, stdout, stderr, reason = "failed", None, "", "", None
         termination_reason_locked = False
 
         decoded = None
+        proc = None
+        trial_reserved = False
+        admission_committed = False
 
         try:
 
-            with tempfile.TemporaryDirectory(prefix="butian-tool-") as work:
+            from contextlib import nullcontext
+            work_root = self.home / "tool_execution_work"
+            work_root.mkdir(parents=True, exist_ok=True)
+            # Retain execution artifacts, including unknown live-process directories.
+            with nullcontext(tempfile.mkdtemp(prefix=execution_id + "-", dir=work_root)) as work:
 
                 argv = [resolved_interpreter, "-I", str(source)] if entrypoint[0] == "python" else [resolved_interpreter, str(source)]
                 runtime_capabilities["argv"] = argv
                 runtime_capabilities["cwd"] = work
                 with self.store._write_lock:
-                    if execution_guard is not None:
-                        execution_guard()
-                    proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work, env={"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}, shell=False)
-
-                with self._active_executions_lock:
-                    self._active_executions[execution_id] = {"process": proc, "actor_member_id": actor_member_id, "tool_id": tool_id, "version": version, "started_at": started, "cancel_requested": False, "cancel_cleanup_confirmed": None}
-                self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "running", None, "", "", None, json.dumps(permissions), started, None, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
-                self._event(tool_id, version, "execution_started", {"execution_id": execution_id, "actor_member_id": actor_member_id}, f"tool:execution:{execution_id}:started")
-
-                captured: dict[str, bytes] = {"stdout": b"", "stderr": b""}
-                overflow = threading.Event()
-
-                def drain(name, pipe):
-                    chunks = bytearray()
-                    while True:
-                        chunk = pipe.read(8192)
-                        if not chunk:
-                            break
-                        remaining = output_limit - len(chunks)
-                        if remaining > 0:
-                            chunks.extend(chunk[:remaining])
-                        if len(chunk) > remaining:
-                            overflow.set()
-                            try:
-                                _terminate_process_tree(proc)
-                            except OSError:
-                                pass
-                            break
-                    captured[name] = bytes(chunks)
-
-                if current_share is not None and current_share["issue_id"]:
-                    updated = self.store.db.execute("UPDATE tool_shares SET used_count=used_count+1 WHERE share_id=? AND status='trial' AND used_count < COALESCE(max_uses, 2147483647) AND (expires_at IS NULL OR expires_at>?)", (share_id, time.time()))
-                    if updated.rowcount != 1:
-                        _terminate_process_tree(proc)
-                        proc.wait()
-                        raise ValueError("tool_trial_exhausted")
-                readers = [threading.Thread(target=drain, args=("stdout", proc.stdout), daemon=True), threading.Thread(target=drain, args=("stderr", proc.stderr), daemon=True)]
-                for reader in readers:
-                    reader.start()
-                try:
-                    proc.stdin.write(encoded)
-                    proc.stdin.close()
-                    proc.wait(timeout=timeout)
-                except subprocess.TimeoutExpired:
-                    cleaned = _terminate_process_tree(proc)
-                    proc.wait()
-                    result_status = "failed" if cleaned else "unknown"
-                    reason = "timeout" if cleaned else "cleanup_unconfirmed"
-                    termination_reason_locked = True
-                except (BrokenPipeError, OSError):
-                    proc.wait()
-                finally:
-                    for reader in readers:
-                        reader.join(timeout=2)
-                exit_code = proc.returncode
-                cancel_cleanup_confirmed = None
-                with self._active_executions_lock:
-                    active = self._active_executions.get(execution_id)
-                    cancel_requested = bool(active and active["cancel_requested"])
-                if cancel_requested:
-                    deadline = time.monotonic() + 5.0
-                    while time.monotonic() < deadline:
-                        with self._active_executions_lock:
-                            active = self._active_executions.get(execution_id)
-                            cancel_cleanup_confirmed = active.get("cancel_cleanup_confirmed") if active else None
-                        if cancel_cleanup_confirmed is not None:
-                            break
-                        time.sleep(0.01)
-                with self._active_executions_lock:
-                    active = self._active_executions.get(execution_id)
-                    cancel_requested = cancel_requested or bool(active and active["cancel_requested"])
-                    if cancel_cleanup_confirmed is None and active:
-                        cancel_cleanup_confirmed = active.get("cancel_cleanup_confirmed")
-                    self._active_executions.pop(execution_id, None)
-                recorded = self.store.db.execute("SELECT termination_reason FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
-                recorded_reason = recorded["termination_reason"] if recorded else None
-                if recorded_reason in {"cancelled_by_actor", "cancel_unconfirmed"}:
-                    cancel_requested = True
-                if cancel_requested and not termination_reason_locked:
-                    recorded = self.store.db.execute("SELECT termination_reason FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
-                    recorded_reason = recorded["termination_reason"] if recorded else None
-                    if recorded_reason in {"cancelled_by_actor", "cancel_unconfirmed"}:
-                        reason = recorded_reason
-                        result_status = "cancelled" if reason == "cancelled_by_actor" else "unknown"
+                    owns_admission_transaction = not self.store.db.in_transaction
+                    admission_savepoint = "admission_" + uuid.uuid4().hex
+                    if owns_admission_transaction:
+                        self.store.db.execute("BEGIN IMMEDIATE")
                     else:
-                        result_status = "cancelled" if cancel_cleanup_confirmed is True and proc.poll() is not None else "unknown"
-                        reason = "cancelled_by_actor" if result_status == "cancelled" else "cancel_unconfirmed"
-                    termination_reason_locked = True
-                out, err = captured["stdout"], captured["stderr"]
-                stdout, stderr = out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
-                if not cancel_requested and not termination_reason_locked:
-                    result_status = "failed" if overflow.is_set() or exit_code else "success"
-                    reason = "output_limit_exceeded" if overflow.is_set() else (None if exit_code == 0 else "nonzero_exit")
-                    if result_status == "success":
-
-                        contract = manifest.get("output_contract", {})
-
-                        try:
-
-                            decoded = stdout if contract.get("type") in {"text", "string"} else json.loads(stdout)
-
-                        except (TypeError, ValueError):
-
-                            result_status, reason = "failed", "output_contract_invalid_json"
-
+                        self.store.db.execute("SAVEPOINT " + admission_savepoint)
+                    try:
+                        if execution_guard is not None:
+                            execution_guard()
+                        if task_id:
+                            self.assert_task_authorization(actor_member_id, task_id, permissions)
+                        if self.store.db.execute("SELECT 1 FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND status='open'", (tool_id, version)).fetchone():
+                            raise ValueError("tool_circuit_breaker_open")
+                        admitted_tool = self.store.db.execute("SELECT status, current_version, owner_member_id FROM tool_assets WHERE tool_id=?", (tool_id,)).fetchone()
+                        if not admitted_tool or admitted_tool["owner_member_id"] != current["owner_member_id"]:
+                            raise ValueError("tool_version_state_changed")
+                        admitted_repair = None
+                        if repair_version_access:
+                            admitted_repair = self.store.db.execute("SELECT 1 FROM tool_shares WHERE share_id=? AND tool_id=? AND recipient_member_id=? AND version=? AND issue_id IS NOT NULL AND status='trial'", (share_id, tool_id, actor_member_id, version)).fetchone()
+                        admitted_security = None
+                        if security_review_mode:
+                            admitted_security = self.store.db.execute("SELECT 1 FROM tool_issues WHERE issue_id=? AND severity='security' AND status='security_review' AND tool_id=? AND repair_version=?", (security_review_issue_id, tool_id, version)).fetchone()
+                        if admitted_tool["status"] != "active" and not (verification_only and actor_member_id == admitted_tool["owner_member_id"] and admitted_tool["status"] in {"draft", "candidate"}) and not admitted_repair and not (admitted_security and admitted_tool["status"] in {"draft", "candidate", "active"}):
+                            raise ValueError("tool_version_state_changed")
+                        if version != admitted_tool["current_version"] and actor_member_id != admitted_tool["owner_member_id"] and not admitted_repair and not admitted_security:
+                            raise ValueError("tool_version_state_changed")
+                        if security_review_mode and not admitted_security:
+                            raise ValueError("security_review_version_unavailable")
+                        admitted_version = self.store.db.execute("SELECT source_path, content_hash, manifest FROM tool_versions WHERE tool_id=? AND version=?", (tool_id, version)).fetchone()
+                        if not admitted_version or admitted_version["source_path"] != row["source_path"] or admitted_version["content_hash"] != actual_hash or admitted_version["manifest"] != row["manifest"]:
+                            raise ValueError("tool_content_hash_mismatch")
+                        if source.resolve() != source or not source.is_relative_to(version_root) or not source.is_file():
+                            raise ValueError("tool_source_path_invalid")
+                        if hashlib.sha256(source.read_bytes()).hexdigest() != actual_hash:
+                            raise ValueError("tool_content_hash_mismatch")
+                        if runtime_profile == "host_trusted":
+                            latest_authorization = self.store.db.execute(
+                                "SELECT capabilities FROM host_authorizations WHERE authorization_id=? AND status='active'",
+                                (authorization["authorization_id"],),
+                            ).fetchone()
+                            if not latest_authorization:
+                                raise ValueError("host_authorization_revoked")
+                            if not set(required_host_capabilities).issubset(set(json.loads(latest_authorization["capabilities"]))):
+                                raise ValueError("host_authorization_capability_missing")
+                        if current_share is not None:
+                            admitted_share = self.store.db.execute("SELECT * FROM tool_shares WHERE share_id=? AND tool_id=? AND recipient_member_id=? AND version=?", (share_id, tool_id, actor_member_id, version)).fetchone()
+                            if not admitted_share or admitted_share["status"] not in {"trial", "active"} or admitted_share["permission"] != "team_execute":
+                                raise ValueError("tool_execute_denied")
+                            if admitted_share["expires_at"] is not None and admitted_share["expires_at"] <= time.time():
+                                raise ValueError("tool_trial_expired")
+                            if admitted_share["max_uses"] is not None and admitted_share["used_count"] >= admitted_share["max_uses"]:
+                                raise ValueError("tool_trial_exhausted")
+                            if admitted_share["issue_id"]:
+                                updated = self.store.db.execute("UPDATE tool_shares SET used_count=used_count+1 WHERE share_id=? AND status='trial' AND used_count < COALESCE(max_uses, 2147483647) AND (expires_at IS NULL OR expires_at>?)", (share_id, time.time()))
+                                if updated.rowcount != 1:
+                                    raise ValueError("tool_trial_exhausted")
+                                trial_reserved = True
+                        if work_budget is not None:
+                            if work_root.is_symlink():
+                                raise ValueError("tool_work_budget_unverifiable")
+                            if _retained_work_bytes(work_root) > work_budget:
+                                raise ValueError("tool_work_budget_exhausted")
+                        if runner is None:
+                            proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=work, env={"PATH": os.environ.get("PATH", ""), "PYTHONIOENCODING": "utf-8"}, shell=False)
                         else:
+                            task_snapshot = self.store.db.execute("SELECT revision,payload FROM tasks WHERE task_id=?", (task_id,)).fetchone() if task_id else None
+                            task_revision = task_snapshot["revision"] if task_snapshot else 0
+                            problem_revision = json.loads(task_snapshot["payload"]).get("problem_model", {}).get("revision", 0) if task_snapshot else 0
+                            # This is a business execution lease, not an OS privilege grant.
+                            permit_authorization = authorization["authorization_id"] if runtime_profile == "host_trusted" else "business:" + execution_id
+                            if runtime_profile == "host_trusted":
+                                self._bind_host_executor(permit_authorization, capabilities)
+                            self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "running", None, "", "", None, json.dumps(permissions), started, None, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+                            self._event(tool_id, version, "execution_started", {"execution_id": execution_id, "actor_member_id": actor_member_id}, f"tool:execution:{execution_id}:started")
+                        if owns_admission_transaction:
+                            self.store.db.execute("COMMIT")
+                            admission_committed = True
+                        else:
+                            self.store.db.execute("RELEASE " + admission_savepoint)
+                            admission_committed = True
+                    except BaseException:
+                        if self.store.db.in_transaction:
+                            if owns_admission_transaction:
+                                self.store.db.execute("ROLLBACK")
+                            else:
+                                self.store.db.execute("ROLLBACK TO " + admission_savepoint)
+                                self.store.db.execute("RELEASE " + admission_savepoint)
+                        raise
 
+                if runner is not None:
+                    from dataclasses import replace
+                    from .execution_contract import ExecutionRequest
+                    from .execution_permit import capability_digest, request_digest
+                    capabilities = runner.adapter.capabilities()
+                    if runtime_profile == "host_trusted":
+                        with self.store._write_lock:
+                            self._bind_host_executor(permit_authorization, capabilities)
+                    permit = {
+                        "member_id": actor_member_id, "task_id": task_id or "standalone:" + execution_id,
+                        "problem_revision": problem_revision, "tool_id": tool_id, "version": version,
+                        "source_path": str(source), "source_sha256": actual_hash, "manifest_sha256": manifest_digest, "manifest": unsigned,
+                        "input_sha256": input_hash, "permissions": permissions,
+                        "authorization_id": permit_authorization, "authorization_generation": 0,
+                        "expires_at": time.time() + 30, "executor_id": capabilities.executor_id,
+                        "instance_id": capabilities.instance_id, "capability_sha256": capability_digest(capabilities),
+                        "timeout": timeout, "output_limit": output_limit, "work_budget_bytes": work_budget,
+                    }
+                    request = ExecutionRequest(execution_id, "0" * 64, tuple(argv), work, encoded, timeout, output_limit, permit)
+                    request = replace(request, request_sha256=request_digest(request))
+                    def authorization_valid():
+                        with self.store._write_lock:
+                            try:
+                                if execution_guard is not None:
+                                    execution_guard()
+                                if task_id:
+                                    self.assert_task_authorization(actor_member_id, task_id, permissions)
+                                    latest_task = self.store.db.execute("SELECT revision,payload,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+                                    if not latest_task or latest_task["revision"] != task_revision or latest_task["status"] in {"done", "cancelled"}:
+                                        return False
+                                    if json.loads(latest_task["payload"]).get("problem_model", {}).get("revision", 0) != problem_revision:
+                                        return False
+                                latest = self.store.db.execute("SELECT status,current_version FROM tool_assets WHERE tool_id=?", (tool_id,)).fetchone()
+                                if not latest or latest["status"] != admitted_tool["status"] or latest["current_version"] != admitted_tool["current_version"]:
+                                    return False
+                                latest_version = self.store.db.execute("SELECT content_hash,manifest,source_path FROM tool_versions WHERE tool_id=? AND version=?", (tool_id, version)).fetchone()
+                                if not latest_version or latest_version["content_hash"] != actual_hash or latest_version["manifest"] != row["manifest"] or latest_version["source_path"] != row["source_path"]:
+                                    return False
+                                if source.is_symlink() or hashlib.sha256(source.read_bytes()).hexdigest() != actual_hash:
+                                    return False
+                                if self.store.db.execute("SELECT 1 FROM tool_circuit_breakers WHERE tool_id=? AND version=? AND status='open'", (tool_id, version)).fetchone():
+                                    return False
+                                if runtime_profile == "host_trusted":
+                                    latest_auth = self.store.db.execute("SELECT capabilities FROM host_authorizations WHERE authorization_id=? AND status='active'", (permit_authorization,)).fetchone()
+                                    if not latest_auth or not set(required_host_capabilities).issubset(json.loads(latest_auth[0])):
+                                        return False
+                                if current_share is not None:
+                                    latest_share = self.store.db.execute("SELECT status,expires_at FROM tool_shares WHERE share_id=?", (share_id,)).fetchone()
+                                    if not latest_share or latest_share["status"] not in {"trial", "active"} or (latest_share["expires_at"] is not None and latest_share["expires_at"] <= time.time()):
+                                        return False
+                                return True
+                            except (ValueError, OSError):
+                                return False
+                    observation = runner.run(request, authorization_valid=authorization_valid)
+                    result_status, exit_code, reason = observation.state, observation.exit_code, observation.reason
+                    if reason == 'output_limit':
+                        reason = 'output_limit_exceeded'
+                    elif result_status == 'cancelled' and reason not in {'authorization_revoked', 'control_lease_expired', 'executor_shutdown'}:
+                        reason = 'cancelled_by_actor'
+                    stdout = observation.metadata.get("stdout", "")
+                    stderr = observation.metadata.get("stderr", "")
+                    runtime_capabilities["tree_exit_confirmed"] = observation.tree_exit_confirmed
+                    runtime_capabilities["owner_sequence"] = observation.sequence
+                    if observation.reason == 'stop_unconfirmed' and observation.metadata.get('error_type'):
+                        runtime_capabilities['stop_error'] = {'type': observation.metadata['error_type'], 'code': observation.metadata.get('error_code')}
+                    if result_status == "success":
+                        contract = manifest.get("output_contract", {})
+                        try:
+                            decoded = stdout if contract.get("type") in {"text", "string"} else json.loads(stdout)
+                        except (TypeError, ValueError):
+                            result_status, reason = "failed", "output_contract_invalid_json"
+                        else:
                             output_errors = _contract_errors(decoded, contract)
-
                             assertion_errors = _business_assertion_errors(decoded, business_assertions) if not output_errors else []
                             if assertion_errors:
                                 result_status, reason = "failed", "business_assertion_failed:" + json.dumps(assertion_errors, separators=(",", ":"))
                             if output_errors:
-
                                 result_status, reason = "failed", "output_contract_invalid:" + json.dumps(output_errors, separators=(",", ":"))
+                else:
+                    with self._active_executions_lock:
+                        self._active_executions[execution_id] = {"process": proc, "actor_member_id": actor_member_id, "tool_id": tool_id, "version": version, "started_at": started, "cancel_requested": False, "cancel_cleanup_confirmed": None}
+                    with self.store._write_lock:
+                        self.store.db.execute("SAVEPOINT execution_started")
+                        try:
+                            self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "running", None, "", "", None, json.dumps(permissions), started, None, runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+                            self._event(tool_id, version, "execution_started", {"execution_id": execution_id, "actor_member_id": actor_member_id}, f"tool:execution:{execution_id}:started")
+                            self.store.db.execute("RELEASE execution_started")
+                        except BaseException:
+                            self.store.db.execute("ROLLBACK TO execution_started")
+                            self.store.db.execute("RELEASE execution_started")
+                            raise
 
-        except OSError as exc:
+                    captured: dict[str, bytes] = {"stdout": b"", "stderr": b""}
+                    overflow = threading.Event()
 
+                    def drain(name, pipe):
+                        chunks = bytearray()
+                        while True:
+                            chunk = pipe.read(8192)
+                            if not chunk:
+                                break
+                            remaining = output_limit - len(chunks)
+                            if remaining > 0:
+                                chunks.extend(chunk[:remaining])
+                            if len(chunk) > remaining:
+                                overflow.set()
+                                try:
+                                    _terminate_process_tree(proc)
+                                except OSError:
+                                    pass
+                                break
+                        captured[name] = bytes(chunks)
+
+                    readers = [threading.Thread(target=drain, args=("stdout", proc.stdout), daemon=True), threading.Thread(target=drain, args=("stderr", proc.stderr), daemon=True)]
+                    for reader in readers:
+                        reader.start()
+                    try:
+                        proc.stdin.write(encoded)
+                        proc.stdin.close()
+                        proc.wait(timeout=timeout)
+                    except subprocess.TimeoutExpired:
+                        cleaned = _terminate_process_tree(proc)
+                        try:
+                            proc.wait(timeout=1.0)
+                        except subprocess.TimeoutExpired:
+                            cleaned = False
+                        result_status = "failed" if cleaned else "unknown"
+                        reason = "timeout" if cleaned else "cleanup_unconfirmed"
+                        termination_reason_locked = True
+                    except (BrokenPipeError, OSError):
+                        try:
+                            proc.wait(timeout=1.0)
+                        except subprocess.TimeoutExpired:
+                            result_status, reason = "unknown", "process_io_exit_unconfirmed"
+                            termination_reason_locked = True
+                    finally:
+                        for reader in readers:
+                            reader.join(timeout=2)
+                    exit_code = proc.returncode
+                    cancel_cleanup_confirmed = None
+                    with self._active_executions_lock:
+                        active = self._active_executions.get(execution_id)
+                        cancel_requested = bool(active and active["cancel_requested"])
+                    if cancel_requested:
+                        deadline = time.monotonic() + 5.0
+                        while time.monotonic() < deadline:
+                            with self._active_executions_lock:
+                                active = self._active_executions.get(execution_id)
+                                cancel_cleanup_confirmed = active.get("cancel_cleanup_confirmed") if active else None
+                            if cancel_cleanup_confirmed is not None:
+                                break
+                            time.sleep(0.01)
+                    with self._active_executions_lock:
+                        active = self._active_executions.get(execution_id)
+                        cancel_requested = cancel_requested or bool(active and active["cancel_requested"])
+                        if cancel_cleanup_confirmed is None and active:
+                            cancel_cleanup_confirmed = active.get("cancel_cleanup_confirmed")
+                        if proc.poll() is not None:
+                            self._active_executions.pop(execution_id, None)
+                        elif active:
+                            active["worker_finished"] = True
+                    recorded = self.store.db.execute("SELECT termination_reason FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+                    recorded_reason = recorded["termination_reason"] if recorded else None
+                    if recorded_reason in {"cancelled_by_actor", "cancel_unconfirmed"}:
+                        cancel_requested = True
+                    if cancel_requested and not termination_reason_locked:
+                        recorded = self.store.db.execute("SELECT termination_reason FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+                        recorded_reason = recorded["termination_reason"] if recorded else None
+                        if recorded_reason in {"cancelled_by_actor", "cancel_unconfirmed"}:
+                            reason = recorded_reason
+                            result_status = "cancelled" if reason == "cancelled_by_actor" else "unknown"
+                        else:
+                            result_status = "cancelled" if cancel_cleanup_confirmed is True and proc.poll() is not None else "unknown"
+                            reason = "cancelled_by_actor" if result_status == "cancelled" else "cancel_unconfirmed"
+                        termination_reason_locked = True
+                    out, err = captured["stdout"], captured["stderr"]
+                    stdout, stderr = out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
+                    if not cancel_requested and not termination_reason_locked:
+                        result_status = "failed" if overflow.is_set() or exit_code else "success"
+                        reason = "output_limit_exceeded" if overflow.is_set() else (None if exit_code == 0 else "nonzero_exit")
+                        if result_status == "success":
+
+                            contract = manifest.get("output_contract", {})
+
+                            try:
+
+                                decoded = stdout if contract.get("type") in {"text", "string"} else json.loads(stdout)
+
+                            except (TypeError, ValueError):
+
+                                result_status, reason = "failed", "output_contract_invalid_json"
+
+                            else:
+
+                                output_errors = _contract_errors(decoded, contract)
+
+                                assertion_errors = _business_assertion_errors(decoded, business_assertions) if not output_errors else []
+                                if assertion_errors:
+                                    result_status, reason = "failed", "business_assertion_failed:" + json.dumps(assertion_errors, separators=(",", ":"))
+                                if output_errors:
+
+                                    result_status, reason = "failed", "output_contract_invalid:" + json.dumps(output_errors, separators=(",", ":"))
+
+        except ExecutionNotStarted:
+            result_status, reason = "cancelled", "cancelled_by_actor"
+            runtime_capabilities["execution_not_started"] = True
+            termination_reason_locked = True
+
+        except (OSError, ValueError, RuntimeError, sqlite3.Error) as exc:
+
+            if runner is not None:
+                if execution_id in runner.unresolved():
+                    result_status, reason = "unknown", "execution_owner_exit_unconfirmed"
+                    termination_reason_locked = True
+                stderr = str(exc)[:output_limit]
+            if proc is not None:
+                result_status = "unknown" if proc.poll() is None else "failed"
+                reason = "process_exit_unconfirmed" if result_status == "unknown" else "execution_failed"
+                stderr = str(exc)[:output_limit]
+                termination_reason_locked = True
             if not termination_reason_locked:
                 stderr, reason = str(exc)[:output_limit], "launch_failed"
-            if not self.store.db.execute("SELECT 1 FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone():
-                self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "failed", None, "", stderr, reason, json.dumps(permissions), started, time.time(), runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+            try:
+                with self.store._write_lock:
+                    if not self.store.db.execute("SELECT 1 FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone():
+                        self.store.db.execute("INSERT INTO tool_executions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (execution_id, tool_id, version, actor_member_id, task_id, input_hash, 0, "failed", None, "", stderr, reason, json.dumps(permissions), started, time.time(), runtime_backend, isolation_level, json.dumps(runtime_capabilities), json.dumps(business_assertions)))
+            except sqlite3.Error:
+                # Final persistence below records the failure outside SQLite.
+                pass
+
+        finally:
+            if proc is not None:
+                with self._active_executions_lock:
+                    active = self._active_executions.get(execution_id)
+                    if proc.poll() is not None:
+                        self._active_executions.pop(execution_id, None)
+                    elif active:
+                        active["worker_finished"] = True
+
+        if runtime_capabilities.get("cwd"):
+            try:
+                runtime_capabilities["work_bytes"] = _retained_work_bytes(Path(runtime_capabilities["cwd"]))
+                runtime_capabilities["retained_work_bytes"] = _retained_work_bytes(work_root)
+                runtime_capabilities["work_budget_status"] = "unlimited" if work_budget is None else "within_budget"
+                if work_budget is not None and runtime_capabilities["retained_work_bytes"] > work_budget:
+                    runtime_capabilities["work_budget_status"] = "exceeded"
+                    if result_status == "success":
+                        result_status, reason = "failed", "tool_work_budget_exhausted"
+            except ValueError:
+                runtime_capabilities["work_budget_status"] = "unverifiable"
+                if result_status == "success":
+                    result_status, reason = "failed", "tool_work_budget_unverifiable"
+
+        stop_error = runtime_capabilities.get("stop_error")
+        if proc is not None and getattr(proc, "_butian_stop_permission_denied", False):
+            stop_error = {"code": getattr(proc, "_butian_stop_error_code", None), "type": getattr(proc, "_butian_stop_error_type", None)}
+            runtime_capabilities["stop_error"] = stop_error
 
         finished = time.time()
 
-        self.store.db.execute("UPDATE tool_executions SET status=?, exit_code=?, stdout=?, stderr=?, termination_reason=?, finished_at=? WHERE execution_id=?", (result_status, exit_code, stdout, stderr, reason, finished, execution_id))
-        self._event(tool_id, version, "execution", {"execution_id": execution_id, "actor_member_id": actor_member_id, "status": result_status, "reason": reason}, f"tool:execution:{execution_id}")
+        audit_status = "committed"
+        recovery_record = None
+        recovery_error_type = None
+        try:
+            with self.store._write_lock:
+                self.store.db.execute("SAVEPOINT execution_result")
+                try:
+                    dispatch_table = self.store.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='execution_dispatch'").fetchone()
+                    dispatch_exists = dispatch_table and self.store.db.execute("SELECT 1 FROM execution_dispatch WHERE execution_id=?", (execution_id,)).fetchone()
+                    if trial_reserved and admission_committed and proc is None and not dispatch_exists and (reason == "launch_failed" or runtime_capabilities.get("execution_not_started")):
+                        self.store.db.execute("UPDATE tool_shares SET used_count=used_count-1 WHERE share_id=? AND used_count>0", (share_id,))
+                    self.store.db.execute("UPDATE tool_executions SET status=?, exit_code=?, stdout=?, stderr=?, termination_reason=?, finished_at=?, isolation_capabilities=? WHERE execution_id=?", (result_status, exit_code, stdout, stderr, reason, finished, json.dumps(runtime_capabilities), execution_id))
+                    self._event(tool_id, version, "execution", {"execution_id": execution_id, "actor_member_id": actor_member_id, "status": result_status, "reason": reason, "stop_error": stop_error}, f"tool:execution:{execution_id}")
+                    if result_status in {"failed", "cancelled"}:
+                        self.report_issue(actor_member_id, tool_id, version, description=f"Execution {execution_id}: {reason}", execution_id=execution_id)
+                    self.store.db.execute("RELEASE execution_result")
+                except BaseException:
+                    self.store.db.execute("ROLLBACK TO execution_result")
+                    self.store.db.execute("RELEASE execution_result")
+                    raise
+        except sqlite3.Error as exc:
+            audit_status = "persistence_failed"
+            record = {"execution_id": execution_id, "tool_id": tool_id, "version": version,
+                      "actor_member_id": actor_member_id, "task_id": task_id,
+                      "pid": proc.pid if proc is not None else None, "status": result_status,
+                      "termination_reason": reason, "started_at": started, "finished_at": finished,
+                      "audit_status": audit_status, "error_type": type(exc).__name__, "isolation_capabilities": runtime_capabilities}
+            directory = self.home / "execution_recovery"
+            target = directory / (execution_id + ".json")
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                # Exclusive creation preserves prior recovery evidence.
+                with target.open("x", encoding="utf-8") as handle:
+                    json.dump(record, handle, ensure_ascii=False, sort_keys=True)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                recovery_record = str(target.resolve())
+            except OSError as recovery_exc:
+                recovery_error_type = type(recovery_exc).__name__
+            with self._active_executions_lock:
+                self._execution_recovery_snapshots[execution_id] = {**record, "recovery_record": recovery_record, "recovery_error_type": recovery_error_type}
+                active = self._active_executions.get(execution_id)
+                if active:
+                    active["recovery_record"] = recovery_record
+                    active["audit_status"] = audit_status
+                    active["recovery_error_type"] = recovery_error_type
+                    active["recovery_snapshot"] = record
 
-        if result_status in {"failed", "cancelled"}:
-
-            self.report_issue(actor_member_id, tool_id, version, description=f"Execution {execution_id}: {reason}", execution_id=execution_id)
-
-        return {**common, "status": result_status, "exit_code": exit_code, "stdout": stdout, "stderr": stderr, "termination_reason": reason, "input_hash": input_hash, "expected_output": decoded if result_status == "success" else None}
-
-
+        return {**common, "status": result_status, "exit_code": exit_code, "stdout": stdout, "stderr": stderr, "termination_reason": reason, "input_hash": input_hash, "expected_output": decoded if result_status == "success" else None, "audit_status": audit_status, "recovery_record": recovery_record, "recovery_error_type": recovery_error_type, "stop_error": stop_error}
 
     def _issue_access(self, actor, tool_id, version):
 
@@ -927,7 +1354,22 @@ class ToolStore:
 
 
 
-    def report_issue(self, actor, tool_id, version, *, description, execution_id=None, severity="bug", environment=None, input_summary=None, expected_output=None, actual_output=None, reproduction_steps=None, impact_scope=None):
+    def report_issue(self, actor, tool_id, version, **kwargs):
+        with self.store._write_lock:
+            savepoint = "report_issue_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                # Reserve the database writer before permission and duplicate checks.
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._report_issue(actor, tool_id, version, **kwargs)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _report_issue(self, actor, tool_id, version, *, description, execution_id=None, severity="bug", environment=None, input_summary=None, expected_output=None, actual_output=None, reproduction_steps=None, impact_scope=None):
 
         self._issue_access(actor, tool_id, version)
 
@@ -985,6 +1427,20 @@ class ToolStore:
 
 
     def repair_issue(self, owner_member_id, issue_id, *, repair_version, diagnosis):
+        with self.store._write_lock:
+            savepoint = "repair_issue_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._repair_issue(owner_member_id, issue_id, repair_version=repair_version, diagnosis=diagnosis)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _repair_issue(self, owner_member_id, issue_id, *, repair_version, diagnosis):
 
         row = self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone()
 
@@ -1012,19 +1468,15 @@ class ToolStore:
         if row["severity"] == "security":
             self._member_dir(owner_member_id)
             now = time.time()
-            self.store.db.execute("BEGIN")
             try:
                 self.store.db.execute("UPDATE tool_issues SET status='security_review', repair_version=?, diagnosis=?, updated_at=? WHERE issue_id=?", (repair_version, diagnosis, now, issue_id))
                 self._event(row["tool_id"], repair_version, "security_repair_proposed", {"issue_id": issue_id, "repair_version": repair_version}, f"issue:{issue_id}:security-repair:{repair_version}")
-                self.store.db.commit()
             except BaseException:
-                self.store.db.rollback()
                 raise
             return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone())
         now = time.time()
         trial_share_id = f"share_{uuid.uuid4().hex}"
         expires_at = now + 7 * 24 * 60 * 60
-        self.store.db.execute("BEGIN")
         try:
             existing = self.store.db.execute("SELECT share_id, status FROM tool_shares WHERE tool_id=? AND version=? AND recipient_member_id=?", (row["tool_id"], repair_version, row["reporter_member_id"])).fetchone()
             if existing and existing["status"] != "revoked":
@@ -1037,15 +1489,29 @@ class ToolStore:
                 (trial_share_id, row["tool_id"], repair_version, owner_member_id, row["reporter_member_id"], "team_execute", "trial", now, issue_id, 3, 0, expires_at),
             )
             self._event(row["tool_id"], repair_version, "issue_repair_proposed", {"issue_id": issue_id, "repair_version": repair_version, "trial_share_id": trial_share_id, "trial_expires_at": expires_at, "trial_max_uses": 3}, f"issue:{issue_id}:repair:{repair_version}")
-            self.store.db.commit()
         except BaseException:
-            self.store.db.rollback()
             raise
         return {**dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone()), "trial_share_id": trial_share_id, "trial_expires_at": expires_at, "trial_max_uses": 3}
 
 
 
     def confirm_repair(self, confirmer_member_id, issue_id, *, execution_id, resolved):
+        if not isinstance(resolved, bool):
+            raise ValueError("tool_repair_resolution_must_be_boolean")
+        with self.store._write_lock:
+            savepoint = "confirm_repair_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._confirm_repair(confirmer_member_id, issue_id, execution_id=execution_id, resolved=resolved)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _confirm_repair(self, confirmer_member_id, issue_id, *, execution_id, resolved):
 
         row = self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone()
 
@@ -1072,16 +1538,13 @@ class ToolStore:
 
         status = "resolved" if resolved else "reopened"
         now = time.time()
-        self.store.db.execute("BEGIN")
         try:
             updated = self.store.db.execute("UPDATE tool_issues SET status=?, updated_at=? WHERE issue_id=? AND status='awaiting_confirmation'", (status, now, issue_id))
             if updated.rowcount != 1:
                 raise ValueError("tool_issue_not_awaiting_confirmation")
             self.store.db.execute("UPDATE tool_shares SET status='revoked' WHERE issue_id=? AND status='trial'", (issue_id,))
             self._event(row["tool_id"], row["repair_version"], "issue_repair_confirmed", {"issue_id": issue_id, "status": status, "execution_id": execution_id}, f"issue:{issue_id}:confirm:{execution_id}")
-            self.store.db.commit()
         except BaseException:
-            self.store.db.rollback()
             raise
 
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone())
@@ -1089,6 +1552,22 @@ class ToolStore:
 
 
     def review_security_issue(self, reviewer_member_id, issue_id, *, execution_id, evidence_ids, resolved):
+        if not isinstance(resolved, bool):
+            raise ValueError("tool_repair_resolution_must_be_boolean")
+        with self.store._write_lock:
+            savepoint = "review_security_issue_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._review_security_issue(reviewer_member_id, issue_id, execution_id=execution_id, evidence_ids=evidence_ids, resolved=resolved)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _review_security_issue(self, reviewer_member_id, issue_id, *, execution_id, evidence_ids, resolved):
         row = self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone()
         if not row:
             raise ValueError("tool_issue_not_found")
@@ -1109,15 +1588,12 @@ class ToolStore:
                 raise ValueError("tool_security_review_evidence_invalid")
         status = "resolved" if resolved else "reopened"
         now = time.time()
-        self.store.db.execute("BEGIN")
         try:
             updated = self.store.db.execute("UPDATE tool_issues SET status=?, review_member_id=?, review_execution_id=?, review_evidence=?, updated_at=? WHERE issue_id=? AND status IN ('security_review','reopened')", (status, reviewer_member_id, execution_id, json.dumps(list(dict.fromkeys(evidence_ids))), now, issue_id))
             if updated.rowcount != 1:
                 raise ValueError("tool_security_review_not_pending")
             self._event(row["tool_id"], row["repair_version"], "security_issue_reviewed", {"issue_id": issue_id, "status": status, "reviewer": reviewer_member_id, "execution_id": execution_id, "evidence_ids": list(dict.fromkeys(evidence_ids))}, f"issue:{issue_id}:security-review:{execution_id}")
-            self.store.db.commit()
         except BaseException:
-            self.store.db.rollback()
             raise
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?", (issue_id,)).fetchone())
 
@@ -1190,6 +1666,20 @@ class ToolStore:
         return {"tool_id":tool_id,"version":version,"environment":environment or {},"counts":counts,"reliability_lower":wilson_lower(counts["success"],counts["failure"]),"sample_count":sum(counts.values()),"paired":{"n":len(comparable),"improved":wins,"regressed":losses,"net_improved":wins-losses,"improvement_confidence_interval":improvement_interval}}
 
     def triage_issue(self, actor_member_id, issue_id, *, status="triaged", reason="", due_seconds=86400):
+        with self.store._write_lock:
+            savepoint = "issue_information_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._triage_issue(actor_member_id, issue_id, status=status, reason=reason, due_seconds=due_seconds)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _triage_issue(self, actor_member_id, issue_id, *, status="triaged", reason="", due_seconds=86400):
         row=self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()
         if not row: raise ValueError("tool_issue_not_found")
         tool=self._tool(row["tool_id"])
@@ -1200,43 +1690,73 @@ class ToolStore:
         escalation_target = self.store.get_setting("dispatcher_member_id") if status == "rejected" else None
         if status == "rejected" and not escalation_target: raise ValueError("issue_dispatcher_not_configured")
         now=time.time()
-        self.store.db.execute("BEGIN")
-        try:
-            self.store.db.execute("UPDATE tool_issues SET status=?,triage_owner_member_id=?,triage_reason=?,rejection_reason=?,escalation_to_member_id=?,escalated_at=?,due_at=?,updated_at=? WHERE issue_id=?",(status,actor_member_id,reason or None,reason if status=="rejected" else None,escalation_target,now if status=="rejected" else None,now+max(1,float(due_seconds)),now,issue_id))
-            self._event(row["tool_id"],row["version"],"issue_triaged",{"issue_id":issue_id,"status":status,"reason":reason},f"issue:{issue_id}:triage:{status}")
-            self._issue_event(issue_id, actor_member_id, "triaged", row["status"], status, {"reason":reason})
-            self.store.db.commit()
-        except BaseException:
-            self.store.db.rollback()
-            raise
+        self.store.db.execute("UPDATE tool_issues SET status=?,triage_owner_member_id=?,triage_reason=?,rejection_reason=?,escalation_to_member_id=?,escalated_at=?,due_at=?,updated_at=? WHERE issue_id=?",(status,actor_member_id,reason or None,reason if status=="rejected" else None,escalation_target,now if status=="rejected" else None,now+max(1,float(due_seconds)),now,issue_id))
+        self._event(row["tool_id"],row["version"],"issue_triaged",{"issue_id":issue_id,"status":status,"reason":reason},f"issue:{issue_id}:triage:{status}")
+        self._issue_event(issue_id, actor_member_id, "triaged", row["status"], status, {"reason":reason})
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
     def request_issue_information(self, actor_member_id, issue_id, *, request):
+        with self.store._write_lock:
+            savepoint = "issue_information_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._request_issue_information(actor_member_id, issue_id, request=request)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _request_issue_information(self, actor_member_id, issue_id, *, request):
         row=self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()
         if not row: raise ValueError("tool_issue_not_found")
         if actor_member_id != self._tool(row["tool_id"])["owner_member_id"] or not request.strip(): raise ValueError("tool_access_denied" if not request.strip() else "tool_access_denied")
         if row["status"] not in {"open","triaged","repairing","needs_information"}: raise ValueError("invalid_tool_issue_transition")
-        now=time.time(); self.store.db.execute("BEGIN")
-        try:
-            self.store.db.execute("UPDATE tool_issues SET status='needs_information',requested_information=?,updated_at=? WHERE issue_id=?",(request,now,issue_id)); self._event(row["tool_id"],row["version"],"issue_information_requested",{"issue_id":issue_id,"request":request},f"issue:{issue_id}:information:{uuid.uuid4().hex}"); self._issue_event(issue_id, actor_member_id, "information_requested", row["status"], "needs_information", {"request":request}); self.store.db.commit()
-        except BaseException:
-            self.store.db.rollback(); raise
+        now=time.time()
+        self.store.db.execute("UPDATE tool_issues SET status='needs_information',requested_information=?,updated_at=? WHERE issue_id=?",(request,now,issue_id)); self._event(row["tool_id"],row["version"],"issue_information_requested",{"issue_id":issue_id,"request":request},f"issue:{issue_id}:information:{uuid.uuid4().hex}"); self._issue_event(issue_id, actor_member_id, "information_requested", row["status"], "needs_information", {"request":request})
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
     def provide_issue_information(self, reporter_member_id, issue_id, *, information):
+        with self.store._write_lock:
+            savepoint = "issue_information_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._provide_issue_information(reporter_member_id, issue_id, information=information)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _provide_issue_information(self, reporter_member_id, issue_id, *, information):
         row=self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()
         if not row: raise ValueError("tool_issue_not_found")
         if reporter_member_id != row["reporter_member_id"]: raise ValueError("tool_issue_reporter_required")
         if row["status"] != "needs_information" or not information.strip(): raise ValueError("tool_issue_information_not_requested")
-        now=time.time(); self.store.db.execute("BEGIN")
-        try:
-            self.store.db.execute("UPDATE tool_issues SET status='open',requested_information=NULL,description=description || char(10) || 'Reporter information: ' || ?,updated_at=? WHERE issue_id=?",(information,now,issue_id)); self._issue_event(issue_id, reporter_member_id, "information_provided", row["status"], "open", {"information_hash": hashlib.sha256(information.encode()).hexdigest()}, f"issue:{issue_id}:information-provided:{uuid.uuid4().hex}")
-            self._event(row["tool_id"],row["version"],"issue_information_provided",{"issue_id":issue_id},f"issue:{issue_id}:information-provided:{uuid.uuid4().hex}"); self.store.db.commit()
-        except BaseException:
-            self.store.db.rollback(); raise
+        now=time.time()
+        self.store.db.execute("UPDATE tool_issues SET status='open',requested_information=NULL,description=description || char(10) || 'Reporter information: ' || ?,updated_at=? WHERE issue_id=?",(information,now,issue_id)); self._issue_event(issue_id, reporter_member_id, "information_provided", row["status"], "open", {"information_hash": hashlib.sha256(information.encode()).hexdigest()}, f"issue:{issue_id}:information-provided:{uuid.uuid4().hex}")
+        self._event(row["tool_id"],row["version"],"issue_information_provided",{"issue_id":issue_id},f"issue:{issue_id}:information-provided:{uuid.uuid4().hex}")
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
     def link_duplicate_issue(self, actor_member_id, issue_id, duplicate_of):
+        with self.store._write_lock:
+            savepoint = "issue_duplicate_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._link_duplicate_issue(actor_member_id, issue_id, duplicate_of)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _link_duplicate_issue(self, actor_member_id, issue_id, duplicate_of):
         row=self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone(); parent=self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(duplicate_of,)).fetchone()
         if not row or not parent: raise ValueError("tool_issue_not_found")
         if actor_member_id != self._tool(row["tool_id"])["owner_member_id"]: raise ValueError("tool_access_denied")
@@ -1255,6 +1775,20 @@ class ToolStore:
         return dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone())
 
     def escalate_issue(self, actor_member_id, issue_id, *, reason="timeout", now=None):
+        with self.store._write_lock:
+            savepoint = "issue_escalation_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._escalate_issue(actor_member_id, issue_id, reason=reason, now=now)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _escalate_issue(self, actor_member_id, issue_id, *, reason="timeout", now=None):
         row=self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()
         if not row: raise ValueError("tool_issue_not_found")
         if actor_member_id != self._tool(row["tool_id"])["owner_member_id"]: raise ValueError("tool_access_denied")
@@ -1263,23 +1797,17 @@ class ToolStore:
         target = self.store.get_setting("dispatcher_member_id")
         if not target:
             raise ValueError("issue_dispatcher_not_configured")
-        self.store.db.execute("BEGIN IMMEDIATE")
-        try:
-            self.store.db.execute("UPDATE tool_issues SET escalated_at=?,escalation_to_member_id=?,updated_at=? WHERE issue_id=?",(stamp,target,stamp,issue_id))
-            work_item_id = "escalation_" + uuid.uuid4().hex
-            existing = self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE issue_id=? AND dispatcher_member_id=? AND reason=? AND status IN ('open','claimed') ORDER BY created_at DESC LIMIT 1", (issue_id, target, reason)).fetchone()
-            if existing:
-                work_item_id = existing["work_item_id"]
-            else:
-                self.store.db.execute("INSERT INTO tool_issue_escalations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (work_item_id, issue_id, target, "open", reason, None, None, stamp, None, None, stamp))
-                self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "created", actor_member_id, json.dumps({"issue_id": issue_id, "reason": reason}, ensure_ascii=False), f"escalation:{work_item_id}:created", stamp))
-            self._event(row["tool_id"],row["version"],"issue_escalated",{"issue_id":issue_id,"reason":reason,"work_item_id":work_item_id,"dispatcher_member_id":target},f"issue:{issue_id}:escalate:{int(stamp)}")
-            result = {**dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()), "work_item_id": work_item_id}
-            self.store.db.commit()
-            return result
-        except BaseException:
-            self.store.db.rollback()
-            raise
+        self.store.db.execute("UPDATE tool_issues SET escalated_at=?,escalation_to_member_id=?,updated_at=? WHERE issue_id=?",(stamp,target,stamp,issue_id))
+        work_item_id = "escalation_" + uuid.uuid4().hex
+        existing = self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE issue_id=? AND dispatcher_member_id=? AND reason=? AND status IN ('open','claimed') ORDER BY created_at DESC LIMIT 1", (issue_id, target, reason)).fetchone()
+        if existing:
+            work_item_id = existing["work_item_id"]
+        else:
+            self.store.db.execute("INSERT INTO tool_issue_escalations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (work_item_id, issue_id, target, "open", reason, None, None, stamp, None, None, stamp))
+            self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "created", actor_member_id, json.dumps({"issue_id": issue_id, "reason": reason}, ensure_ascii=False), f"escalation:{work_item_id}:created", stamp))
+        self._event(row["tool_id"],row["version"],"issue_escalated",{"issue_id":issue_id,"reason":reason,"work_item_id":work_item_id,"dispatcher_member_id":target},f"issue:{issue_id}:escalate:{int(stamp)}")
+        result = {**dict(self.store.db.execute("SELECT * FROM tool_issues WHERE issue_id=?",(issue_id,)).fetchone()), "work_item_id": work_item_id}
+        return result
 
     def list_issue_escalations(self, dispatcher_member_id, *, status=None):
         args=[dispatcher_member_id]
@@ -1290,56 +1818,70 @@ class ToolStore:
         return [dict(row) for row in self.store.db.execute(sql, args).fetchall()]
 
     def claim_issue_escalation(self, dispatcher_member_id, work_item_id):
+        with self.store._write_lock:
+            savepoint = "issue_escalation_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._claim_issue_escalation(dispatcher_member_id, work_item_id)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _claim_issue_escalation(self, dispatcher_member_id, work_item_id):
         now=time.time()
         row=self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone()
         if not row: raise ValueError("tool_issue_escalation_not_found")
         if row["dispatcher_member_id"] != dispatcher_member_id: raise ValueError("tool_issue_escalation_forbidden")
         if row["status"] != "open": raise ValueError("tool_issue_escalation_not_open")
-        self.store.db.execute("BEGIN IMMEDIATE")
-        try:
-            updated = self.store.db.execute("UPDATE tool_issue_escalations SET status='claimed',claimed_by=?,claimed_at=?,updated_at=? WHERE work_item_id=? AND status='open'", (dispatcher_member_id, now, now, work_item_id)).rowcount
-            if updated != 1:
-                self.store.db.rollback()
-                raise ValueError("tool_issue_escalation_not_open")
-            self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "claimed", dispatcher_member_id, "{}", f"escalation:{work_item_id}:claimed", now))
-            result = dict(self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone())
-            self.store.db.commit()
-            return result
-        except BaseException:
-            self.store.db.rollback()
-            raise
+        updated = self.store.db.execute("UPDATE tool_issue_escalations SET status='claimed',claimed_by=?,claimed_at=?,updated_at=? WHERE work_item_id=? AND status='open'", (dispatcher_member_id, now, now, work_item_id)).rowcount
+        if updated != 1:
+            raise ValueError("tool_issue_escalation_not_open")
+        self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "claimed", dispatcher_member_id, "{}", f"escalation:{work_item_id}:claimed", now))
+        result = dict(self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone())
+        return result
 
     def resolve_issue_escalation(self, dispatcher_member_id, work_item_id, *, status, resolution=""):
+        with self.store._write_lock:
+            savepoint = "issue_escalation_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_issues SET status=status WHERE 0")
+                result = self._resolve_issue_escalation(dispatcher_member_id, work_item_id, status=status, resolution=resolution)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _resolve_issue_escalation(self, dispatcher_member_id, work_item_id, *, status, resolution=""):
         if status not in {"completed", "rejected"}: raise ValueError("invalid_tool_issue_escalation_status")
         now=time.time(); row=self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone()
         if not row: raise ValueError("tool_issue_escalation_not_found")
         if row["dispatcher_member_id"] != dispatcher_member_id or row["claimed_by"] != dispatcher_member_id: raise ValueError("tool_issue_escalation_forbidden")
         if row["status"] != "claimed": raise ValueError("tool_issue_escalation_not_claimed")
         if status == "rejected" and not resolution.strip(): raise ValueError("tool_issue_escalation_rejection_reason_required")
-        self.store.db.execute("BEGIN IMMEDIATE")
-        try:
-            updated = self.store.db.execute("UPDATE tool_issue_escalations SET status=?,resolution=?,completed_at=?,updated_at=? WHERE work_item_id=? AND status='claimed'", (status, resolution, now, now, work_item_id)).rowcount
-            if updated != 1:
-                self.store.db.rollback()
-                raise ValueError("tool_issue_escalation_not_claimed")
-            self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, status, dispatcher_member_id, json.dumps({"resolution": resolution}, ensure_ascii=False), f"escalation:{work_item_id}:{status}", now))
-            result = dict(self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone())
-            issue = self.store.db.execute("SELECT status FROM tool_issues WHERE issue_id=?", (row["issue_id"],)).fetchone()
-            # Dispatcher completion records handling of the work item; only the reporter's verified repair confirmation resolves the issue.
-            result["issue_status"] = issue["status"] if issue else None
-            result["issue_resolution_required"] = True
-            if status == "rejected":
-                next_item_id = "escalation_" + uuid.uuid4().hex
-                self.store.db.execute("INSERT INTO tool_issue_escalations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (next_item_id, row["issue_id"], row["dispatcher_member_id"], "open", "re-escalated", None, None, now, None, None, now))
-                payload = json.dumps({"previous_work_item_id": work_item_id, "reason": resolution}, ensure_ascii=False)
-                self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, next_item_id, "created", dispatcher_member_id, payload, f"escalation:{next_item_id}:created", now))
-                self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "re-escalated", dispatcher_member_id, json.dumps({"next_work_item_id": next_item_id}, ensure_ascii=False), f"escalation:{work_item_id}:re-escalated", now))
-                result["next_work_item_id"] = next_item_id
-            self.store.db.commit()
-            return result
-        except BaseException:
-            self.store.db.rollback()
-            raise
+        updated = self.store.db.execute("UPDATE tool_issue_escalations SET status=?,resolution=?,completed_at=?,updated_at=? WHERE work_item_id=? AND status='claimed'", (status, resolution, now, now, work_item_id)).rowcount
+        if updated != 1:
+            raise ValueError("tool_issue_escalation_not_claimed")
+        self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, status, dispatcher_member_id, json.dumps({"resolution": resolution}, ensure_ascii=False), f"escalation:{work_item_id}:{status}", now))
+        result = dict(self.store.db.execute("SELECT * FROM tool_issue_escalations WHERE work_item_id=?", (work_item_id,)).fetchone())
+        issue = self.store.db.execute("SELECT status FROM tool_issues WHERE issue_id=?", (row["issue_id"],)).fetchone()
+        # Dispatcher completion records handling of the work item; only the reporter's verified repair confirmation resolves the issue.
+        result["issue_status"] = issue["status"] if issue else None
+        result["issue_resolution_required"] = True
+        if status == "rejected":
+            next_item_id = "escalation_" + uuid.uuid4().hex
+            self.store.db.execute("INSERT INTO tool_issue_escalations VALUES (?,?,?,?,?,?,?,?,?,?,?)", (next_item_id, row["issue_id"], row["dispatcher_member_id"], "open", "re-escalated", None, None, now, None, None, now))
+            payload = json.dumps({"previous_work_item_id": work_item_id, "reason": resolution}, ensure_ascii=False)
+            self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, next_item_id, "created", dispatcher_member_id, payload, f"escalation:{next_item_id}:created", now))
+            self.store.db.execute("INSERT INTO tool_issue_escalation_events VALUES (?,?,?,?,?,?,?)", ("eevent_" + uuid.uuid4().hex, work_item_id, "re-escalated", dispatcher_member_id, json.dumps({"next_work_item_id": next_item_id}, ensure_ascii=False), f"escalation:{work_item_id}:re-escalated", now))
+            result["next_work_item_id"] = next_item_id
+        return result
 
     def expire_issue_escalations(self, actor_member_id=None, *, now=None):
         stamp=time.time() if now is None else float(now)
@@ -1374,21 +1916,118 @@ class ToolStore:
             raise ValueError("tool_version_not_found")
         now = time.time()
         authorization_id = "hauth_" + uuid.uuid4().hex
-        self.store.db.execute("INSERT INTO host_authorizations VALUES (?,?,?,?,?,?,?,?,?,?)", (authorization_id, owner_member_id, tool_id, version, json.dumps(sorted(set(capabilities))), "active", reason, now, None, None))
-        self._event(tool_id, version, "host_authorization_granted", {"authorization_id": authorization_id, "capabilities": sorted(set(capabilities))}, f"host-auth:{authorization_id}:grant")
+        caps = self.execution_runner.adapter.capabilities() if self.execution_runner is not None else None
+        with self.store._write_lock:
+            savepoint = 'host_grant_' + uuid.uuid4().hex
+            self.store.db.execute('SAVEPOINT ' + savepoint)
+            try:
+                self.store.db.execute("INSERT INTO host_authorizations VALUES (?,?,?,?,?,?,?,?,?,?)", (authorization_id, owner_member_id, tool_id, version, json.dumps(sorted(set(capabilities))), "active", reason, now, None, None))
+                if caps is not None:
+                    self._bind_host_executor(authorization_id, caps)
+                self._event(tool_id, version, "host_authorization_granted", {"authorization_id": authorization_id, "capabilities": sorted(set(capabilities))}, f"host-auth:{authorization_id}:grant")
+                self.store.db.execute('RELEASE SAVEPOINT ' + savepoint)
+            except BaseException:
+                self.store.db.execute('ROLLBACK TO SAVEPOINT ' + savepoint)
+                self.store.db.execute('RELEASE SAVEPOINT ' + savepoint)
+                raise
         return dict(self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone())
 
+    def _bind_host_executor(self, authorization_id, caps):
+        if not caps.executor_id or not caps.instance_id:
+            raise ValueError('executor_authorization_identity_missing')
+        self.store.db.execute('INSERT OR IGNORE INTO host_authorization_executors VALUES (?,?,?)', (authorization_id, caps.executor_id, caps.instance_id))
+        target = self.store.db.execute('SELECT executor_id,instance_id FROM host_authorization_executors WHERE authorization_id=?', (authorization_id,)).fetchone()
+        if tuple(target) != (caps.executor_id, caps.instance_id):
+            raise ValueError('executor_authorization_owner_changed')
+
     def revoke_host_authorization(self, owner_member_id: str, authorization_id: str, *, reason: str) -> dict[str, Any]:
-        row = self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone()
-        if not row or row["owner_member_id"] != owner_member_id:
-            raise ValueError("host_authorization_not_found")
+        if self.execution_runner is not None and self.store.db.in_transaction:
+            raise ValueError('execution_dispatch_requires_committed_transaction')
         if not reason.strip():
             raise ValueError("host_revoke_reason_required")
-        updated = self.store.db.execute("UPDATE host_authorizations SET status='revoked', revoked_at=?, revoke_reason=? WHERE authorization_id=? AND status='active'", (time.time(), reason, authorization_id)).rowcount
-        if updated != 1:
-            raise ValueError("host_authorization_not_active")
-        self._event(row["tool_id"], row["version"], "host_authorization_revoked", {"authorization_id": authorization_id, "reason": reason}, f"host-auth:{authorization_id}:revoke")
-        return dict(self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone())
+        with self.store._write_lock:
+            savepoint = 'host_revoke_' + uuid.uuid4().hex
+            self.store.db.execute('SAVEPOINT ' + savepoint)
+            try:
+                self.store.db.execute("UPDATE host_authorizations SET status=status WHERE 0")
+                row = self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone()
+                if not row or row["owner_member_id"] != owner_member_id:
+                    raise ValueError("host_authorization_not_found")
+                updated = self.store.db.execute("UPDATE host_authorizations SET status='revoked', revoked_at=?, revoke_reason=? WHERE authorization_id=? AND status='active'", (time.time(), reason, authorization_id)).rowcount
+                if updated != 1:
+                    raise ValueError("host_authorization_not_active")
+                self._event(row["tool_id"], row["version"], "host_authorization_revoked", {"authorization_id": authorization_id, "reason": reason}, f"host-auth:{authorization_id}:revoke")
+                target = self.store.db.execute('SELECT executor_id,instance_id FROM host_authorization_executors WHERE authorization_id=?', (authorization_id,)).fetchone()
+                self.store.db.execute("INSERT INTO host_revocation_outbox (authorization_id,delivery_state,created_at,executor_id,instance_id) VALUES (?,'pending',?,?,?)", (authorization_id, time.time(), target['executor_id'] if target else None, target['instance_id'] if target else None))
+                self.store.db.execute('RELEASE SAVEPOINT ' + savepoint)
+            except BaseException:
+                self.store.db.execute('ROLLBACK TO SAVEPOINT ' + savepoint)
+                self.store.db.execute('RELEASE SAVEPOINT ' + savepoint)
+                raise
+        result = dict(self.store.db.execute("SELECT * FROM host_authorizations WHERE authorization_id=?", (authorization_id,)).fetchone())
+        if self.execution_runner is not None:
+            result['executor_revocation'] = self._deliver_host_revocation(authorization_id)
+        return result
+
+    def _deliver_host_revocation(self, authorization_id: str) -> dict[str, Any]:
+        if self.store.db.in_transaction:
+            raise ValueError('execution_dispatch_requires_committed_transaction')
+        try:
+            adapter = self.execution_runner.adapter
+            caps = adapter.capabilities()
+            if not caps.executor_id or not caps.instance_id:
+                raise ValueError('executor_revocation_identity_missing')
+            with self.store._write_lock:
+                target = self.store.db.execute('SELECT executor_id,instance_id,delivery_state FROM host_revocation_outbox WHERE authorization_id=?', (authorization_id,)).fetchone()
+                if target is None or (target['executor_id'], target['instance_id']) != (caps.executor_id, caps.instance_id):
+                    raise ValueError('executor_revocation_owner_changed')
+                if target['delivery_state'] == 'acknowledged':
+                    return {'state': 'acknowledged'}
+            response = adapter.revoke(authorization_id, 0)
+            after = adapter.capabilities()
+            if (after.executor_id, after.instance_id) != (caps.executor_id, caps.instance_id):
+                raise ValueError('executor_revocation_owner_changed')
+            if (not isinstance(response, dict)
+                    or response.get('authorization_id') != authorization_id
+                    or not isinstance(response.get('executions'), list)
+                    or any(not isinstance(item, str) or not item for item in response['executions'])):
+                raise ValueError('executor_revocation_receipt_invalid')
+        except (OSError, ValueError, RuntimeError) as exc:
+            with self.store._write_lock:
+                self.store.db.execute("UPDATE host_revocation_outbox SET attempts=attempts+1,last_error_type=? WHERE authorization_id=? AND delivery_state='pending'", (type(exc).__name__, authorization_id))
+            return {'state': 'unknown', 'error_type': type(exc).__name__}
+        # An acknowledgement confirms delivery, never process exit. Preserve the
+        # pending row if persisting its receipt or audit fails; revoke is idempotent.
+        with self.store._write_lock:
+            savepoint = 'host_revoke_ack_' + uuid.uuid4().hex
+            self.store.db.execute('SAVEPOINT ' + savepoint)
+            try:
+                delivery = self.store.db.execute('SELECT delivery_state FROM host_revocation_outbox WHERE authorization_id=?', (authorization_id,)).fetchone()
+                if delivery['delivery_state'] == 'acknowledged':
+                    self.store.db.execute('RELEASE SAVEPOINT ' + savepoint)
+                    return {'state': 'acknowledged', 'response': response}
+                row = self.store.db.execute('SELECT tool_id,version FROM host_authorizations WHERE authorization_id=?', (authorization_id,)).fetchone()
+                self._event(row['tool_id'], row['version'], 'executor_authorization_revocation', {'state': 'acknowledged'}, f'host-auth:{authorization_id}:executor-revoke')
+                self.store.db.execute("UPDATE host_revocation_outbox SET delivery_state='acknowledged',attempts=attempts+1,last_error_type=NULL,acknowledged_at=? WHERE authorization_id=?", (time.time(), authorization_id))
+                self.store.db.execute('RELEASE SAVEPOINT ' + savepoint)
+            except BaseException:
+                self.store.db.execute('ROLLBACK TO SAVEPOINT ' + savepoint)
+                self.store.db.execute('RELEASE SAVEPOINT ' + savepoint)
+                raise
+        return {'state': 'acknowledged', 'response': response}
+
+    def retry_host_revocations(self) -> int:
+        if self.execution_runner is None:
+            return 0
+        if self.store.db.in_transaction:
+            raise ValueError('execution_dispatch_requires_committed_transaction')
+        with self.store._write_lock:
+            pending = self.store.db.execute("SELECT authorization_id FROM host_revocation_outbox WHERE delivery_state='pending' ORDER BY created_at").fetchall()
+        acknowledged = 0
+        for row in pending:
+            result = self._deliver_host_revocation(row['authorization_id'])
+            acknowledged += result['state'] == 'acknowledged'
+        return acknowledged
 
     def list_host_authorizations(self, owner_member_id: str, *, status: str | None = None) -> list[dict[str, Any]]:
         sql = "SELECT * FROM host_authorizations WHERE owner_member_id=?"
@@ -1405,6 +2044,18 @@ class ToolStore:
             raise ValueError("execution_access_denied")
         if not isinstance(reason, str) or not reason.strip():
             raise ValueError("execution_cancel_reason_required")
+        if self.execution_runner is not None and row["runtime_backend"] == "unified_executor":
+            observation = self.execution_runner.cancel(execution_id, reason=reason)
+            self._event(row["tool_id"], row["version"], "execution_cancel_requested", {"execution_id": execution_id, "actor_member_id": actor_member_id, "reason": reason, "status": observation.state}, f"tool:execution:{execution_id}:cancel")
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                with self.store._write_lock:
+                    completed = self.store.db.execute("SELECT status,isolation_capabilities FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+                if completed and completed["status"] in {"success", "failed", "cancelled", "unknown"}:
+                    evidence = json.loads(completed["isolation_capabilities"])
+                    return {"execution_id": execution_id, "status": completed["status"], "tree_exit_confirmed": evidence.get("tree_exit_confirmed", False), "execution_not_started": evidence.get("execution_not_started", False)}
+                threading.Event().wait(0.02)
+            return {"execution_id": execution_id, "status": observation.state, "tree_exit_confirmed": observation.tree_exit_confirmed}
         with self._active_executions_lock:
             active = self._active_executions.get(execution_id)
             if not active:
@@ -1425,12 +2076,102 @@ class ToolStore:
         else:
             status = "cancelled" if cleaned and proc.poll() is not None else "unknown"
         final_reason = "cancelled_by_actor" if status == "cancelled" else "cancel_unconfirmed"
+        stop_error = {"code": getattr(proc, "_butian_stop_error_code", None), "type": getattr(proc, "_butian_stop_error_type", None)}
         self.store.db.execute("UPDATE tool_executions SET status='cancelling', termination_reason=? WHERE execution_id=? AND status='cancelling'", (final_reason, execution_id))
-        self._event(row["tool_id"], row["version"], "execution_cancel_requested", {"execution_id": execution_id, "actor_member_id": actor_member_id, "reason": reason, "status": status}, f"tool:execution:{execution_id}:cancel")
-        return {"execution_id": execution_id, "status": status}
+        self._event(row["tool_id"], row["version"], "execution_cancel_requested", {"execution_id": execution_id, "actor_member_id": actor_member_id, "reason": reason, "status": status, "stop_error": stop_error}, f"tool:execution:{execution_id}:cancel")
+        return {"execution_id": execution_id, "status": status, "stop_error": stop_error}
 
     def list_running_executions(self, actor_member_id: str) -> list[dict[str, Any]]:
-        return [dict(row) for row in self.store.db.execute("SELECT execution_id, tool_id, version, actor_member_id, task_id, status, started_at FROM tool_executions WHERE status IN ('running','cancelling') AND (actor_member_id=? OR tool_id IN (SELECT tool_id FROM tool_assets WHERE owner_member_id=?)) ORDER BY started_at", (actor_member_id, actor_member_id))]
+        try:
+            rows = [dict(row) for row in self.store.db.execute("SELECT execution_id, tool_id, version, actor_member_id, task_id, status, started_at FROM tool_executions WHERE status IN ('running','cancelling','unknown') AND (actor_member_id=? OR tool_id IN (SELECT tool_id FROM tool_assets WHERE owner_member_id=?)) ORDER BY started_at", (actor_member_id, actor_member_id))]
+        except sqlite3.Error as exc:
+            raise RuntimeError("execution_list_database_unavailable") from exc
+        indexed = {row["execution_id"]: row for row in rows}
+        with self._active_executions_lock:
+            for identity, record in self._execution_recovery_snapshots.items():
+                if record["actor_member_id"] == actor_member_id and record["status"] in {"running", "cancelling", "unknown"}:
+                    indexed[identity] = dict(record)
+        for path in (self.home / "execution_recovery").glob("exec_*.json"):
+            self._include_recovery_record(path, actor_member_id, indexed)
+        # Legacy/manual recovery records use other stable IDs.
+        for path in (self.home / "execution_recovery").glob("*.json"):
+            if not path.name.startswith("exec_"):
+                self._include_recovery_record(path, actor_member_id, indexed)
+        return sorted(indexed.values(), key=lambda row: row.get("started_at", 0))
+
+    def _include_recovery_record(self, path, actor_member_id, indexed):
+        try:
+            if path.is_symlink() or path.stat().st_size > 65536:
+                raise ValueError("invalid_execution_recovery_record")
+            record = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(record, dict) or not isinstance(record.get("execution_id"), str):
+                raise ValueError("invalid_execution_recovery_record")
+            import math
+            started_at = record.get("started_at")
+            if isinstance(started_at, bool) or not isinstance(started_at, (int, float)) or not math.isfinite(started_at) or started_at < 0:
+                raise ValueError("invalid_execution_recovery_timestamp")
+            if record.get("actor_member_id") == actor_member_id and record.get("status") in {"running", "cancelling", "unknown"}:
+                indexed[record["execution_id"]] = {**record, "recovery_record": str(path.resolve())}
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("execution_recovery_record_unreadable:" + path.name) from exc
+
+    def replay_execution_audit(self, actor_member_id: str, execution_id: str, *, expected_sha256: str) -> dict[str, Any]:
+        if not isinstance(execution_id, str) or not execution_id or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-' for c in execution_id):
+            raise ValueError('invalid_execution_id')
+        directory = self.home / 'execution_recovery'
+        path = directory / (execution_id + '.json')
+        if directory.is_symlink() or path.is_symlink() or path.stat().st_size > 65536:
+            raise ValueError('invalid_execution_recovery_record')
+        raw = path.read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != expected_sha256:
+            raise ValueError('execution_recovery_hash_mismatch')
+        record = json.loads(raw)
+        if not isinstance(record, dict) or record.get('execution_id') != execution_id:
+            raise ValueError('invalid_execution_recovery_record')
+        if record.get('actor_member_id') != actor_member_id:
+            raise ValueError('execution_recovery_actor_mismatch')
+        self._member_dir(actor_member_id)
+        for field in ('started_at', 'finished_at'):
+            value = record.get(field)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise ValueError('invalid_execution_recovery_timestamp')
+        if record['finished_at'] < record['started_at'] or record.get('status') not in {'unknown', 'failed', 'cancelled'}:
+            raise ValueError('invalid_execution_recovery_status')
+        version = record.get('version')
+        if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+            raise ValueError('invalid_execution_recovery_version')
+        tool_id = record.get('tool_id')
+        if not self.store.db.execute('SELECT 1 FROM tool_versions WHERE tool_id=? AND version=?', (tool_id, version)).fetchone():
+            raise ValueError('execution_recovery_tool_version_missing')
+        key = 'tool:execution_recovery:' + execution_id
+        with self.store._write_lock:
+            self.store.db.execute('SAVEPOINT execution_replay')
+            try:
+                event = self.store.db.execute('SELECT payload FROM tool_events WHERE idempotency_key=?', (key,)).fetchone()
+                if event:
+                    if json.loads(event[0]).get('record_sha256') != digest:
+                        raise ValueError('execution_recovery_conflict')
+                    result = {'execution_id': execution_id, 'status': record['status'], 'audit_status': 'recovered', 'idempotent': True}
+                else:
+                    existing = self.store.db.execute('SELECT * FROM tool_executions WHERE execution_id=?', (execution_id,)).fetchone()
+                    if existing:
+                        for field in ('actor_member_id', 'tool_id', 'version', 'task_id', 'started_at'):
+                            if existing[field] != record.get(field):
+                                raise ValueError('execution_recovery_conflict')
+                        if existing['status'] not in {'running', 'cancelling', 'unknown', record['status']}:
+                            raise ValueError('execution_recovery_conflict')
+                        self.store.db.execute('UPDATE tool_executions SET status=?, termination_reason=?, finished_at=? WHERE execution_id=?', (record['status'], record.get('termination_reason'), record['finished_at'], execution_id))
+                    else:
+                        self.store.db.execute('INSERT INTO tool_executions (execution_id,tool_id,version,actor_member_id,task_id,input_hash,dry_run,status,stdout,stderr,termination_reason,permissions,started_at,finished_at,isolation_capabilities) VALUES (?,?,?,?,?,?,0,?,?,?,?,?,?,?,?)', (execution_id, tool_id, version, actor_member_id, record.get('task_id'), 'unavailable', record['status'], '', '', record.get('termination_reason'), '[]', record['started_at'], record['finished_at'], json.dumps({'recovered_metadata_only': True})))
+                    self._event(tool_id, version, 'execution_audit_recovered', {'execution_id': execution_id, 'actor_member_id': actor_member_id, 'record_sha256': digest, 'metadata_only': True, 'status': record['status']}, key)
+                    result = {'execution_id': execution_id, 'status': record['status'], 'audit_status': 'recovered', 'idempotent': False}
+                self.store.db.execute('RELEASE execution_replay')
+                return result
+            except BaseException:
+                self.store.db.execute('ROLLBACK TO execution_replay')
+                self.store.db.execute('RELEASE execution_replay')
+                raise
 
     def list_executions(self, actor_member_id: str, *, tool_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
 
@@ -1446,7 +2187,32 @@ class ToolStore:
 
         sql += " ORDER BY started_at DESC LIMIT ?"; args.append(limit)
 
-        return [dict(row) for row in self.store.db.execute(sql, args)]
+        rows = [dict(row) for row in self.store.db.execute(sql, args)]
+        indexed = {row["execution_id"]: row for row in rows}
+        with self._active_executions_lock:
+            for identity, record in self._execution_recovery_snapshots.items():
+                if record["actor_member_id"] == actor_member_id and (not tool_id or record["tool_id"] == tool_id):
+                    indexed[identity] = dict(record)
+        recovery = self.home / "execution_recovery"
+        if recovery.exists():
+            for path in recovery.glob("*.json"):
+                try:
+                    if path.is_symlink() or path.stat().st_size > 65536:
+                        raise ValueError("invalid_execution_recovery_record")
+                    record = json.loads(path.read_text(encoding="utf-8"))
+                    if not isinstance(record, dict) or not isinstance(record.get("execution_id"), str):
+                        raise ValueError("invalid_execution_recovery_record")
+                    if record.get("actor_member_id") != actor_member_id:
+                        continue
+                    started_at = record.get("started_at")
+                    if isinstance(started_at, bool) or not isinstance(started_at, (int, float)) or not math.isfinite(started_at) or started_at < 0:
+                        raise ValueError("invalid_execution_recovery_timestamp")
+                    if tool_id and record.get("tool_id") != tool_id:
+                        continue
+                    indexed[record["execution_id"]] = {**record, "recovery_record": str(path.resolve())}
+                except (OSError, ValueError) as exc:
+                    raise RuntimeError("execution_recovery_record_unreadable:" + path.name) from exc
+        return sorted(indexed.values(), key=lambda row: row.get("started_at", 0), reverse=True)[:limit]
 
 
 
@@ -1658,6 +2424,20 @@ class ToolStore:
         self.recovery_events.append({"tool_id": tool_id, "version": version, "path": str(target), "action": "quarantined_orphan"})
 
     def verify(self, owner_member_id: str, tool_id: str, version: int, outcome: str, *, independent_key: str, task_id: str | None = None, environment: dict[str, Any] | None = None, evidence_ids: list[str] | None = None, execution_id: str | None = None, input_hash: str | None = None, expected_output: Any = None) -> dict[str, Any]:
+        with self.store._write_lock:
+            savepoint = "tool_verify_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                self.store.db.execute("UPDATE tool_assets SET status=status WHERE 0")
+                result = self._verify(owner_member_id, tool_id, version, outcome, independent_key=independent_key, task_id=task_id, environment=environment, evidence_ids=evidence_ids, execution_id=execution_id, input_hash=input_hash, expected_output=expected_output)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO SAVEPOINT " + savepoint)
+                self.store.db.execute("RELEASE SAVEPOINT " + savepoint)
+                raise
+
+    def _verify(self, owner_member_id: str, tool_id: str, version: int, outcome: str, *, independent_key: str, task_id: str | None = None, environment: dict[str, Any] | None = None, evidence_ids: list[str] | None = None, execution_id: str | None = None, input_hash: str | None = None, expected_output: Any = None) -> dict[str, Any]:
         tool = self._tool(tool_id)
         if tool["owner_member_id"] != owner_member_id:
             raise ValueError("tool_access_denied")
@@ -1672,7 +2452,7 @@ class ToolStore:
         if outcome == "success" and (execution_id is None or input_hash is None or expected_output is None):
             raise ValueError("verification_success_binding_required")
         if execution_id is not None:
-            execution = self.store.db.execute("SELECT tool_id, version, actor_member_id, input_hash, status, stdout FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
+            execution = self.store.db.execute("SELECT tool_id, version, actor_member_id, task_id, input_hash, status, stdout FROM tool_executions WHERE execution_id=?", (execution_id,)).fetchone()
             if not execution or execution["tool_id"] != tool_id or execution["version"] != version:
                 raise ValueError("verification_execution_not_found")
             if execution["actor_member_id"] != owner_member_id:
@@ -1686,6 +2466,15 @@ class ToolStore:
                 recorded = execution["stdout"] if manifest.get("output_contract", {}).get("type") in {"text", "string"} else json.loads(execution["stdout"])
                 if recorded != expected_output:
                     raise ValueError("verification_expected_output_mismatch")
+        if task_id is not None:
+            if not self.store.task_access(task_id, owner_member_id):
+                raise ValueError("verification_task_access_denied")
+            if execution_id is not None and execution["task_id"] != task_id:
+                raise ValueError("verification_execution_task_mismatch")
+        for evidence_id in dict.fromkeys(evidence_ids):
+            verified = self.store.verify_evidence(evidence_id, actor_member_id=owner_member_id)
+            if verified["status"] != "valid":
+                raise ValueError("verification_evidence_invalid")
         env_json = json.dumps(environment or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         evidence_json = json.dumps(evidence_ids, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         expected_json = json.dumps(expected_output, ensure_ascii=False, sort_keys=True, separators=(",", ":")) if expected_output is not None else None
@@ -1696,23 +2485,17 @@ class ToolStore:
                 raise ValueError("verification_idempotency_conflict")
             return dict(existing)
         now = time.time(); verification_id = f"tverify_{uuid.uuid4().hex}"
-        self.store.db.execute("BEGIN")
-        try:
-            self.store.db.execute("INSERT INTO tool_verifications VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (verification_id, tool_id, version, task_id, env_json, outcome, evidence_json, independent_key, execution_id, input_hash, expected_json, now))
-            stats = self.stats(tool_id, version)
-            self._event(tool_id, version, "verification", {"outcome": outcome, "stats": stats}, f"tool:{tool_id}:verification:{independent_key}")
-            version_manifest = json.loads(self.store.db.execute("SELECT manifest FROM tool_versions WHERE tool_id=? AND version=?", (tool_id, version)).fetchone()["manifest"])
-            supply_chain_ok = version_manifest.get("source_kind", "internal") == "internal" or (version_manifest.get("source") and version_manifest.get("license") and version_manifest.get("scan_status") == "passed")
-            gate = self._admission_gate(tool, version, version_manifest, stats)
-            if gate["eligible"] and supply_chain_ok and tool["status"] in {"draft", "candidate"}:
-                self._transition(tool_id, "active", {"version": version, "stats": stats, "admission": gate}, f"tool:{tool_id}:activate:{version}")
-                self.store.db.execute("UPDATE tool_assets SET current_version=?, updated_at=? WHERE tool_id=?", (version, time.time(), tool_id))
-            elif tool["status"] == "draft":
-                self._transition(tool_id, "candidate", {"version": version}, f"tool:{tool_id}:candidate:{version}")
-            self.store.db.commit()
-        except BaseException:
-            self.store.db.rollback()
-            raise
+        self.store.db.execute("INSERT INTO tool_verifications VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (verification_id, tool_id, version, task_id, env_json, outcome, evidence_json, independent_key, execution_id, input_hash, expected_json, now))
+        stats = self.stats(tool_id, version)
+        self._event(tool_id, version, "verification", {"outcome": outcome, "stats": stats}, f"tool:{tool_id}:verification:{independent_key}")
+        version_manifest = json.loads(self.store.db.execute("SELECT manifest FROM tool_versions WHERE tool_id=? AND version=?", (tool_id, version)).fetchone()["manifest"])
+        supply_chain_ok = version_manifest.get("source_kind", "internal") == "internal" or (version_manifest.get("source") and version_manifest.get("license") and version_manifest.get("scan_status") == "passed")
+        gate = self._admission_gate(tool, version, version_manifest, stats)
+        if gate["eligible"] and supply_chain_ok and tool["status"] in {"draft", "candidate"}:
+            self._transition(tool_id, "active", {"version": version, "stats": stats, "admission": gate}, f"tool:{tool_id}:activate:{version}")
+            self.store.db.execute("UPDATE tool_assets SET current_version=?, updated_at=? WHERE tool_id=?", (version, time.time(), tool_id))
+        elif tool["status"] == "draft":
+            self._transition(tool_id, "candidate", {"version": version}, f"tool:{tool_id}:candidate:{version}")
         return {"verification_id": verification_id, "stats": stats, "status": self._tool(tool_id)["status"]}
 
     def trial(self, recipient_member_id: str, share_id: str, outcome: str, *, independent_key: str, task_id: str | None = None, environment: dict[str, Any] | None = None, evidence_ids: list[str] | None = None, execution_id: str | None = None, input_hash: str | None = None, expected_output: Any = None) -> dict[str, Any]:
@@ -1733,8 +2516,20 @@ class ToolStore:
                 raise ValueError("trial_input_binding_mismatch")
             if outcome == "success" and execution["status"] != "success":
                 raise ValueError("trial_execution_outcome_mismatch")
-            if outcome == "success" and execution["stdout"] != expected_output:
-                raise ValueError("trial_expected_output_mismatch")
+            if outcome == "success":
+                manifest = json.loads(self.store.db.execute("SELECT manifest FROM tool_versions WHERE tool_id=? AND version=?", (row["tool_id"], row["version"])).fetchone()["manifest"])
+                recorded = execution["stdout"] if manifest.get("output_contract", {}).get("type") in {"text", "string"} else json.loads(execution["stdout"])
+                if recorded != expected_output:
+                    raise ValueError("trial_expected_output_mismatch")
+        if task_id is not None:
+            if not self.store.task_access(task_id, recipient_member_id):
+                raise ValueError("verification_task_access_denied")
+            if execution_id is not None and execution["task_id"] != task_id:
+                raise ValueError("verification_execution_task_mismatch")
+        for evidence_id in dict.fromkeys(evidence_ids):
+            verified = self.store.verify_evidence(evidence_id, actor_member_id=recipient_member_id)
+            if verified["status"] != "valid":
+                raise ValueError("verification_evidence_invalid")
         result = self._record_trial(row, recipient_member_id, outcome, independent_key, task_id, environment, evidence_ids, execution_id=execution_id, input_hash=input_hash, expected_output=expected_output)
         return {"share_id": share_id, "outcome": outcome, "status": "trial", "verification": result}
 
@@ -1850,9 +2645,42 @@ class ToolStore:
         return [{key: value for key, value in card.items() if key not in {"matched_by", "confidence"}} for card in cards]
 
     def stats(self, tool_id: str, version: int):
-        rows = self.store.db.execute("SELECT outcome, task_id, environment, execution_id, evidence_ids FROM tool_verifications WHERE tool_id=? AND version=?", (tool_id, version)).fetchall()
+        rows = self.store.db.execute("SELECT outcome, task_id, environment, execution_id, evidence_ids FROM tool_verifications WHERE tool_id=? AND version=? ORDER BY created_at, verification_id", (tool_id, version)).fetchall()
         counts = {key: sum(row["outcome"] == key for row in rows) for key in ("success", "failure", "unknown", "cancelled")}
-        successes = [row for row in rows if row["outcome"] == "success"]
+        successes = []
+        seen_executions, seen_digests = set(), set()
+        for row in rows:
+            if row["outcome"] != "success":
+                continue
+            execution = self.store.db.execute("SELECT actor_member_id,task_id,status FROM tool_executions WHERE execution_id=? AND tool_id=? AND version=?", (row["execution_id"], tool_id, version)).fetchone()
+            if not execution or execution["status"] != "success":
+                continue
+            if row["task_id"] and (execution["task_id"] != row["task_id"] or not self.store.task_access(row["task_id"], execution["actor_member_id"])):
+                continue
+            evidence_ids = json.loads(row["evidence_ids"] or "[]")
+            if not evidence_ids:
+                continue
+            digests = set()
+            valid_evidence = True
+            for evidence_id in evidence_ids:
+                try:
+                    evidence = self.store.verify_evidence(evidence_id, actor_member_id=execution["actor_member_id"])
+                except ValueError:
+                    valid_evidence = False
+                    break
+                if evidence["status"] != "valid":
+                    valid_evidence = False
+                    break
+                digests.add(evidence["sha256"])
+            if not valid_evidence:
+                continue
+            if row["execution_id"] in seen_executions or digests & seen_digests:
+                continue
+            if row["execution_id"]:
+                seen_executions.add(row["execution_id"])
+            seen_digests.update(digests)
+            successes.append(row)
+        counts["success"] = len(successes)
         environments = {json.dumps(json.loads(row["environment"] or "{}"), sort_keys=True, separators=(",", ":")) for row in successes}
         tasks = {row["task_id"] for row in successes if row["task_id"]}
         bound = sum(bool(row["execution_id"] and json.loads(row["evidence_ids"] or "[]")) for row in successes)
@@ -1883,7 +2711,8 @@ class ToolStore:
 
         if existing:
 
-            same = existing["outcome"] == outcome and existing["task_id"] == task_id and existing["environment"] == env_json and existing["evidence_ids"] == evidence_json
+            expected_json = json.dumps(expected_output, ensure_ascii=False, sort_keys=True, separators=(",", ":")) if expected_output is not None else None
+            same = (existing["outcome"], existing["task_id"], existing["environment"], existing["evidence_ids"], existing["execution_id"], existing["input_hash"], existing["expected_output"]) == (outcome, task_id, env_json, evidence_json, execution_id, input_hash, expected_json)
 
             if not same:
 
@@ -1926,27 +2755,34 @@ class ToolStore:
         return {**dict(row), "status": "trial"}
 
     def archive(self, owner_member_id: str, tool_id: str, *, reason: str = "maintenance") -> dict[str, Any]:
-
-        tool = self._tool(tool_id)
-
-        if tool["owner_member_id"] != owner_member_id:
-
-            raise ValueError("tool_access_denied")
-
-        if tool["status"] == "archived":
-
-            return tool
-
-        if tool["status"] not in {"draft", "candidate", "active", "deprecated", "quarantined"}:
-
-            raise ValueError("invalid_tool_status_transition")
-
-        self._transition(tool_id, "archived", {"reason": reason}, f"tool:{tool_id}:archive")
-
-        return self._tool(tool_id)
-
-
-
+        with self.store._write_lock:
+            savepoint = "archive_" + uuid.uuid4().hex
+            self.store.db.execute("SAVEPOINT " + savepoint)
+            try:
+                # Reserve the writer before reading ownership, status or references.
+                self.store.db.execute("UPDATE tool_assets SET status=status WHERE tool_id=?", (tool_id,))
+                tool = self._tool(tool_id)
+                if tool["owner_member_id"] != owner_member_id:
+                    raise ValueError("tool_access_denied")
+                if tool["status"] != "archived":
+                    if tool["status"] not in {"draft", "candidate", "active", "deprecated", "quarantined"}:
+                        raise ValueError("invalid_tool_status_transition")
+                    running = self.store.db.execute("SELECT 1 FROM tool_executions WHERE tool_id=? AND status IN ('running','cancelling','unknown') LIMIT 1", (tool_id,)).fetchone()
+                    if running:
+                        raise ValueError("tool_has_inflight_executions")
+                    workflows_exist = self.store.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='tool_workflows'").fetchone()
+                    if workflows_exist:
+                        for workflow in self.store.db.execute("SELECT manifest FROM tool_workflows WHERE status IN ('active','candidate')"):
+                            if any(step['tool_id'] == tool_id for step in json.loads(workflow['manifest'])['steps']):
+                                raise ValueError("tool_has_workflow_dependencies")
+                    self._transition(tool_id, "archived", {"reason": reason}, f"tool:{tool_id}:archive")
+                result = self._tool(tool_id)
+                self.store.db.execute("RELEASE " + savepoint)
+                return result
+            except BaseException:
+                self.store.db.execute("ROLLBACK TO " + savepoint)
+                self.store.db.execute("RELEASE " + savepoint)
+                raise
     def restore(self, owner_member_id: str, tool_id: str) -> dict[str, Any]:
 
         tool = self._tool(tool_id)

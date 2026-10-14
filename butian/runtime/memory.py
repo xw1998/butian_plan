@@ -72,8 +72,9 @@ class MemoryStore:
             raise ValueError("invalid_memory_source_events")
         now = time.time()
         version_id = f"ver_{uuid.uuid4().hex}"
-        from contextlib import nullcontext
-        with (nullcontext() if self.db.in_transaction else self.db):
+        self.db.execute("SAVEPOINT memory_put")
+        try:
+            self.db.execute("UPDATE memories SET updated_at=updated_at WHERE 0")
             previous = self.db.execute("SELECT content FROM memories WHERE memory_id=?", (memory_id,)).fetchone()
             latest = self.db.execute("SELECT version, version_id FROM memory_versions WHERE memory_id=? ORDER BY version DESC LIMIT 1", (memory_id,)).fetchone()
             if parent_version_id is None and latest:
@@ -93,6 +94,11 @@ class MemoryStore:
                 conflict = self.db.execute("SELECT memory_id FROM memories WHERE memory_id!=? AND content=? AND status NOT IN ('invalidated','archived') LIMIT 1", (memory_id, content)).fetchone()
                 if conflict:
                     self.db.execute("INSERT INTO memory_conflicts VALUES (?,?,?,?,?,?)", (f"conf_{uuid.uuid4().hex}", memory_id, conflict["memory_id"], "same_content_different_memory", "open", now))
+            self.db.execute("RELEASE memory_put")
+        except BaseException:
+            self.db.execute("ROLLBACK TO memory_put")
+            self.db.execute("RELEASE memory_put")
+            raise
         return version_id
 
     def create_validation_batch(self, memory_id: str, *, sample_count: int, notes: str | None = None, batch_id: str | None = None):
@@ -206,7 +212,7 @@ class MemoryStore:
                 item["last_recalled_at"] = now
         return result
 
-    def record_practice_outcome(self, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None, evidence_digest: str | None = None, evidence_digests: list[str] | None = None):
+    def record_practice_outcome(self, *, memory_id: str, kind: str, content: str, outcome: str, independent_key: str, evidence_ref: str | None = None, environment=None, source_event_ids=None, evidence_digest: str | None = None, evidence_digests: list[str] | None = None, expected_content_hash: str | None = None):
         """Record independent evidence; contradictions remain disputed pending revision."""
         if outcome not in {"success", "failure", "unknown"}:
             raise ValueError("invalid_practice_outcome")
@@ -225,6 +231,10 @@ class MemoryStore:
                     raise ValueError("independent_evidence_required")
                 self.db.execute("INSERT INTO practice_evidence VALUES (?,?,?)", (memory_id, digest, independent_key))
             row = self.get(memory_id)
+            if expected_content_hash is not None:
+                import hashlib
+                if not row or hashlib.sha256(row["content"].encode("utf-8")).hexdigest() != expected_content_hash:
+                    raise ValueError("memory_review_content_changed")
             if not row:
                 self.put(memory_id, kind, content, confidence=0.2, weight=0.5, environment=environment, source_event_ids=list(source_event_ids or []), status="candidate", change_reason="practice_observation")
                 row = self.get(memory_id)

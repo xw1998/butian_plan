@@ -18,6 +18,34 @@ class ProviderRuntime:
         self.registry = registry or ProviderRegistry()
 
     def start(self, member_id: str, prompt: str, *, task_id: str | None = None, provider_id: str | None = None, model: str | None = None, expected_revision: int | None = None) -> dict[str, Any]:
+        if task_id is None:
+            return self._start(member_id, prompt, provider_id=provider_id, model=model, expected_revision=expected_revision)
+        lock_dir = self.store.path.parent / '.provider-locks'
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        key = str(self.store.path.resolve()) + ':' + task_id
+        lock_path = lock_dir / ('start-' + hashlib.sha256(key.encode()).hexdigest() + '.lock')
+        with open(lock_path, 'a+b') as lock_file:
+            # Byte-range locks may extend past EOF; never write before locking.
+            lock_file.seek(0)
+            try:
+                if os.name == 'nt':
+                    import msvcrt
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                raise ValueError('provider_start_in_progress') from exc
+            try:
+                return self._start(member_id, prompt, task_id=task_id, provider_id=provider_id, model=model, expected_revision=expected_revision)
+            finally:
+                lock_file.seek(0)
+                if os.name == 'nt':
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def _start(self, member_id: str, prompt: str, *, task_id: str | None = None, provider_id: str | None = None, model: str | None = None, expected_revision: int | None = None) -> dict[str, Any]:
         provider = self.registry.get(provider_id)
         selection = provider.select_model(model)
         if selection.selection_status in {"unsupported", "unknown"}:
@@ -29,6 +57,8 @@ class ProviderRuntime:
                 task = self.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (task_id,)).fetchone()
                 if not task or task["status"] != "running" or (expected_revision is not None and task["revision"] != expected_revision):
                     raise ValueError("provider_execution_revision_conflict")
+                if self.store.db.execute("SELECT 1 FROM provider_sessions WHERE task_id=? AND task_revision=? AND status IN ('running','cancelling') LIMIT 1", (task_id, task['revision'])).fetchone():
+                    raise ValueError('provider_start_in_progress')
                 task_revision = task["revision"]
                 previous = self.store.db.execute("SELECT provider_session_id FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (task_id,)).fetchone()
                 previous_session = previous[0] if previous else None
@@ -68,9 +98,7 @@ class ProviderRuntime:
             lock_dir.mkdir(parents=True, exist_ok=True)
             lock_path = lock_dir / (hashlib.sha256(repr(key).encode()).hexdigest() + ".lock")
             lock_file = open(lock_path, "a+b")
-            if lock_file.seek(0, os.SEEK_END) == 0:
-                lock_file.write(b"0")
-                lock_file.flush()
+            # Keep the lock file empty to avoid racing a held byte-range lock.
             lock_file.seek(0)
             try:
                 if os.name == "nt":

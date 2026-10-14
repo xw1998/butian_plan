@@ -54,3 +54,40 @@ def test_experiment_reproducibility_and_summary():
             assert store.get(experiment_id)['dataset_version'] == 'ds-1'
         finally:
             store.close()
+
+
+def test_single_observation_does_not_claim_zero_uncertainty(tmp_path):
+    store = ExperimentStore(tmp_path / 'single.db')
+    try:
+        experiment = store.create('single', task_package={}, dataset_version='v1', code_commit='baseline', configuration={}, provider_version='host')
+        store.add_event(experiment, 'metric', {'success': 1})
+        summary = store.summarize(experiment, 'success')
+        assert summary['mean'] == 1
+        assert summary['stddev'] is None
+        assert summary['ci95'] is None
+    finally:
+        store.close()
+
+
+def test_small_sample_interval_declares_approximation(tmp_path):
+    store = ExperimentStore(tmp_path / 'interval.db')
+    try:
+        eid = store.create('sample', task_package={}, dataset_version='v1', code_commit='base', configuration={}, provider_version='host')
+        for value in (1, 2, 3):
+            store.add_event(eid, 'metric', {'latency': value})
+        result = store.summarize(eid, 'latency')
+        assert result['ci95_method'] == 'normal_approximation'
+        assert result['ci95_small_sample'] is True
+    finally:
+        store.close()
+
+
+def test_provider_variants_are_reported_as_strata(tmp_path):
+    store = ExperimentStore(tmp_path / 'strata.db')
+    try:
+        batch = store.run_batch('providers', [{'name': 'B0', 'provider_version': 'model-a'}, {'name': 'B2', 'provider_version': 'model-b'}], task_package={}, dataset_version='v1', code_commit='base')
+        result = store.batch_compare(batch['experiment_ids'], ['success'])
+        assert result['provider_strata'] == {'model-a': [batch['experiment_ids'][0]], 'model-b': [batch['experiment_ids'][1]]}
+        assert result['pooled_provider_comparison'] is False
+    finally:
+        store.close()

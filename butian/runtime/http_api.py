@@ -316,6 +316,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 experiment_id = path.split("/")[3]; event_id = self.experiments.add_event(experiment_id, body["event_type"], body.get("payload", {})); self._send(201, {"event_id": event_id}); return
             if path.startswith("/api/experiments/") and path.endswith("/summary"):
                 experiment_id = path.split("/")[3]; self._send(200, self.experiments.summarize(experiment_id, body["metric"])); return
+            if path == "/api/evidence/verify":
+                actor, _ = self._member_credentials(body)
+                self._send(200, self.service.verify_evidence(body["evidence_id"], actor_member_id=actor)); return
             if path == "/api/evidence":
                 actor, token = self._member_credentials(body)
                 if body.get("owner_member_id") not in {None, actor}:
@@ -330,7 +333,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/knowledge/sources":
                 source_id = self.service.learning.add_source(body["source_type"], body["locator"], body["title"], body["content_hash"], owner_member_id=self._visible_member_id(), metadata=body.get("metadata")); self._send(201, {"source_id": source_id}); return
             if path == "/api/knowledge/capture":
-                result = self.service.learning.capture_url(body["url"], owner_member_id=self._visible_member_id(), title=body.get("title"), source_type=body.get("source_type", "web"), timeout=float(body.get("timeout", 10)), max_bytes=int(body.get("max_bytes", 1_000_000)))
+                result = self.service.learning.capture_url(body["url"], owner_member_id=self._visible_member_id(), title=body.get("title"), source_type=body.get("source_type", "web"), timeout=body.get("timeout", 10), max_bytes=body.get("max_bytes", 1_000_000))
                 result.pop("content", None)
                 self._send(201, result); return
             if path == "/api/knowledge/sources/verify":
@@ -361,7 +364,17 @@ class ApiHandler(BaseHTTPRequestHandler):
             if path == "/api/migration/import":
                 self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
             if path == "/api/goals/submit":
-                self._send(201, self.service.submit_goal(body["goal"], mode=body.get("mode", "solo"), member_id=body.get("member_id"), dispatcher_member_id=body.get("dispatcher_member_id"), requested_model=body.get("requested_model"), capabilities=body.get("capabilities"), environment=body.get("environment"), member_ids=body.get("member_ids"), subtasks=body.get("subtasks"))); return
+                self._send(201, self.service.submit_goal(body["goal"], mode=body.get("mode", "solo"), member_id=body.get("member_id"), dispatcher_member_id=body.get("dispatcher_member_id"), requested_model=body.get("requested_model"), capabilities=body.get("capabilities"), environment=body.get("environment"), member_ids=body.get("member_ids"), subtasks=body.get("subtasks"), problem=body.get("problem"))); return
+            if path in {"/api/goals/host-submit", "/api/goals/problem/get", "/api/goals/problem/update", "/api/goals/problem/resume"}:
+                from ..mcp_server import call_tool
+                tool = {"/api/goals/host-submit": "butian_goal_submit", "/api/goals/problem/get": "butian_problem_get", "/api/goals/problem/update": "butian_problem_update", "/api/goals/problem/resume": "butian_problem_resume"}[path]
+                actor, token = self._member_credentials(body)
+                self._send(200, call_tool(self.service, tool, {**body, "actor_member_id": actor, "token": token})); return
+            if path in {"/api/executions/export", "/api/executions/submit"}:
+                from ..mcp_server import call_tool
+                actor, token = self._member_credentials(body)
+                tool = "butian_execution_export" if path.endswith("/export") else "butian_execution_submit"
+                self._send(200, call_tool(self.service, tool, {**body, "actor_member_id": actor, "token": token})); return
             if path == "/api/goals/run-solo":
                 self._send(200, self.service.run_solo_task(body["task_id"], actor_member_id=self._member_credentials(body)[0])); return
             if path == "/api/goals/run-team":
@@ -411,8 +424,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(201, self.service.dream_propose_hypothesis(body["member_id"], body["candidate_id"], body["statement"], prior_reliability=body["prior_reliability"], argument=body["argument"], evidence_refs=body.get("evidence_refs"))); return
             if path == "/api/evolution/dream/schedule":
                 self._send(201, self.service.dream_schedule_verification(body["member_id"], body["hypothesis_id"], body["description"], cost=body["cost"], risk=body["risk"], expected_information_gain=body["expected_information_gain"], authorized=body.get("authorized", False))); return
+            if path == "/api/evolution/dream/start":
+                self._send(200, self.service.dream_start_verification(body["member_id"], body["action_id"])); return
             if path == "/api/evolution/dream/verify":
-                self._send(200, self.service.dream_record_verification(body["member_id"], body["hypothesis_id"], outcome=body["outcome"], evidence_refs=body.get("evidence_refs", []), new_memory_id=body.get("new_memory_id"), new_content=body.get("new_content"))); return
+                self._send(200, self.service.dream_record_verification(body["member_id"], body["hypothesis_id"], action_id=body.get("action_id"), outcome=body["outcome"], evidence_refs=body.get("evidence_refs", []), new_memory_id=body.get("new_memory_id"), new_content=body.get("new_content"))); return
             if path == "/api/sessions":
                 self._send(201, self.service.create_session(body.get("mode", "solo"), body.get("dispatcher_member_id"), body.get("requested_model"), body.get("capabilities"), current_member_id=body.get("current_member_id"))); return
             if path == "/api/sessions/switch":

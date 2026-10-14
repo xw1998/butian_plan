@@ -198,6 +198,7 @@ def test_dream_hypothesis_argument_and_verification_drive(tmp_path):
     assert pending["status"] == "awaiting_authorization"
     queued = dream.schedule_verification(hypothesis_id, "低风险仿真", cost=1, risk=.1, expected_information_gain=.4, authorized=True)
     assert queued["status"] == "queued" and dream.verification_queue()
+    dream.start_verification(queued["action_id"])
     with pytest.raises(ValueError, match="verification_evidence_required"):
         dream.record_verification(hypothesis_id, outcome="supported", evidence_refs=[])
     outcome = dream.record_verification(hypothesis_id, outcome="supported", evidence_refs=["lab:1"], new_memory_id="new", new_content="验证后的经验")
@@ -213,8 +214,10 @@ def test_memory_dream_distillation_and_abstraction_are_auditable_and_idempotent(
     memory.put("m1", "lesson", "电源布局测试一", source_event_ids=["e1"])
     memory.put("m2", "lesson", "电源布局测试二", source_event_ids=["e2"])
     distill = dream.distill_memories(["m1", "m2"], summary="电源布局测试摘要", merged_items=["重复项"], conflicts=["条件不同"], discarded_items=[], information_loss=.1)
-    again = dream.distill_memories(["m2", "m1"], summary="电源布局测试摘要", information_loss=.1)
+    again = dream.distill_memories(["m2", "m1"], summary="电源布局测试摘要", merged_items=["重复项"], conflicts=["条件不同"], discarded_items=[], information_loss=.1)
     assert distill["distillation_id"] == again["distillation_id"]
+    changed = dream.distill_memories(["m2", "m1"], summary="电源布局测试摘要", information_loss=.1)
+    assert changed["distillation_id"] != distill["distillation_id"]
     assert distill["status"] == "candidate" and distill["reversible"] == 1
     abstract = dream.abstract_memories(["m1", "m2"], pattern="布局必须结合负载条件验证", supports=["m1", "m2"], counterexamples=["e1"], applicability=["同一电源拓扑"], failure_conditions=["负载变化"], abstraction_level=1)
     assert abstract["status"] == "candidate"

@@ -122,7 +122,7 @@ def test_team_child_lease_is_released_when_child_enters_review(tmp_path):
             def cancel(self, provider_session_id): return ProviderResult("unsupported", reason="not_supported")
         service.providers.register(CompletingProvider())
         service.add_member("worker", "Worker", provider_id="completing", model_id="test")
-        result = service.submit_goal("goal", mode="team", dispatcher_member_id="dispatcher", member_ids=["worker"], subtasks=["do work"])
+        result = service.submit_goal("goal", mode="team", dispatcher_member_id="dispatcher", member_ids=["worker"], subtasks=["do work"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         service.run_team_goal(result["task_id"])
         child = service.store.db.execute("SELECT status, lease_id, lease_until FROM tasks WHERE parent_id=?", (result["task_id"],)).fetchone()
         assert child["status"] == "review"

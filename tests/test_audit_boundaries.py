@@ -26,7 +26,7 @@ def test_old_provider_session_cannot_publish_after_new_session(tmp_path):
     service = ButianService(tmp_path)
     try:
         service.add_member('worker', 'Worker', provider_id='local-command')
-        task = service.submit_goal('stale', member_id='worker')
+        task = service.submit_goal('stale', member_id='worker', problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         old = task['execution']['provider_session_id']
         service.store.create_provider_session('worker', 'local-command', task_id=task['task_id'], prompt='new')
         service.provider_runtime.consume(old, service.providers.get('local-command'))
@@ -79,7 +79,7 @@ def test_superseded_provider_is_rejected_before_process_execution(tmp_path):
     service = ButianService(tmp_path)
     try:
         service.add_member('worker', 'Worker', provider_id='local-command')
-        goal = service.submit_goal('stale', member_id='worker')
+        goal = service.submit_goal('stale', member_id='worker', problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         old = goal['execution']['provider_session_id']
         service.store.create_provider_session('worker', 'local-command', task_id=goal['task_id'], prompt='new')
         with pytest.raises(ValueError, match='provider_execution_superseded'):
@@ -187,7 +187,7 @@ def test_solo_answer_can_resume_with_new_context(tmp_path):
     service = ButianService(tmp_path)
     try:
         service.add_member('worker', 'Worker', provider_id='local-command')
-        goal = service.submit_goal('original', member_id='worker')
+        goal = service.submit_goal('original', member_id='worker', problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         task = service.store.db.execute('SELECT * FROM tasks WHERE task_id=?', (goal['task_id'],)).fetchone()
         question = service.ask_user(task['task_id'], task['revision'], 'worker', 'input?')
         service.answer_user(question, 'new-answer')
@@ -310,7 +310,7 @@ def test_mcp_dispatcher_can_consume_assigned_provider_without_new_prompt(tmp_pat
         service.add_member('dispatcher', 'Dispatcher', provider_id='local-command')
         service.add_member('worker', 'Worker', provider_id='local-command')
         service.store.set_member_token('dispatcher', 'fixture-token')
-        task = service.submit_goal('delegated', member_id='worker', dispatcher_member_id='dispatcher')
+        task = service.submit_goal('delegated', member_id='worker', dispatcher_member_id='dispatcher', problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         result = call_tool(service, 'butian_provider_consume', {'provider_session_id': task['execution']['provider_session_id'], 'actor_member_id': 'dispatcher', 'token': 'fixture-token'})
         assert result['status'] == 'completed'
         assert 'delegated-output' in result['text']

@@ -74,17 +74,12 @@ def test_unknown_provider_is_explicitly_unsupported(tmp_path):
     assert result["status"] == "unsupported"
 
 
-def test_local_command_provider_executes_prompt(tmp_path):
-    store = Store(tmp_path / "team.db")
-    provider = LocalCommandProvider([sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"])
-    registry = ProviderRegistry(); registry.register(provider)
-    runtime = ProviderRuntime(store, registry)
-    session = runtime.start("m", "hello", provider_id="local-command")
-    result = runtime.consume(session["provider_session_id"], provider, "hello")
+def test_local_command_provider_executes_prompt(tmp_path, operator_local_provider):
+    service, provider, session, remote = operator_local_provider(
+        [sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"], "hello")
+    result = service.provider_runtime.consume(session["provider_session_id"], provider, "hello")
     assert result["status"] == "completed"
     assert result["text"].strip() == "HELLO"
-    store.close()
-
 
 def test_remote_provider_session_id_is_passed_to_stream(tmp_path):
     store = Store(tmp_path / "team.db")
@@ -162,7 +157,7 @@ def test_completed_empty_output_remains_unknown_for_team_child(tmp_path):
         service.providers.register(EmptyProvider())
         service.add_member("dispatcher", "Dispatcher")
         service.add_member("worker", "Worker", provider_id="empty", model_id="test-model")
-        goal = service.submit_goal("goal", mode="team", dispatcher_member_id="dispatcher", member_ids=["worker"], subtasks=["do work"])
+        goal = service.submit_goal("goal", mode="team", dispatcher_member_id="dispatcher", member_ids=["worker"], subtasks=["do work"], problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         result = service.run_team_goal(goal["task_id"])
         child = service.store.db.execute("SELECT status FROM tasks WHERE parent_id=?", (goal["task_id"],)).fetchone()
         assert result["children"][0]["status"] == "unknown"
@@ -460,3 +455,58 @@ def test_provider_tool_call_identifiers_and_version_are_fail_closed(tmp_path):
             assert result["reason"] == "provider_tool_call_invalid"
     finally:
         store.close()
+
+def test_task_cannot_create_second_live_provider_execution(tmp_path):
+    import pytest
+    store = Store(tmp_path / 'team.db')
+    provider = ScriptedProvider()
+    registry = ProviderRegistry()
+    registry.register(provider)
+    store.add_member('member', '执行者')
+    session = store.create_session('solo', 'member', None, {})
+    task = store.create_task(session, '只执行一次', assignee_id='member')
+    for revision, status in enumerate(['ready', 'claimed', 'running'], 1):
+        store.transition_task(task, revision, status, 'single-start-' + status)
+    runtime = ProviderRuntime(store, registry)
+    calls = []
+    original = provider.create_child_session
+    def create(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+    provider.create_child_session = create
+    try:
+        runtime.start('member', '执行', task_id=task, provider_id='scripted')
+        with pytest.raises(ValueError, match='provider_start_in_progress'):
+            runtime.start('member', '执行', task_id=task, provider_id='scripted')
+        assert len(calls) == 1
+    finally:
+        store.close()
+
+
+def test_executor_provider_cancellation_before_dispatch_revokes_business_permission():
+    from types import SimpleNamespace
+    provider = None
+    class Runner:
+        def run(self, request, *, authorization_valid):
+            # Reproduce cancellation after registration but before dispatch.
+            provider._cancelled.add('session')
+            assert not authorization_valid()
+            raise ValueError('execution_permit_authorization_revoked')
+    provider = LocalCommandProvider(['unused'], execution_runner=Runner(),
+        execution_request_factory=lambda *args: (SimpleNamespace(execution_id='exec'), lambda: True))
+    events = list(provider.stream('session', 'prompt'))
+    assert events[-1].status == 'unknown'
+    assert events[-1].reason == 'provider_executor_unconfirmed'
+
+
+def test_executor_provider_factory_failure_is_reported_without_launch():
+    def invalid_factory(*args):
+        raise ValueError('provider_execution_session_unverified')
+    class Runner:
+        def run(self, *args, **kwargs):
+            raise AssertionError('must not dispatch an invalid permit')
+    provider = LocalCommandProvider(['unused'], execution_runner=Runner(),
+                                    execution_request_factory=invalid_factory)
+    events = list(provider.stream('session', 'prompt'))
+    assert events[-1].status == 'failed'
+    assert events[-1].reason == 'provider_execution_permit_invalid'

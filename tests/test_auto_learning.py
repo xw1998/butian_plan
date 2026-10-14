@@ -93,7 +93,7 @@ def test_real_task_candidate_reuse_counterevidence_and_restart(tmp_path):
     service = ButianService(tmp_path)
     try:
         service.add_member('worker', 'Worker', provider_id='local-command')
-        goal = service.submit_goal('calibration', member_id='worker')
+        goal = service.submit_goal('calibration', member_id='worker', problem={'acceptance_criteria': ['执行结果须留存证据并通过本用例业务断言']})
         result = service.consume_provider_task(goal['execution']['provider_session_id'])
         assert result['status'] == 'completed'
         task = service.store.db.execute('SELECT * FROM tasks WHERE task_id=?', (goal['task_id'],)).fetchone()
@@ -257,7 +257,7 @@ def test_review_method_outbox_recovers_without_double_count(tmp_path):
         memory.put('method', 'lesson', 'check input')
         memory.close()
         proof = registered_proof(service, 'm', 'recovery-run')
-        oid = service.store.enqueue_member_memory('review:method:run', 'm', 'method', 'review_method_practice', json.dumps({'outcome':'success','evidence_id':proof}), {}, [])
+        oid = service.store.enqueue_member_memory('review:method:run', 'm', 'method', 'review_method_practice', json.dumps({'outcome':'success','evidence_id':proof,'memory_content_hash':__import__('hashlib').sha256(b'check input').hexdigest()}), {}, [])
         result = service.drain_member_memory_outbox(fail_after_write=True)
         assert result[0]['status'] == 'processing'
         service.store.db.execute('UPDATE member_memory_outbox SET lease_until=0 WHERE outbox_id=?', (oid,))
