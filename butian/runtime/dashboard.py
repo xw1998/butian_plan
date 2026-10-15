@@ -8,18 +8,23 @@ import time
 def snapshot(service, actor):
     if not service.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (actor,)).fetchone():
         raise ValueError("member_not_found")
-    members = service.store.db.execute("SELECT member_id FROM members").fetchall()
+    members = service.store.db.execute("SELECT member_id,name,role FROM members ORDER BY member_id").fetchall()
     totals = Counter()
     kinds, states, practice = Counter(), Counter(), Counter()
     coverage = Counter()
+    member_stats = []
     root = (service.home / 'members').resolve()
     for member in members:
+        row = dict(member)
+        row.update(coverage='unavailable', totals={}, memory_kinds={}, memory_states={})
+        member_stats.append(row)
         path = root / member['member_id'] / 'memory.db'
         if root not in path.resolve().parents:
             coverage['unavailable'] += 1
             continue
         if not path.is_file():
             coverage['not_initialized'] += 1
+            row['coverage'] = 'not_initialized'
             continue
         db = None
         try:
@@ -47,6 +52,12 @@ def snapshot(service, actor):
                 local_practice.update(dict(db.execute('SELECT outcome,COUNT(*) FROM practice_observations GROUP BY outcome')))
             if 'memory_validation_batches' in tables:
                 local['validation_batches'] = db.execute('SELECT COUNT(*) FROM memory_validation_batches').fetchone()[0]
+            for table, metric in [('dream_runs','dream_runs'), ('dream_candidates','dream_candidates'), ('hypotheses','dream_hypotheses'), ('verification_queue','verification_queue'), ('memory_distillations','distillations'), ('memory_abstractions','abstractions'), ('memory_maintenance','maintenance'), ('memory_compositions','compositions'), ('skill_events','skill_events'), ('practice_observations','practice_observations')]:
+                if table in tables:
+                    local[metric] = db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
+            if 'memory_validation_batches' in tables:
+                local['validation_samples'], local['validation_passes'], local['validation_failures'] = db.execute('SELECT COALESCE(SUM(sample_count),0),COALESCE(SUM(pass_count),0),COALESCE(SUM(fail_count),0) FROM memory_validation_batches').fetchone()
+            row.update(coverage='readable', totals=dict(local), memory_kinds=dict(local_kinds), memory_states=dict(local_states))
             totals.update(local)
             kinds.update(local_kinds)
             states.update(local_states)
@@ -64,7 +75,7 @@ def snapshot(service, actor):
         'generated_at': time.time(), 'scope': 'team_counts_only',
         'task_scope': 'authenticated_member', 'members': len(members),
         'coverage': dict(coverage), 'partial': bool(coverage['unavailable']),
-        'totals': dict(totals), 'memory_kinds': dict(kinds), 'memory_states': dict(states),
+        'member_stats': member_stats, 'totals': dict(totals), 'memory_kinds': dict(kinds), 'memory_states': dict(states),
         'practice_outcomes': dict(practice), 'task_states': dict(tasks),
         'avoided_errors': {'count': None, 'supported': False,
                            'reason': '尚未记录独立避错证据；有用反馈和召回命中不等于避免错误。'},

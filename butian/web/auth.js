@@ -20,10 +20,17 @@ async function login(){
  const feedback=document.querySelector('#authFeedback');
  if(!id||(!localMode&&!token)){if(feedback)feedback.textContent=!id?'请先选择数字人。':'请输入所选数字人的访问口令。';return}
  selected=id;submitting=true;message=localMode?'正在加载工作台…':'正在验证身份…';render();
- try{const response=await fetch('/api/dashboard',{headers:{'X-Butian-Member':id,'X-Butian-Token':token}});const result=await response.json();if(!response.ok||result.status==='error')throw Error(result.error||'request_failed');state.dispatcherMember=id;state.token=token;state.authenticated=true;message='认证成功，已加载工作台。';await sync()}catch(e){message=friendly(e.message)}finally{submitting=false;render()}
+ try{const response=await fetch('/api/dashboard',{headers:{'X-Butian-Member':id,'X-Butian-Token':token}});const result=await response.json();if(!response.ok||result.status==='error')throw Error(result.error||'request_failed');state.dispatcherMember=id;state.evolutionMember=id;state.evolution=null;state.token=token;state.authenticated=true;message='认证成功，已加载工作台。';await sync()}catch(e){message=friendly(e.message)}finally{submitting=false;render()}
 }
 document.addEventListener('click',e=>{if(e.target.closest('#saveDispatcherAuth')){e.preventDefault();e.stopImmediatePropagation();login()}if(e.target.closest('#retryAuthOptions'))loadOptions()},true);
 document.addEventListener('change',e=>{if(e.target.id==='dispatcherMember'){selected=e.target.value;message='';render()}});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='dispatcherToken'){e.preventDefault();login()}});
 loadOptions();
 })();
+
+// Local selection changes the working identity; remote users keep their authenticated scope.
+document.addEventListener('input', e=>{
+ if(e.target.id!=='evolutionMember')return;
+ if(state.localMode){state.dispatcherMember=e.target.value;state.evolutionMember=e.target.value;state.evolution=null;state.token='';}
+ else if(e.target.value!==state.dispatcherMember){e.stopImmediatePropagation();notice('请先在工作台切换到该数字人的身份。',true);state.evolutionMember=state.dispatcherMember;render();}
+},true);

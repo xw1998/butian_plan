@@ -15,6 +15,10 @@ def test_dashboard_counts_and_missing_libraries(tmp_path):
         memory.close()
         result = snapshot(service, 'a')
         assert result['members'] == baseline['members'] + 2
+        rows = {r['member_id']: r for r in result['member_stats']}
+        assert rows['a']['totals']['memories'] == 2
+        assert rows['b']['totals'].get('memories', 0) == 0
+        assert sum(r['totals'].get('memories', 0) for r in rows.values()) == result['totals']['memories']
         assert result['totals']['memories'] == baseline['totals'].get('memories', 0) + 2
         assert result['totals']['pending_validation'] == baseline['totals'].get('pending_validation', 0) + 1
         assert result['memory_kinds']['experience'] == baseline['memory_kinds'].get('experience', 0) + 1
