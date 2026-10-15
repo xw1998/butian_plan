@@ -128,7 +128,167 @@ Thompson Sampling不是经验形成过程本身，而是当系统有多个待验
 
 恢复时先读取已提交事件、经验当前版本、父版本链和未完成任务，再恢复候选上下文。若事件处于prepared但没有committed，不能把外部行动当成成功；若工具退出没有确认，状态保留unknown；若当前版本和经验版本不一致，经验只能作为候选并触发重新取证。恢复算法的目标是延续实践过程，而不是简单把旧文本重新塞回上下文。
 
-### F. 有限闭环的条件命题
+### F. 带输入输出与错误分支的伪代码
+
+以下伪代码按实际责任边界编写。算法1a对应生产实践接口；算法2a、3a、4a对应数学模块；算法5a是宿主侧恢复与准入流程，不能当作一个已实现的单函数；算法6是主实验真实执行路径。算法6直接写warm，不能代替算法1a的候选验证。行号表示执行顺序，IF/ELSE和FOR块用END闭合。
+
+#### 算法1a 记录实践反馈（生产接口）
+
+01  INPUT: member, memory_id, content, outcome, independent_key, evidence_ref
+
+02  OUTPUT: memory_id, status, successes, failures；或明确错误
+
+03  REQUIRE outcome IN {success, failure, unknown} 且 independent_key非空
+
+04  IF success且无evidence_ref: RAISE practice_success_evidence_required
+
+05  由服务验证证据归属与正文哈希；无效则RAISE并结束
+
+06  BEGIN IMMEDIATE（成员记忆数据库事务）
+
+07  IF 独立键已用，或证据引用/摘要已用: RAISE重复证据错误
+
+08  读取经验；不存在则创建candidate；如指定正文哈希则校验
+
+09  插入观察、环境和证据摘要；统计该memory_id的成功数s与失败数f
+
+10  IF outcome=failure: 成熟经验置disputed，否则保留candidate；降低confidence与weight
+
+11  ELSE IF outcome=success AND s>=2 AND f=0 AND旧状态为candidate或pending_validation: 置warm并有界增加分值
+
+12  ELSE: 不执行升级；unknown不计入成功或失败
+
+13  保存新版本、父链、来源引用和领域技能统计；COMMIT
+
+14  ON事务内异常: ROLLBACK；重新抛出错误
+
+15  事务后服务另行追加practice_observed事件；失败不得宣称两库整体回滚
+
+16  RETURN 实际已提交状态与计数
+
+#### 算法2a Beta证据摘要（可选数学模块）
+
+01  INPUT: alpha>0, beta>0, outcome, q,d,m IN [0,1]
+
+02  OUTPUT: 更新参数与后验均值；不改变生产生命周期状态
+
+03  检查参数有限性与范围；不合法则RAISE
+
+04  w <- q*d*m
+
+05  IF outcome=success: alpha <- alpha+w
+
+06  ELSE IF outcome=failure: beta <- beta+w
+
+07  ELSE IF outcome=unknown: 保持参数
+
+08  ELSE: RAISE invalid_outcome
+
+09  RETURN alpha, beta, alpha/(alpha+beta)
+
+10  NOTE: 去重在算法1a执行；分数权重不是独立性的证明
+
+#### 算法3a 求证行动排序（显式后验控制）
+
+01  INPUT: 先验p；行动a的结果概率r；各结果后验p_y；成本cost与惩罚lambda
+
+02  OUTPUT: 合法行动的EIG与成本调整得分
+
+03  FOR EACH action a:
+
+04    检查p、r、p_y有限非负、维度一致、各分布归一
+
+05    检查对每个分量i有 sum_y r_y*p_y[i] 与 p[i]在容差内一致
+
+06    不合法则RAISE，不凭文字猜测后验
+
+07    eig[a] <- H(p)-sum_y r_y*H(p_y)
+
+08    score[a] <- eig[a]-lambda*cost[a]
+
+09  END FOR
+
+10  RETURN 按score排序的行动；执行选择仍由调用方决定
+
+#### 算法4a Thompson探索分配（Bandit控制）
+
+01  INPUT: K个臂的正参数alpha[k], beta[k]与随机数生成器
+
+02  OUTPUT: 选择臂k；获得反馈后更新该臂
+
+03  REQUIRE K>0；所有参数有限且为正
+
+04  FOR k=1 TO K: sample[k] <- BetaSample(alpha[k],beta[k])
+
+05  END FOR
+
+06  selected <- ARGMAX sample[k]（使用实现约定处理并列）
+
+07  执行selected；等待可核验的Bernoulli反馈reward
+
+08  IF反馈未知: 不伪造reward，不执行成功或失败更新
+
+09  ELSE IF reward=1: alpha[selected] <- alpha[selected]+1
+
+10  ELSE IF reward=0: beta[selected] <- beta[selected]+1
+
+11  ELSE: RAISE invalid_reward
+
+12  RETURN selected与更新参数；不据此自动晋升经验状态
+
+#### 算法5a 恢复后的条件准入（宿主责任流程）
+
+01  INPUT: 已持久化任务、事件、经验、版本链与当前任务条件
+
+02  OUTPUT: 可复核候选上下文与结果状态；并非自动成功
+
+03  打开服务存储与成员记忆，读取当前版本和来源
+
+04  检查父版本链；损坏则报错，不补造缺失版本
+
+05  FOR EACH 未完成行动:
+
+06    committed有可核验证据时才恢复其已提交结果
+
+07    prepared无提交、退出未确认或证据缺失时保留unknown
+
+08  END FOR
+
+09  召回候选；再按实体、当前版本、完整性与冲突逐项准入
+
+10  候选不适用则重新取源；来源不可用则RETURN unknown
+
+11  RETURN 候选、来源和未决事项；宿主仍需执行下一次实践
+
+12  NOTE: 当前实验只验证正常close/open，不验证任意断电恢复
+
+#### 算法6 多轮规则复用基准（研究脚本实际路径）
+
+01  INPUT: 共享任务流、精确来源档案、条件method与记忆目录
+
+02  OUTPUT: 首次答案、正确/错误/unknown及读取/查询/写入计数
+
+03  IF 条件启用记忆: compose_context；解析唯一实体规则
+
+04  IF 启用版本准入: 拒绝不匹配版本；否则允许旧规则
+
+05  IF 无可用规则 AND source_available: 扫描或精确索引读取来源
+
+06  answer <- 固定solve(rule,task)；冻结首次答案
+
+07  依据reference计分；此后修复不能改写首次分数
+
+08  IF 首次错误 AND source_available: 重新取正确来源规则
+
+09  IF 已取源 AND条件允许写入: append_event；MemoryStore.put(status=warm,confidence=1)
+
+10  按协议第8轮close/open；no-persist条件改用空目录
+
+11  RETURN 本轮记录；后续轮重复上述步骤
+
+12  NOTE: 本算法没有candidate验证、自动归纳或disputed状态实验
+
+### G. 有限闭环的条件命题
 
 命题1：若每次状态更新都经MemoryStore实践接口，candidate升级前必须存在至少两条通过接口去重的成功观察且无失败。证明直接来自升级分支：程序在事务内读取成功数和失败数，仅在successes≥2、failures=0且旧状态属于candidate或pending_validation时置warm。该命题证明的是程序门槛，无法证明外部证据真实，也无法保证绕过接口的人工写入满足同样条件。两次成功是必要的接口条件，不能作为经验普遍有效的充分条件。
 
@@ -138,7 +298,7 @@ Thompson Sampling不是经验形成过程本身，而是当系统有多个待验
 
 过程闭环成立还需要宿主实际执行行动、返回可靠观察并在下一轮使用记录。数据库写入成功只能证明保存完成；主张在多个任务上有效需要外部结果，长期收益需要跨轮对照。本文将可执行闭环与认识正确性分开论证：前者由接口、事务和恢复控制验证，后者只在给定实验任务族内报告结果。
 
-### G. 复杂度与实现边界
+### H. 复杂度与实现边界
 
 经验写入涉及固定种类的表操作，但成功计数、失败计数和领域汇总会随观察记录增长；令$N$为相关观察数、$N_d$为领域观察数，聚合在无更强索引保证时保守计为$O(N+N_d)$，不能把整条实践写回称为O(1)。固定表操作数量也不意味着每条SQL耗时为常数；候选召回使用当前实现的OR LIKE路径，若M条经验、平均正文长度L，保守成本为O(ML)；候选解析为O(B)，B为上下文字符数；版本链检查为O(V)，V为版本数；Beta更新为O(1)；Thompson一次选择为O(K)；Pareto预算分配取决于前沿状态数并设100000上限。复杂度说明的是程序执行量，不等于宿主模型token成本，也不等于人的认知复杂度。
 
