@@ -24,3 +24,8 @@
 - `run_persistent_experience.py`：真实生产服务12条经验持久化试验，写入前0/12、关闭重启后12/12召回；结果在 `experiment_results/persistent-experience-20261015/`。
 - `run_evolution_controls.py`：容量玩具模型、标签噪声、多次使用的任务覆盖模拟；结果在 `experiment_results/evolution-controls-20261015-r2/`。
 - 回归：42 passed；DOCX生成统计：约7926汉字、15条引用；精确正文以DOCX为准。
+
+
+## 同类问题的具体收益
+
+论文第14节新增24个同类版本校准任务实测。三组均24/24正确，在线数据访问次数B0/B1/B2为216/240/24；B2生产召回相对B0档案扫描减少88.89%。该收益是资料访问数量减少，不是延迟降低（B2本地耗时反而增加），不是模型能力或参数进化。B2仅测量生产召回复用，完整生命周期和真实Agent端到端收益尚未验证。脚本：`run_same_family_benefit.py`；结果：`experiment_results/same-family-benefit-20261015/results.json`。

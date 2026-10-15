@@ -1,0 +1,194 @@
+[
+  {
+    "seed": 1103,
+    "case": 0,
+    "context": "【L0 当前指令】\nprobe_000 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_000 version=2 scale=2000; source event evt_04cce1bc3ab84820af9675ef1abf1084; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 1103,
+    "case": 1,
+    "context": "【L0 当前指令】\nprobe_001 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_001 version=2 scale=2000; source event evt_5cce89b46b464feea9a84dc1669df228; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 1103,
+    "case": 2,
+    "context": "【L0 当前指令】\nprobe_002 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_002 version=2 scale=2000; source event evt_4dce237e73204eaaa75e270ba60530e3; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 1103,
+    "case": 3,
+    "context": "【L0 当前指令】\nprobe_003 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_003 version=2 scale=2000; source event evt_3fa30ade31ba4afa8cec771c2781e5d5; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 1103,
+    "case": 4,
+    "context": "【L0 当前指令】\nprobe_004 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_004 version=2 scale=250; source event evt_13f239dbc0264186b98eae991f2abdba; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 1103,
+    "case": 5,
+    "context": "【L0 当前指令】\nprobe_005 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_005 version=2 scale=500; source event evt_9142733c9f5d451f920e189c9287f119; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 1103,
+    "case": 6,
+    "context": "【L0 当前指令】\nprobe_006 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_006 version=2 scale=1000; source event evt_deea6a00261c4ebe98f31adae8490554; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 1103,
+    "case": 7,
+    "context": "【L0 当前指令】\nprobe_007 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_007 version=2 scale=1000; source event evt_25af3573e9d2469cac69b56b598455c4; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 0,
+    "context": "【L0 当前指令】\nprobe_000 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_000 version=2 scale=1000; source event evt_ad8fe1cda4dc4c55b8dc2cae79a64ce0; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 1,
+    "context": "【L0 当前指令】\nprobe_001 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_001 version=2 scale=250; source event evt_1f1a1f6b672b4187b256e7fa5ca91002; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 2,
+    "context": "【L0 当前指令】\nprobe_002 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_002 version=2 scale=2000; source event evt_b91524033e8e4abb87506b93ccfc0ee1; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 3,
+    "context": "【L0 当前指令】\nprobe_003 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_003 version=2 scale=2000; source event evt_ef68749af5104bc9a96b98d8f8f11c4f; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 4,
+    "context": "【L0 当前指令】\nprobe_004 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_004 version=2 scale=250; source event evt_28e439082c8040948547b725ba73102e; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 5,
+    "context": "【L0 当前指令】\nprobe_005 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_005 version=2 scale=500; source event evt_ae4889838e484065b6570f1f029dd542; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 6,
+    "context": "【L0 当前指令】\nprobe_006 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_006 version=2 scale=1000; source event evt_baab65fa925140fab713c0690cbbca21; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 2207,
+    "case": 7,
+    "context": "【L0 当前指令】\nprobe_007 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_007 version=2 scale=2000; source event evt_4672f567c0174e62bc089773b1acc346; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 0,
+    "context": "【L0 当前指令】\nprobe_000 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_000 version=2 scale=500; source event evt_24a7f84e9e23456083b2fa66b977b20d; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 1,
+    "context": "【L0 当前指令】\nprobe_001 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_001 version=2 scale=1000; source event evt_c7182731db4f43f889ba1cf4a9a9a079; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 2,
+    "context": "【L0 当前指令】\nprobe_002 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_002 version=2 scale=1000; source event evt_b7494abc79dd48bc9d62d9a85f60ebb6; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 3,
+    "context": "【L0 当前指令】\nprobe_003 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_003 version=2 scale=250; source event evt_9d50d8b1105247b1bbd24e3b1008dd7c; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 4,
+    "context": "【L0 当前指令】\nprobe_004 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_004 version=2 scale=250; source event evt_ce57be5b51ad4b0daac16906a48dac60; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 5,
+    "context": "【L0 当前指令】\nprobe_005 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_005 version=2 scale=250; source event evt_fdecb8da8a594639b26ade840258e55e; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 6,
+    "context": "【L0 当前指令】\nprobe_006 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_006 version=2 scale=1000; source event evt_fc199e787b08470195ff5b463b1001a7; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  },
+  {
+    "seed": 3301,
+    "case": 7,
+    "context": "【L0 当前指令】\nprobe_007 version=2 calibration\n\n【身份与权限】\n{\"name\":\"Same host Agent\",\"role\":\"member\",\"responsibilities\":[],\"persona\":\"{}\",\"tool_policy\":{},\"authorization\":\"工具调用仍须通过运行时授权与撤销校验\"}\n\n【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）\n- CAL probe_007 version=2 scale=1000; source event evt_e2f7708e9fb94445bfa3a55a88e131e1; supersedes version=1 without deleting history",
+    "recalled_memory_ids": [
+      "calibration"
+    ]
+  }
+]
