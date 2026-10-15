@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-> **Give your AI long-term memory, practical experience, and team coordination—so each task contributes to the next.**
+> **Practice is the sole criterion for testing truth.**
 
 AI can answer questions. Working with it over time asks for more: remembering your requirements, resuming unfinished work, reusing methods that worked, learning from failures, and carrying complex tasks through to a result you can review.
 
