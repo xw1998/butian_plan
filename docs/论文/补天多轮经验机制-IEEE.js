@@ -54,6 +54,7 @@ h.h2('E. 配置解析与宿主依附'),
 h.p('config.py对JSON顶层对象、providers列表及各条目对象进行结构检查。已知类型包括openai-compatible、ollama、local-command、manual和mcp；命令必须为非空列表，context_window须为正整数且拒绝bool。API密钥由适配器内部读取，缺少指定环境变量显式报错；本研究只检查代码和测试夹具，不读取实际providers.json。build_registry逐项收集ValueError、KeyError和TypeError，最后始终注册人工通道。显式BUTIAN_PROVIDERS_FILE优先于home/providers.json，指定文件不存在直接报错。'),
 h.p('Ollama只是可选适配器，不是运行项目的前置依赖；宿主AI可通过集成接口使用经验与任务机制，存在外部模型连接代码不表示用户必须独立创建模型会话。local-command及mcp超时值在配置入口仅转为float，这里不能独立保证有限性；执行层仍须检查参数。配置可解析、能力可枚举、真实执行被OS授权和进程退出被确认是不同命题，应分别取证。扩展配置/runtime测试只支持其覆盖的契约，不能证明任意AI应用无修改即可接入。'),
 h.h2('F. 当前回归证据'),
+h.p('2026年10月15日，对提交1e5cd24执行显式验收后端的仓库回归，1025 passed、1 skipped、0 failed，耗时400.05秒。命令只排除tests/test_backup_reparse.py，因为运行环境先前禁止创建真实Windows junction；该排除项不记为通过。属性级及三入口重解析检查均正常包含。当前自动化覆盖的功能未出现失败，但不能据此保证所有外部宿主联调、全部用户场景或模型能力收益。历史间歇失败本次未复现，根因仍未知，原历史记录不删除。'),
 h.p('前轮完整工具测试为114 passed（84.04秒），增加前置失败状态诊断后再次114 passed（86.89秒），历史间歇失败此次未复现但根因未确认；本轮备份专项为20 passed、1 skipped（8.16秒）；四项迁移测试验证产品入口禁用。增加三项根路径检查后，备份、provider配置/runtime及禁用迁移入口的扩展回归合计64 passed、1 skipped（13.94秒）。既有全库1014 passed、1 skipped、2 failed的历史结果仍保留，超时前置绑定间歇失败尚未定位，真实junction创建仍受环境限制。专项通过不能改写历史全库结果，更不能代替尚未完成的宿主AI多轮确认实验。')
 ];}
 

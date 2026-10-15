@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-15",
+  "code_commit": "1e5cd24d99a106d432ed0696a8d7f0e9ecc0a36c",
+  "command": "BUTIAN_OPERATOR_ACCEPTANCE=1 python -m pytest -q --ignore=tests/test_backup_reparse.py",
+  "passed": 1025,
+  "skipped": 1,
+  "failed": 0,
+  "duration_seconds": 400.05,
+  "excluded": [{"path": "tests/test_backup_reparse.py", "reason": "Environment previously denied real Windows junction creation. Not counted as passing."}],
+  "scope": "Repository automated tests using the explicit operator acceptance backend; not validation of every external host AI integration.",
+  "limitations": ["Prior intermittent tool verification prerequisite failure did not recur; root cause remains unconfirmed.", "Does not establish language-model task benefit or complete the detailed paper.", "Historical identity migration product entrypoints are intentionally disabled and tested as such."]
+}

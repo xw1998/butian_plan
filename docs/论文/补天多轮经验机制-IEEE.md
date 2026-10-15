@@ -324,3 +324,8 @@ Word脚本已加入附录A，具体覆盖服务启动/关闭、任务迁移事�
 补充可达性更正：上述迁移模块为保留实现，当前服务preflight_members/import_members均直接抛historical_identity_migration_out_of_scope，HTTP、CLI、MCP亦禁用，list_migration_runs返回空列表；四项迁移测试验证禁用行为，不能视为导入算法通过。Store以isolation_level=None自动提交，保留模块没有显式BEGIN或逐成员SAVEPOINT，不能宣称导入原子。人工说明与Word均已同步这一边界。
 
 进一步扩展回归：备份、provider配置/runtime与禁用迁移合计64 passed、1 skipped（13.94秒）。工具测试辅助函数新增前置执行必须成功的诊断断言，失败时保留执行ID、状态与终止原因，未改生产成功绑定或退出保护。完整tests/test_tools.py再次114 passed（86.89秒），此次未复现历史间歇失败；其根因仍未确认。
+
+
+### 当前版本仓库回归
+
+2026-10-15在代码`1e5cd24`上运行`BUTIAN_OPERATOR_ACCEPTANCE=1 python -m pytest -q --ignore=tests/test_backup_reparse.py`，得到1025 passed、1 skipped、0 failed，400.05秒。只排除已被环境禁止创建的真实Windows junction用例，不计为通过；其余测试照常运行。当前覆盖的功能路径未出现失败，历史工具超时前置间歇失败本次未复现但尚未定位根因。此验收不证明所有外部AI应用已经实际接入，不替代真实宿主模型多轮收益实验，也不改变历史迁移产品入口禁用边界。机器可读记录为`experiment_results/functional-regression-20261015.json`。

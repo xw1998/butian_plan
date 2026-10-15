@@ -120,18 +120,18 @@
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.md",
-      "bytes": 50812,
-      "sha256": "ef35cb63aebc83cf65b7300df2210a70225abd7a1cd13b4dbdc4e177bd907d34"
+      "bytes": 51498,
+      "sha256": "6afcd53ba58f01013064d3c67a9f7e401225659d0ada14ca7e3a55f28473f6b7"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.js",
-      "bytes": 34684,
-      "sha256": "d36dfa883ed3bcc625b845bbd421d0c7bcd0c0dd1381979e97559dbdd60d6638"
+      "bytes": 35236,
+      "sha256": "7fea792c7b3bc0258c8a8d07451d49f7f9f38ef170c401999e9aa0b233971d55"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.docx",
-      "bytes": 620316,
-      "sha256": "f314176b25818803e41661fc37b0d47d9948113739ad4813a9a2d43d471b033b"
+      "bytes": 620555,
+      "sha256": "196f61a861088689dcad6accf1cd4e1b70f7c7e876050032ffd969a66934961e"
     },
     {
       "path": "docs/论文/references/ieee-study-references.json",
@@ -140,8 +140,8 @@
     },
     {
       "path": "docs/论文/核心实现语义说明.md",
-      "bytes": 26944,
-      "sha256": "227ae9216fa996828577999d93aec6991c380f137311dfe0fb894957820e7920"
+      "bytes": 27505,
+      "sha256": "f020a9278d04faecf36d26625f2e84b3cee57cbea30a1c4615132fc12a930f2f"
     },
     {
       "path": "docs/论文/逐模块算法与逻辑附录.md",
@@ -207,6 +207,16 @@
       "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/version-audits.json",
       "bytes": 62451,
       "sha256": "b6bac7ae22f93d7f701576312bdc2772a40bcbe84df01845eb5f5721735f4a03"
+    },
+    {
+      "path": "docs/论文/README.md",
+      "bytes": 5396,
+      "sha256": "122e1eb035b8e710d5c182409041db43a749ad8e4e15406fbe840129dea79189"
+    },
+    {
+      "path": "docs/论文/experiment_results/functional-regression-20261015.json",
+      "bytes": 879,
+      "sha256": "e3799ad08572ec0c76da3f28843abaa9973cb15ba99cbf4c04a9eb2f2a977c72"
     }
   ],
   "limitations": [
@@ -216,5 +226,5 @@
     "Exploratory pilot preceded main protocol",
     "Not a model parameter evolution experiment"
   ],
-  "verification_note": "Full suite: 1014 passed, 1 skipped, 2 failed; junction creation denied by environment; intermittent tool verification failure unresolved. Focused explicit-backend rerun: 70 passed; complete tools rerun: 114 passed in 86.89s; expanded backup/provider/config/migration-disabled controls: 64 passed, 1 skipped. Migration tests confirm disabled product entrypoints, not successful imports. Reparse attribute guard added; real junction creation remains blocked. No confirmatory host-LLM benefit experiment completed."
+  "verification_note": "Latest repository regression at 1e5cd24: 1025 passed, 1 skipped, 0 failed in 400.05s, excluding real-junction test_backup_reparse.py due to prior environment denial. Historical full suite: 1014 passed, 1 skipped, 2 failed; junction creation denied by environment; intermittent tool verification failure unresolved. Focused explicit-backend rerun: 70 passed; complete tools rerun: 114 passed in 86.89s; expanded backup/provider/config/migration-disabled controls: 64 passed, 1 skipped. Migration tests confirm disabled product entrypoints, not successful imports. Reparse attribute guard added; real junction creation remains blocked. No confirmatory host-LLM benefit experiment completed."
 }
