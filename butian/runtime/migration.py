@@ -8,11 +8,11 @@ _KIND_MAP = {"fact": "fact", "lesson": "lesson", "experience": "experience", "kn
 class MemberAssetMigrator:
     """Import agent profiles from Nuwa memory.db without modifying the source.
 
-    完整资产迁移：
+    成员档案迁移（公开入口禁止导入历史记忆）：
     - 档案：persona/personality/角色文件正文、rank、reports_to、reasoning_effort、
       max_tokens、model_tier、tool_policy、provider、model、traits、domains。
-    - 记忆：源库 memory 表（含共享 default 池）导入到每个数字人的独立记忆库，
-      状态映射为 candidate（未验证不升温），环境里保留来源指纹。
+    - 记忆：公开入口禁止历史记忆导入，import_memories=True 显式报错；
+      私有 _import_member_memories 为保留实现，公开入口不调用。
     - 台账：migration_runs 记录 source_sha256，可核验源版本；重复导入幂等跳过；
       同名不同 ID 显式报错，不静默合并。
     """

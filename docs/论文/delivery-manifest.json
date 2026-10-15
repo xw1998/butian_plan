@@ -120,18 +120,18 @@
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.md",
-      "bytes": 48957,
-      "sha256": "54782895561b97105cfb215455f411ae13d03ca39df59a86a1c0349303f14e1d"
+      "bytes": 49945,
+      "sha256": "856083ec8eda3d021bf2d82759d5a48903d3b84bafe2af593a32e949310b0cbd"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.js",
-      "bytes": 27547,
-      "sha256": "fb040a11370e2e9ca6a493e84ae7c4c1a68b8d50ada8bd6dfc06e623c6cfd462"
+      "bytes": 31399,
+      "sha256": "e4c6d9d1f12026c3d82c5692c9c28c937983157afddbd77ea850e05a41dcb58d"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.docx",
-      "bytes": 616755,
-      "sha256": "5c3721a322b262b06f88b093f2c1fe6b1fa323c015fa77b6baf199df834c9a59"
+      "bytes": 618683,
+      "sha256": "82b9b4e252edb4a43a8d49802e6fb8276d888639a393800b8fc45f2788590f2e"
     },
     {
       "path": "docs/论文/references/ieee-study-references.json",
@@ -140,18 +140,18 @@
     },
     {
       "path": "docs/论文/核心实现语义说明.md",
-      "bytes": 17747,
-      "sha256": "cc7ad640ad517d035066a395eee42e9b96ab6851521788dff77f73f5155fa8d9"
+      "bytes": 22614,
+      "sha256": "045c05693ead8a6cae78cbeccbd215589caec5c2810df4b00d521f3857c3aa99"
     },
     {
       "path": "docs/论文/逐模块算法与逻辑附录.md",
-      "bytes": 793610,
-      "sha256": "dbbd331a7b2388a9eaafc757f75a5b87ca4fb1a88a0ad2ef4f5f11020761ae9a"
+      "bytes": 794431,
+      "sha256": "d593f43646af1c52ebe9e1582a0beb2e504a93fae4a4d38bf286e7c8d64d9a10"
     },
     {
       "path": "docs/论文/implementation-ledger.json",
-      "bytes": 1361742,
-      "sha256": "6fd2c39d47d6dc23ad8fc3098f772248dc98ba7e7eaad450a08e055707c1ced7"
+      "bytes": 1363764,
+      "sha256": "4e968c728583e94cb8245533b947231af41d9bdbc1df55d03edfa3e00696848f"
     },
     {
       "path": "docs/论文/inspect_implementation.py",
@@ -182,6 +182,31 @@
       "path": "docs/论文/experiment_results/practice-lifecycle-20261015/manifest.json",
       "bytes": 180,
       "sha256": "79b4d72fbb50338c548a30bf984e412b5564f5d17c74a27a0fa289560c8083d3"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/protocol.json",
+      "bytes": 721,
+      "sha256": "9c2311ef351a9ef58a2857d5a0e1dfbbdb1dbf9b3384baa479a2b48fabeb9476"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/rows.json",
+      "bytes": 8179418,
+      "sha256": "2270d2dc7f4570dc8f945feac5e9274ccf7234badadae2f211fa7494aa4e2dfb"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/task-stream.json",
+      "bytes": 584055,
+      "sha256": "92a266ad0ba83a558cb179bfb2aca301fbbfe02c033cdf66d40f33f7cb069748"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/context-traces.json",
+      "bytes": 4379401,
+      "sha256": "15ad280c9dffe071b3a13cab97ae20667f302f5ea29f9440e4e9c091cac4eadc"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/version-audits.json",
+      "bytes": 62451,
+      "sha256": "b6bac7ae22f93d7f701576312bdc2772a40bcbe84df01845eb5f5721735f4a03"
     }
   ],
   "limitations": [
@@ -191,5 +216,5 @@
     "Exploratory pilot preceded main protocol",
     "Not a model parameter evolution experiment"
   ],
-  "verification_note": "Full suite: 1014 passed, 1 skipped, 2 failed; junction creation denied by environment; intermittent tool verification failure unresolved. Focused explicit-backend rerun: 70 passed. No confirmatory host-LLM benefit experiment completed."
+  "verification_note": "Full suite: 1014 passed, 1 skipped, 2 failed; junction creation denied by environment; intermittent tool verification failure unresolved. Focused explicit-backend rerun: 70 passed; complete tools: 114 passed; backup controls: 20 passed, 1 skipped; migration: 4 passed. Reparse attribute guard added; real junction creation remains blocked. No confirmatory host-LLM benefit experiment completed."
 }

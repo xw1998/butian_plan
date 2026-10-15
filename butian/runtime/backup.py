@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import sqlite3
+import stat
 import time
 import uuid
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -33,7 +34,20 @@ def _safe_relative(value: str) -> PurePosixPath:
     return relative
 
 
+def _is_redirect(path: Path) -> bool:
+    """Reject symlinks and Windows reparse points without following targets."""
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return False
+    return stat.S_ISLNK(metadata.st_mode) or bool(
+        getattr(metadata, "st_file_attributes", 0)
+        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    )
+
 def _scan_tree(root: Path, *, allow_manifest: bool, ignore_sidecars: bool = False) -> tuple[list[Path], list[str]]:
+    if _is_redirect(root):
+        raise ValueError("backup_symlink_not_allowed")
     files: list[Path] = []
     directories: list[str] = []
     for current, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
@@ -41,14 +55,14 @@ def _scan_tree(root: Path, *, allow_manifest: bool, ignore_sidecars: bool = Fals
         kept = []
         for name in sorted(dirnames):
             path = base / name
-            if path.is_symlink():
+            if _is_redirect(path):
                 raise ValueError("backup_symlink_not_allowed")
             kept.append(name)
             directories.append(path.relative_to(root).as_posix())
         dirnames[:] = kept
         for name in sorted(filenames):
             path = base / name
-            if path.is_symlink() or not path.is_file():
+            if _is_redirect(path) or not path.is_file():
                 raise ValueError("backup_symlink_not_allowed")
             if ".backup-staging-" in name or ".restore-staging-" in name:
                 continue
@@ -106,7 +120,7 @@ def _backup_sqlite(source: Path, target: Path) -> dict[str, Any]:
 
 def _load_manifest(backup: Path) -> dict[str, Any]:
     manifest_path = backup / "manifest.json"
-    if not backup.is_dir() or manifest_path.is_symlink() or not manifest_path.is_file():
+    if not backup.is_dir() or _is_redirect(manifest_path) or not manifest_path.is_file():
         raise ValueError("backup_manifest_not_found")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("format") != _FORMAT:
@@ -132,7 +146,7 @@ def _manifest_entries(backup: Path, manifest: dict[str, Any]) -> tuple[dict[str,
         if not isinstance(digest, str) or len(digest) != 64:
             raise ValueError("backup_manifest_entry_invalid")
         path = backup.joinpath(*relative.parts)
-        if path.is_symlink() or not path.is_file():
+        if _is_redirect(path) or not path.is_file():
             raise ValueError("backup_file_missing")
         try:
             resolved = path.resolve(strict=True)
@@ -164,7 +178,7 @@ def _manifest_entries(backup: Path, manifest: dict[str, Any]) -> tuple[dict[str,
 
 def _reject_sqlite_sidecars(root: Path) -> None:
     for path in root.rglob("*"):
-        if path.is_symlink():
+        if _is_redirect(path):
             raise ValueError("backup_symlink_not_allowed")
         if path.is_file() and path.name.endswith(("-wal", "-shm")):
             raise ValueError("backup_sqlite_sidecar_present")
@@ -185,7 +199,10 @@ def _check_cross_database_state(root: Path, *, reject_sidecars: bool = True, all
 
 
 def create_backup(home: str | Path, destination: str | Path) -> dict[str, Any]:
-    home = Path(home).resolve()
+    home = Path(home)
+    if _is_redirect(home):
+        raise ValueError("backup_symlink_not_allowed")
+    home = home.resolve()
     destination = Path(destination).resolve()
     if not home.is_dir():
         raise ValueError("backup_source_not_found")
@@ -249,7 +266,10 @@ def create_backup(home: str | Path, destination: str | Path) -> dict[str, Any]:
 
 
 def verify_backup(backup: str | Path) -> dict[str, Any]:
-    backup = Path(backup).resolve()
+    backup = Path(backup)
+    if _is_redirect(backup):
+        raise ValueError("backup_symlink_not_allowed")
+    backup = backup.resolve()
     manifest = _load_manifest(backup)
     entries, listed = _manifest_entries(backup, manifest)
     database_state = _check_cross_database_state(backup, reject_sidecars=True)
@@ -284,7 +304,7 @@ def _evidence_files(home: Path) -> dict[str, Path]:
             except ValueError as exc:
                 raise ValueError("backup_evidence_outside_source") from exc
             source = home.joinpath(*relative.parts)
-            if source.is_symlink() or not source.is_file():
+            if _is_redirect(source) or not source.is_file():
                 raise ValueError("backup_evidence_reference_invalid")
             result[PurePosixPath(*relative.parts).as_posix()] = source
         return result
@@ -352,7 +372,10 @@ def _validate_rebound_references(root: Path, final_root: Path) -> int:
 
 
 def restore_backup(backup: str | Path, destination: str | Path) -> dict[str, Any]:
-    backup = Path(backup).resolve()
+    backup = Path(backup)
+    if _is_redirect(backup):
+        raise ValueError("backup_symlink_not_allowed")
+    backup = backup.resolve()
     verification = verify_backup(backup)
     manifest = _load_manifest(backup)
     entries, _ = _manifest_entries(backup, manifest)

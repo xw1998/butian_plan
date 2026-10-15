@@ -5887,21 +5887,21 @@
     },
     {
       "path": "butian/runtime/backup.py",
-      "lines": 398,
-      "sha256": "607c8fd750ac5a691557d6d2f76ce36eeef8a1493a2fb6518e1d58086e0bcba8",
+      "lines": 421,
+      "sha256": "b2105ab288b322a5c9a9c35504c0251ab3ff30f3672ff01acf110a56edb0432d",
       "doc": null,
       "routines": [
         {
           "name": "_sha256",
-          "line": 17,
-          "end_line": 22,
+          "line": 18,
+          "end_line": 23,
           "signature": "path: Path",
           "returns_annotation": "str",
           "doc": null,
           "guards": [],
           "iterations": [
             {
-              "line": 20,
+              "line": 21,
               "target": "chunk",
               "iterable": "iter(lambda: stream.read(1024 * 1024), b'')"
             }
@@ -5909,7 +5909,7 @@
           "raises": [],
           "returns": [
             {
-              "line": 22,
+              "line": 23,
               "expression": "digest.hexdigest()"
             }
           ],
@@ -5926,43 +5926,43 @@
         },
         {
           "name": "_safe_relative",
-          "line": 25,
-          "end_line": 33,
+          "line": 26,
+          "end_line": 34,
           "signature": "value: str",
           "returns_annotation": "PurePosixPath",
           "doc": null,
           "guards": [
             {
-              "line": 26,
+              "line": 27,
               "condition": "not isinstance(value, str) or not value or '\\\\' in value"
             },
             {
-              "line": 29,
+              "line": 30,
               "condition": "relative.is_absolute() or any((part in {'', '.', '..'} for part in relative.parts)) or (relative.parts and ':' in relative.parts[0])"
             },
             {
-              "line": 31,
+              "line": 32,
               "condition": "relative.as_posix() != value or value == 'manifest.json'"
             }
           ],
           "iterations": [],
           "raises": [
             {
-              "line": 27,
+              "line": 28,
               "expression": "ValueError('backup_path_invalid')"
             },
             {
-              "line": 30,
+              "line": 31,
               "expression": "ValueError('backup_path_invalid')"
             },
             {
-              "line": 32,
+              "line": 33,
               "expression": "ValueError('backup_path_invalid')"
             }
           ],
           "returns": [
             {
-              "line": 33,
+              "line": 34,
               "expression": "relative"
             }
           ],
@@ -5978,64 +5978,106 @@
           "sql": []
         },
         {
+          "name": "_is_redirect",
+          "line": 37,
+          "end_line": 46,
+          "signature": "path: Path",
+          "returns_annotation": "bool",
+          "doc": "Reject symlinks and Windows reparse points without following targets.",
+          "guards": [],
+          "iterations": [],
+          "raises": [],
+          "returns": [
+            {
+              "line": 42,
+              "expression": "False"
+            },
+            {
+              "line": 43,
+              "expression": "stat.S_ISLNK(metadata.st_mode) or bool(getattr(metadata, 'st_file_attributes', 0) & getattr(stat, 'FILE_ATTRIBUTE_REPARSE_POINT', 1024))"
+            }
+          ],
+          "handlers": [
+            {
+              "line": 41,
+              "type": "FileNotFoundError"
+            }
+          ],
+          "calls": [
+            "bool",
+            "getattr",
+            "path.lstat",
+            "stat.S_ISLNK"
+          ],
+          "sql": []
+        },
+        {
           "name": "_scan_tree",
-          "line": 36,
-          "end_line": 60,
+          "line": 48,
+          "end_line": 74,
           "signature": "root: Path, *, allow_manifest: bool, ignore_sidecars: bool=False",
           "returns_annotation": "tuple[list[Path], list[str]]",
           "doc": null,
           "guards": [
             {
-              "line": 44,
-              "condition": "path.is_symlink()"
+              "line": 49,
+              "condition": "_is_redirect(root)"
             },
             {
-              "line": 51,
-              "condition": "path.is_symlink() or not path.is_file()"
+              "line": 58,
+              "condition": "_is_redirect(path)"
             },
             {
-              "line": 53,
+              "line": 65,
+              "condition": "_is_redirect(path) or not path.is_file()"
+            },
+            {
+              "line": 67,
               "condition": "'.backup-staging-' in name or '.restore-staging-' in name"
             },
             {
-              "line": 55,
+              "line": 69,
               "condition": "ignore_sidecars and name.endswith(('-wal', '-shm'))"
             },
             {
-              "line": 57,
+              "line": 71,
               "condition": "not allow_manifest and name == 'manifest.json' and (path.parent == root)"
             }
           ],
           "iterations": [
             {
-              "line": 39,
+              "line": 53,
               "target": "(current, dirnames, filenames)",
               "iterable": "os.walk(root, topdown=True, followlinks=False)"
             },
             {
-              "line": 42,
+              "line": 56,
               "target": "name",
               "iterable": "sorted(dirnames)"
             },
             {
-              "line": 49,
+              "line": 63,
               "target": "name",
               "iterable": "sorted(filenames)"
             }
           ],
           "raises": [
             {
-              "line": 45,
+              "line": 50,
               "expression": "ValueError('backup_symlink_not_allowed')"
             },
             {
-              "line": 52,
+              "line": 59,
+              "expression": "ValueError('backup_symlink_not_allowed')"
+            },
+            {
+              "line": 66,
               "expression": "ValueError('backup_symlink_not_allowed')"
             }
           ],
           "returns": [
             {
-              "line": 60,
+              "line": 74,
               "expression": "(sorted(files), sorted(directories))"
             }
           ],
@@ -6043,13 +6085,13 @@
           "calls": [
             "Path",
             "ValueError",
+            "_is_redirect",
             "directories.append",
             "files.append",
             "kept.append",
             "name.endswith",
             "os.walk",
             "path.is_file",
-            "path.is_symlink",
             "path.relative_to",
             "path.relative_to(root).as_posix",
             "sorted"
@@ -6058,8 +6100,8 @@
         },
         {
           "name": "_is_sqlite",
-          "line": 63,
-          "end_line": 64,
+          "line": 77,
+          "end_line": 78,
           "signature": "path: Path",
           "returns_annotation": "bool",
           "doc": null,
@@ -6068,7 +6110,7 @@
           "raises": [],
           "returns": [
             {
-              "line": 64,
+              "line": 78,
               "expression": "path.name in _SQLITE_NAMES"
             }
           ],
@@ -6078,31 +6120,31 @@
         },
         {
           "name": "_sqlite_state",
-          "line": 67,
-          "end_line": 83,
+          "line": 81,
+          "end_line": 97,
           "signature": "path: Path",
           "returns_annotation": "dict[str, Any]",
           "doc": null,
           "guards": [
             {
-              "line": 71,
+              "line": 85,
               "condition": "not integrity or integrity[0] != 'ok'"
             },
             {
-              "line": 75,
+              "line": 89,
               "condition": "'operations' in tables"
             }
           ],
           "iterations": [],
           "raises": [
             {
-              "line": 72,
+              "line": 86,
               "expression": "ValueError('backup_database_integrity_failed')"
             }
           ],
           "returns": [
             {
-              "line": 77,
+              "line": 91,
               "expression": "{'integrity': integrity[0], 'journal_mode': connection.execute('PRAGMA journal_mode').fetchone()[0].lower(), 'incomplete_operations': incomplete_operations}"
             }
           ],
@@ -6124,33 +6166,33 @@
         },
         {
           "name": "_backup_sqlite",
-          "line": 86,
-          "end_line": 104,
+          "line": 100,
+          "end_line": 118,
           "signature": "source: Path, target: Path",
           "returns_annotation": "dict[str, Any]",
           "doc": null,
           "guards": [
             {
-              "line": 93,
+              "line": 107,
               "condition": "not result or result[0] != 'ok'"
             }
           ],
           "iterations": [],
           "raises": [
             {
-              "line": 94,
+              "line": 108,
               "expression": "ValueError('backup_database_integrity_failed')"
             }
           ],
           "returns": [
             {
-              "line": 97,
+              "line": 111,
               "expression": "state"
             }
           ],
           "handlers": [
             {
-              "line": 101,
+              "line": 115,
               "type": "sqlite3.Error"
             }
           ],
@@ -6171,49 +6213,50 @@
         },
         {
           "name": "_load_manifest",
-          "line": 107,
-          "end_line": 119,
+          "line": 121,
+          "end_line": 133,
           "signature": "backup: Path",
           "returns_annotation": "dict[str, Any]",
           "doc": null,
           "guards": [
             {
-              "line": 109,
-              "condition": "not backup.is_dir() or manifest_path.is_symlink() or (not manifest_path.is_file())"
+              "line": 123,
+              "condition": "not backup.is_dir() or _is_redirect(manifest_path) or (not manifest_path.is_file())"
             },
             {
-              "line": 112,
+              "line": 126,
               "condition": "manifest.get('format') != _FORMAT"
             },
             {
-              "line": 117,
+              "line": 131,
               "condition": "expected != actual"
             }
           ],
           "iterations": [],
           "raises": [
             {
-              "line": 110,
+              "line": 124,
               "expression": "ValueError('backup_manifest_not_found')"
             },
             {
-              "line": 113,
+              "line": 127,
               "expression": "ValueError('backup_format_unsupported')"
             },
             {
-              "line": 118,
+              "line": 132,
               "expression": "ValueError('backup_manifest_checksum_mismatch')"
             }
           ],
           "returns": [
             {
-              "line": 119,
+              "line": 133,
               "expression": "manifest"
             }
           ],
           "handlers": [],
           "calls": [
             "ValueError",
+            "_is_redirect",
             "backup.is_dir",
             "hashlib.sha256",
             "hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(',', ':')).encode()).hexdigest",
@@ -6223,131 +6266,131 @@
             "manifest.get",
             "manifest.items",
             "manifest_path.is_file",
-            "manifest_path.is_symlink",
             "manifest_path.read_text"
           ],
           "sql": []
         },
         {
           "name": "_manifest_entries",
-          "line": 122,
-          "end_line": 162,
+          "line": 136,
+          "end_line": 176,
           "signature": "backup: Path, manifest: dict[str, Any]",
           "returns_annotation": "tuple[dict[str, dict[str, Any]], set[str]]",
           "doc": null,
           "guards": [
             {
-              "line": 125,
+              "line": 139,
               "condition": "not isinstance(entry, dict)"
             },
             {
-              "line": 129,
+              "line": 143,
               "condition": "key in entries or not isinstance(entry.get('size'), int) or entry['size'] < 0"
             },
             {
-              "line": 132,
+              "line": 146,
               "condition": "not isinstance(digest, str) or len(digest) != 64"
             },
             {
-              "line": 135,
-              "condition": "path.is_symlink() or not path.is_file()"
+              "line": 149,
+              "condition": "_is_redirect(path) or not path.is_file()"
             },
             {
-              "line": 141,
+              "line": 155,
               "condition": "backup not in resolved.parents or not resolved.is_file()"
             },
             {
-              "line": 143,
+              "line": 157,
               "condition": "resolved.stat().st_size != entry['size'] or _sha256(resolved) != digest"
             },
             {
-              "line": 145,
+              "line": 159,
               "condition": "_is_sqlite(resolved)"
             },
             {
-              "line": 147,
+              "line": 161,
               "condition": "state['incomplete_operations']"
             },
             {
-              "line": 154,
+              "line": 168,
               "condition": "actual != listed"
             },
             {
-              "line": 157,
+              "line": 171,
               "condition": "any((_safe_relative(name).as_posix() != name for name in expected_directories))"
             },
             {
-              "line": 160,
+              "line": 174,
               "condition": "actual_directories != expected_directories"
             }
           ],
           "iterations": [
             {
-              "line": 124,
+              "line": 138,
               "target": "entry",
               "iterable": "manifest.get('files', [])"
             }
           ],
           "raises": [
             {
-              "line": 126,
-              "expression": "ValueError('backup_manifest_entry_invalid')"
-            },
-            {
-              "line": 130,
-              "expression": "ValueError('backup_manifest_entry_invalid')"
-            },
-            {
-              "line": 133,
-              "expression": "ValueError('backup_manifest_entry_invalid')"
-            },
-            {
-              "line": 136,
-              "expression": "ValueError('backup_file_missing')"
-            },
-            {
               "line": 140,
-              "expression": "ValueError('backup_file_missing')"
-            },
-            {
-              "line": 142,
-              "expression": "ValueError('backup_path_invalid')"
+              "expression": "ValueError('backup_manifest_entry_invalid')"
             },
             {
               "line": 144,
-              "expression": "ValueError('backup_file_checksum_mismatch')"
+              "expression": "ValueError('backup_manifest_entry_invalid')"
             },
             {
-              "line": 148,
-              "expression": "ValueError('backup_incomplete_operation')"
+              "line": 147,
+              "expression": "ValueError('backup_manifest_entry_invalid')"
             },
             {
-              "line": 155,
-              "expression": "ValueError('backup_manifest_file_set_mismatch')"
+              "line": 150,
+              "expression": "ValueError('backup_file_missing')"
+            },
+            {
+              "line": 154,
+              "expression": "ValueError('backup_file_missing')"
+            },
+            {
+              "line": 156,
+              "expression": "ValueError('backup_path_invalid')"
             },
             {
               "line": 158,
+              "expression": "ValueError('backup_file_checksum_mismatch')"
+            },
+            {
+              "line": 162,
+              "expression": "ValueError('backup_incomplete_operation')"
+            },
+            {
+              "line": 169,
+              "expression": "ValueError('backup_manifest_file_set_mismatch')"
+            },
+            {
+              "line": 172,
               "expression": "ValueError('backup_manifest_directory_invalid')"
             },
             {
-              "line": 161,
+              "line": 175,
               "expression": "ValueError('backup_manifest_directory_set_mismatch')"
             }
           ],
           "returns": [
             {
-              "line": 162,
+              "line": 176,
               "expression": "(entries, listed)"
             }
           ],
           "handlers": [
             {
-              "line": 139,
+              "line": 153,
               "type": "OSError"
             }
           ],
           "calls": [
             "ValueError",
+            "_is_redirect",
             "_is_sqlite",
             "_reject_sqlite_sidecars",
             "_safe_relative",
@@ -6362,7 +6405,6 @@
             "len",
             "manifest.get",
             "path.is_file",
-            "path.is_symlink",
             "path.relative_to",
             "path.relative_to(backup).as_posix",
             "path.resolve",
@@ -6375,35 +6417,35 @@
         },
         {
           "name": "_reject_sqlite_sidecars",
-          "line": 165,
-          "end_line": 170,
+          "line": 179,
+          "end_line": 184,
           "signature": "root: Path",
           "returns_annotation": "None",
           "doc": null,
           "guards": [
             {
-              "line": 167,
-              "condition": "path.is_symlink()"
+              "line": 181,
+              "condition": "_is_redirect(path)"
             },
             {
-              "line": 169,
+              "line": 183,
               "condition": "path.is_file() and path.name.endswith(('-wal', '-shm'))"
             }
           ],
           "iterations": [
             {
-              "line": 166,
+              "line": 180,
               "target": "path",
               "iterable": "root.rglob('*')"
             }
           ],
           "raises": [
             {
-              "line": 168,
+              "line": 182,
               "expression": "ValueError('backup_symlink_not_allowed')"
             },
             {
-              "line": 170,
+              "line": 184,
               "expression": "ValueError('backup_sqlite_sidecar_present')"
             }
           ],
@@ -6411,8 +6453,8 @@
           "handlers": [],
           "calls": [
             "ValueError",
+            "_is_redirect",
             "path.is_file",
-            "path.is_symlink",
             "path.name.endswith",
             "root.rglob"
           ],
@@ -6420,41 +6462,41 @@
         },
         {
           "name": "_check_cross_database_state",
-          "line": 173,
-          "end_line": 184,
+          "line": 187,
+          "end_line": 198,
           "signature": "root: Path, *, reject_sidecars: bool=True, allow_incomplete: bool=False",
           "returns_annotation": "dict[str, Any]",
           "doc": null,
           "guards": [
             {
-              "line": 174,
+              "line": 188,
               "condition": "reject_sidecars"
             },
             {
-              "line": 178,
+              "line": 192,
               "condition": "path.name not in _SQLITE_NAMES"
             },
             {
-              "line": 181,
+              "line": 195,
               "condition": "state['incomplete_operations'] and (not allow_incomplete)"
             }
           ],
           "iterations": [
             {
-              "line": 177,
+              "line": 191,
               "target": "path",
               "iterable": "sorted(root.rglob('*.db'))"
             }
           ],
           "raises": [
             {
-              "line": 182,
+              "line": 196,
               "expression": "ValueError('backup_incomplete_operation')"
             }
           ],
           "returns": [
             {
-              "line": 184,
+              "line": 198,
               "expression": "{'database_count': len(databases), 'databases': databases}"
             }
           ],
@@ -6474,103 +6516,111 @@
         },
         {
           "name": "create_backup",
-          "line": 187,
-          "end_line": 248,
+          "line": 201,
+          "end_line": 265,
           "signature": "home: str | Path, destination: str | Path",
           "returns_annotation": "dict[str, Any]",
           "doc": null,
           "guards": [
             {
-              "line": 190,
+              "line": 203,
+              "condition": "_is_redirect(home)"
+            },
+            {
+              "line": 207,
               "condition": "not home.is_dir()"
             },
             {
-              "line": 192,
+              "line": 209,
               "condition": "destination == home or home in destination.parents"
             },
             {
-              "line": 195,
+              "line": 212,
               "condition": "destination.exists()"
             },
             {
-              "line": 202,
+              "line": 219,
               "condition": "any((item['incomplete_operations'] for item in database_state['databases']))"
             },
             {
-              "line": 214,
+              "line": 231,
               "condition": "path.is_file() and path.name.endswith(('-wal', '-shm'))"
             },
             {
-              "line": 216,
+              "line": 233,
               "condition": "database_name not in _SQLITE_NAMES or database_name not in source_names"
             },
             {
-              "line": 222,
+              "line": 239,
               "condition": "_is_sqlite(source)"
             }
           ],
           "iterations": [
             {
-              "line": 206,
+              "line": 223,
               "target": "(relative, source)",
               "iterable": "evidence_files.items()"
             },
             {
-              "line": 209,
+              "line": 226,
               "target": "relative",
               "iterable": "source_directories"
             },
             {
-              "line": 213,
+              "line": 230,
               "target": "path",
               "iterable": "home.rglob('*')"
             },
             {
-              "line": 218,
+              "line": 235,
               "target": "source",
               "iterable": "sources"
             },
             {
-              "line": 230,
+              "line": 247,
               "target": "path",
               "iterable": "copied"
             }
           ],
           "raises": [
             {
-              "line": 191,
+              "line": 204,
+              "expression": "ValueError('backup_symlink_not_allowed')"
+            },
+            {
+              "line": 208,
               "expression": "ValueError('backup_source_not_found')"
             },
             {
-              "line": 193,
+              "line": 210,
               "expression": "ValueError('backup_destination_overlaps_source')"
             },
             {
-              "line": 196,
+              "line": 213,
               "expression": "ValueError('backup_destination_exists')"
             },
             {
-              "line": 203,
+              "line": 220,
               "expression": "ValueError('backup_incomplete_operation')"
             },
             {
-              "line": 217,
+              "line": 234,
               "expression": "ValueError('backup_unrelated_sqlite_sidecar_present')"
             },
             {
-              "line": 248,
+              "line": 265,
               "expression": ""
             }
           ],
           "returns": [
             {
-              "line": 245,
+              "line": 262,
               "expression": "{'status': 'created', 'path': str(destination), 'file_count': len(entries), 'manifest_sha256': manifest['manifest_sha256'], 'consistency': manifest['consistency']}"
             }
           ],
           "handlers": [
             {
-              "line": 246,
+              "line": 263,
               "type": "Exception"
             }
           ],
@@ -6579,12 +6629,12 @@
             "(staging / Path(*PurePosixPath(relative).parts)).mkdir",
             "Path",
             "Path(destination).resolve",
-            "Path(home).resolve",
             "PurePosixPath",
             "ValueError",
             "_backup_sqlite",
             "_check_cross_database_state",
             "_evidence_files",
+            "_is_redirect",
             "_is_sqlite",
             "_reject_sqlite_sidecars",
             "_scan_tree",
@@ -6598,6 +6648,7 @@
             "hashlib.sha256",
             "hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()).hexdigest",
             "home.is_dir",
+            "home.resolve",
             "home.rglob",
             "json.dumps",
             "json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode",
@@ -6630,38 +6681,47 @@
         },
         {
           "name": "verify_backup",
-          "line": 251,
-          "end_line": 260,
+          "line": 268,
+          "end_line": 280,
           "signature": "backup: str | Path",
           "returns_annotation": "dict[str, Any]",
           "doc": null,
           "guards": [
             {
-              "line": 258,
+              "line": 270,
+              "condition": "_is_redirect(backup)"
+            },
+            {
+              "line": 278,
               "condition": "declared != actual"
             }
           ],
           "iterations": [],
           "raises": [
             {
-              "line": 259,
+              "line": 271,
+              "expression": "ValueError('backup_symlink_not_allowed')"
+            },
+            {
+              "line": 279,
               "expression": "ValueError('backup_database_inventory_mismatch')"
             }
           ],
           "returns": [
             {
-              "line": 260,
+              "line": 280,
               "expression": "{'status': 'verified', 'path': str(backup), 'file_count': len(entries), 'manifest_sha256': manifest['manifest_sha256'], 'consistency': manifest.get('consistency', {})}"
             }
           ],
           "handlers": [],
           "calls": [
             "Path",
-            "Path(backup).resolve",
             "ValueError",
             "_check_cross_database_state",
+            "_is_redirect",
             "_load_manifest",
             "_manifest_entries",
+            "backup.resolve",
             "len",
             "manifest.get",
             "manifest.get('consistency', {}).get",
@@ -6671,14 +6731,14 @@
         },
         {
           "name": "_logical_path",
-          "line": 263,
-          "end_line": 266,
+          "line": 283,
+          "end_line": 286,
           "signature": "raw: str",
           "returns_annotation": "PureWindowsPath | PurePosixPath",
           "doc": null,
           "guards": [
             {
-              "line": 264,
+              "line": 284,
               "condition": "'\\\\\\\\' in raw or (len(raw) >= 2 and raw[1] == ':')"
             }
           ],
@@ -6686,11 +6746,11 @@
           "raises": [],
           "returns": [
             {
-              "line": 265,
+              "line": 285,
               "expression": "PureWindowsPath(raw)"
             },
             {
-              "line": 266,
+              "line": 286,
               "expression": "PurePosixPath(raw)"
             }
           ],
@@ -6704,59 +6764,59 @@
         },
         {
           "name": "_evidence_files",
-          "line": 269,
-          "end_line": 292,
+          "line": 289,
+          "end_line": 312,
           "signature": "home: Path",
           "returns_annotation": "dict[str, Path]",
           "doc": null,
           "guards": [
             {
-              "line": 271,
+              "line": 291,
               "condition": "not team.is_file()"
             },
             {
-              "line": 276,
+              "line": 296,
               "condition": "'evidence' not in tables"
             },
             {
-              "line": 287,
-              "condition": "source.is_symlink() or not source.is_file()"
+              "line": 307,
+              "condition": "_is_redirect(source) or not source.is_file()"
             }
           ],
           "iterations": [
             {
-              "line": 279,
+              "line": 299,
               "target": "(raw,)",
               "iterable": "connection.execute('SELECT path FROM evidence')"
             }
           ],
           "raises": [
             {
-              "line": 285,
+              "line": 305,
               "expression": "ValueError('backup_evidence_outside_source')"
             },
             {
-              "line": 288,
+              "line": 308,
               "expression": "ValueError('backup_evidence_reference_invalid')"
             }
           ],
           "returns": [
             {
-              "line": 272,
+              "line": 292,
               "expression": "{}"
             },
             {
-              "line": 277,
+              "line": 297,
               "expression": "{}"
             },
             {
-              "line": 290,
+              "line": 310,
               "expression": "result"
             }
           ],
           "handlers": [
             {
-              "line": 284,
+              "line": 304,
               "type": "ValueError"
             }
           ],
@@ -6764,13 +6824,13 @@
             "PurePosixPath",
             "PurePosixPath(*relative.parts).as_posix",
             "ValueError",
+            "_is_redirect",
             "_logical_path",
             "connection.close",
             "connection.execute",
             "home.joinpath",
             "logical.relative_to",
             "source.is_file",
-            "source.is_symlink",
             "sqlite3.connect",
             "str",
             "team.is_file"
@@ -6782,65 +6842,65 @@
         },
         {
           "name": "_rebind_database_paths",
-          "line": 295,
-          "end_line": 327,
+          "line": 315,
+          "end_line": 347,
           "signature": "root: Path, old_home: str, new_home: Path",
           "returns_annotation": "int",
           "doc": null,
           "guards": [
             {
-              "line": 299,
+              "line": 319,
               "condition": "database.name not in _SQLITE_NAMES"
             },
             {
-              "line": 305,
+              "line": 325,
               "condition": "table not in tables"
             },
             {
-              "line": 308,
+              "line": 328,
               "condition": "column not in columns"
             },
             {
-              "line": 313,
+              "line": 333,
               "condition": "not candidate.is_absolute()"
             },
             {
-              "line": 318,
+              "line": 338,
               "condition": "table == 'evidence'"
             }
           ],
           "iterations": [
             {
-              "line": 298,
+              "line": 318,
               "target": "database",
               "iterable": "root.rglob('*.db')"
             },
             {
-              "line": 304,
+              "line": 324,
               "target": "(table, column)",
               "iterable": "(('evidence', 'path'), ('tool_versions', 'source_path'))"
             },
             {
-              "line": 311,
+              "line": 331,
               "target": "(rowid, raw)",
               "iterable": "rows"
             }
           ],
           "raises": [
             {
-              "line": 319,
+              "line": 339,
               "expression": "ValueError('restore_evidence_reference_invalid')"
             }
           ],
           "returns": [
             {
-              "line": 327,
+              "line": 347,
               "expression": "changed"
             }
           ],
           "handlers": [
             {
-              "line": 317,
+              "line": 337,
               "type": "ValueError"
             }
           ],
@@ -6865,51 +6925,51 @@
         },
         {
           "name": "_validate_rebound_references",
-          "line": 330,
-          "end_line": 351,
+          "line": 350,
+          "end_line": 371,
           "signature": "root: Path, final_root: Path",
           "returns_annotation": "int",
           "doc": null,
           "guards": [
             {
-              "line": 333,
+              "line": 353,
               "condition": "team.is_file()"
             },
             {
-              "line": 337,
+              "line": 357,
               "condition": "'evidence' in tables"
             },
             {
-              "line": 346,
+              "line": 366,
               "condition": "not staged_path.is_file() or staged_path.stat().st_size != size or _sha256(staged_path) != digest"
             }
           ],
           "iterations": [
             {
-              "line": 338,
+              "line": 358,
               "target": "(raw, digest, size)",
               "iterable": "connection.execute('SELECT path,sha256,size FROM evidence')"
             }
           ],
           "raises": [
             {
-              "line": 344,
+              "line": 364,
               "expression": "ValueError('restore_evidence_reference_invalid')"
             },
             {
-              "line": 347,
+              "line": 367,
               "expression": "ValueError('restore_evidence_reference_invalid')"
             }
           ],
           "returns": [
             {
-              "line": 351,
+              "line": 371,
               "expression": "checked"
             }
           ],
           "handlers": [
             {
-              "line": 343,
+              "line": 363,
               "type": "ValueError"
             }
           ],
@@ -6934,99 +6994,107 @@
         },
         {
           "name": "restore_backup",
-          "line": 354,
-          "end_line": 398,
+          "line": 374,
+          "end_line": 421,
           "signature": "backup: str | Path, destination: str | Path",
           "returns_annotation": "dict[str, Any]",
           "doc": null,
           "guards": [
             {
-              "line": 360,
+              "line": 376,
+              "condition": "_is_redirect(backup)"
+            },
+            {
+              "line": 383,
               "condition": "destination == backup or backup in destination.parents or destination in backup.parents"
             },
             {
-              "line": 362,
+              "line": 385,
               "condition": "destination.exists() and any(destination.iterdir())"
             },
             {
-              "line": 369,
+              "line": 392,
               "condition": "not isinstance(directories, list) or len(set(directories)) != len(directories)"
             },
             {
-              "line": 379,
+              "line": 402,
               "condition": "_is_sqlite(source)"
             },
             {
-              "line": 387,
+              "line": 410,
               "condition": "{path.relative_to(staging).as_posix() for path in staged_files} != set(entries)"
             },
             {
-              "line": 390,
+              "line": 413,
               "condition": "set(staged_dirs) != expected_dirs"
             },
             {
-              "line": 392,
+              "line": 415,
               "condition": "destination.exists()"
             }
           ],
           "iterations": [
             {
-              "line": 371,
+              "line": 394,
               "target": "name",
               "iterable": "sorted(directories, key=lambda value: (value.count('/'), value))"
             },
             {
-              "line": 374,
+              "line": 397,
               "target": "(key, entry)",
               "iterable": "entries.items()"
             }
           ],
           "raises": [
             {
-              "line": 361,
+              "line": 377,
+              "expression": "ValueError('backup_symlink_not_allowed')"
+            },
+            {
+              "line": 384,
               "expression": "ValueError('restore_destination_overlaps_backup')"
             },
             {
-              "line": 363,
+              "line": 386,
               "expression": "ValueError('restore_destination_not_empty')"
             },
             {
-              "line": 370,
+              "line": 393,
               "expression": "ValueError('backup_manifest_directory_invalid')"
             },
             {
-              "line": 388,
+              "line": 411,
               "expression": "ValueError('restore_manifest_file_set_mismatch')"
             },
             {
-              "line": 391,
+              "line": 414,
               "expression": "ValueError('restore_manifest_directory_set_mismatch')"
             },
             {
-              "line": 398,
+              "line": 421,
               "expression": ""
             }
           ],
           "returns": [
             {
-              "line": 395,
+              "line": 418,
               "expression": "{'status': 'restored', 'path': str(destination), 'file_count': verification['file_count'], 'manifest_sha256': verification['manifest_sha256'], 'consistency': state, 'rebound_evidence_count': evidence_count}"
             }
           ],
           "handlers": [
             {
-              "line": 396,
+              "line": 419,
               "type": "Exception"
             }
           ],
           "calls": [
             "(staging / Path(*relative.parts)).mkdir",
             "Path",
-            "Path(backup).resolve",
             "Path(destination).resolve",
             "ValueError",
             "_backup_sqlite",
             "_check_cross_database_state",
+            "_is_redirect",
             "_is_sqlite",
             "_load_manifest",
             "_manifest_entries",
@@ -7036,6 +7104,7 @@
             "_validate_rebound_references",
             "any",
             "backup.joinpath",
+            "backup.resolve",
             "destination.exists",
             "destination.iterdir",
             "destination.parent.mkdir",
@@ -20325,7 +20394,7 @@
     {
       "path": "butian/runtime/migration.py",
       "lines": 196,
-      "sha256": "fafa357a8c0829956aa4b197860f6f500f55e6af55ad43fb44b00f6746150beb",
+      "sha256": "644d150746c453c12110f175c250acba5c979c4392b1cb28c2e30f25c110079d",
       "doc": null,
       "routines": [
         {
