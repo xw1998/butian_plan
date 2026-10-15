@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 from PIL import Image, ImageDraw, ImageFont
-root=Path(__file__).resolve().parents[1]/'docs/论文/experiment_results/dream-effect-20261015'
+root=Path(__file__).resolve().parent/'experiment_results/dream-effect-20261015'
 data=json.loads((root/'results.json').read_text(encoding='utf-8'))['summary']
 im=Image.new('RGB',(1500,950),'white'); d=ImageDraw.Draw(im)
 f=ImageFont.truetype('C:/Windows/Fonts/arial.ttf',30)
