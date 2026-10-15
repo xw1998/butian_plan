@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
+from ..version import VERSION
 from .service import ButianService
 from .experiments import ExperimentStore
 
@@ -10,6 +11,11 @@ class ApiHandler(BaseHTTPRequestHandler):
     service: ButianService | None = None
     web_root: Path | None = None
     experiments: ExperimentStore | None = None
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Butian-Version", VERSION)
+        super().end_headers()
+
     def _send(self, code, data):
         if isinstance(data, dict) and data.get("status") in {"ok", "error"}:
             payload = data
@@ -512,11 +518,19 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(500, {"status": "error", "error": type(exc).__name__})
 
 def serve(home=None, host="127.0.0.1", port=8765):
+    # Bind before opening the runtime so an old instance cannot trigger initialization.
+    try:
+        server = ThreadingHTTPServer((host, port), ApiHandler)
+    except OSError as exc:
+        raise RuntimeError(f"Cannot start Butian {VERSION} at {host}:{port}: port unavailable. Close the previous console process, then run the same command again; updating files does not reload a running server.") from exc
     service = ButianService(home); ApiHandler.service = service
     ApiHandler.experiments = ExperimentStore(Path(home or service.home) / "experiments.db")
     ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
-    try: ThreadingHTTPServer((host, port), ApiHandler).serve_forever()
+    try:
+        print(f"Butian {VERSION} console: http://{host}:{port} (loopback requires member selection only)", flush=True)
+        server.serve_forever()
     finally:
+        server.server_close()
         service.close()
         if ApiHandler.experiments:
             ApiHandler.experiments.close()

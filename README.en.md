@@ -347,3 +347,11 @@ Both commands refuse to overwrite existing targets. Normal service startup impor
 - Package and MCP client/server versions are synchronized to 0.1.7. Update a source installation with `python -m pip install -e .` and reconnect the AI application to reload MCP code.
 
 [Repository](https://gitee.com/xw19981010/butian_plan) · [v0.1.7 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.7)
+
+## Local console entry and upgrades
+
+Use **http://127.0.0.1:8765/** with `python -m butian.cli serve --host 127.0.0.1 --port 8765`. Select a member by name and role and enter the workspace without a token. Member selection determines the working identity and data scope.
+
+After tasks finish, stop the old console with `Ctrl+C` in its terminal, update the source, run `python -m pip install -e .`, and restart with the same command. Stopping a task does not stop its HTTP server; updating files or refreshing a browser does not reload Python. If the port is occupied, close the original service rather than switching ports.
+
+Responses include `X-Butian-Version` and `Cache-Control: no-store`. If a token field remains, check the running version and bind address. Non-loopback bindings such as `0.0.0.0` retain authentication. Reconnect MCP clients after updating.
