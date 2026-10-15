@@ -355,3 +355,25 @@ Use **http://127.0.0.1:8765/** with `python -m butian.cli serve --host 127.0.0.1
 After tasks finish, stop the old console with `Ctrl+C` in its terminal, update the source, run `python -m pip install -e .`, and restart with the same command. Stopping a task does not stop its HTTP server; updating files or refreshing a browser does not reload Python. If the port is occupied, close the original service rather than switching ports.
 
 Responses include `X-Butian-Version` and `Cache-Control: no-store`. If a token field remains, check the running version and bind address. Non-loopback bindings such as `0.0.0.0` retain authentication. Reconnect MCP clients after updating.
+
+### MCP discovery and recovery
+
+Use `butian_tools_catalog(offset, limit, prefix)` for compact pages (at most 30 entries), then `butian_tool_schema(name)` for one complete schema. Missing fields and top-level type errors return `invalid_tool_arguments` with field-only MCP tool-error `details.issues`, without echoing credentials or argument values. Business errors retain their original codes. Task state, revision and recovery hints are disclosed only after authentication and task-visibility checks.
+
+Plain task creation records `todo`, not execution. Manual delivery follows ready transition, claim, running transition with refreshed revision, actual execution, evidence registration, handoff and authorized review. Suggested request fragments still require authentication and idempotency keys. For standard host execution, use `butian_goal_submit` with acceptance criteria and then `butian_execution_export`; eligible host tasks can advance automatically. `external_execution_required` is an execution-mode mismatch, not merely a missing running transition. Never silently recreate an existing task to evade this condition.
+
+Experiment tools remain unavailable to member identities through the current MCP endpoint. Schema discovery explicitly reports this restriction; this update does not introduce an administrator grant or identity bypass. Evidence registration and SHA256 validation establish file integrity, not scientific validity or review approval. Reference registered evidence IDs, not file paths.
+
+### Model usage skill and dream accounting
+
+See `skills/butian-workflow/SKILL.md` for schema discovery, host/manual execution, evidence, delivery, permissions and recovery. Install through the host skill mechanism; no member credentials or fixed connector IDs are included. Dream completion counts include only per-member `completed` rows; scheduled checks recorded as `skipped` are separate. Recent evolution history is not a lifetime total.
+
+## v0.1.8 update
+
+- Dream counts now include only `completed` runs. Gated `skipped` checks are reported separately in both member and team totals; recent history is explicitly not a lifetime total.
+- Added `butian_tool_schema` for one tool's parameters and `butian_tools_catalog` for a compact paginated catalog. Tool errors provide visible task state, missing conditions and follow-up actions without relaxing identity or authorization checks.
+- Included the [butian-workflow skill](skills/butian-workflow/SKILL.md) for task execution, evidence registration, delivery review, learning feedback and member-specific dream boundaries.
+- The default dream gate requires at least three eligible new fragments. Imported initial knowledge remains recallable but is excluded from fresh practice material. `insufficient_fragments` means the gate lacks material; a skipped check is not a completed dream.
+- Package and shared MCP version: **0.1.8**. Restart the HTTP backend and reconnect MCP after updating a source installation; these are separate processes.
+
+[v0.1.8 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.8)

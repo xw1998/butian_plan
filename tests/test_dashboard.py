@@ -92,3 +92,30 @@ def test_dashboard_http_authentication(tmp_path):
         server.server_close()
         thread.join(timeout=2)
         service.close()
+
+
+def test_dream_counts_exclude_skipped_and_isolate_members(tmp_path, monkeypatch):
+    monkeypatch.setenv('BUTIAN_MAINTENANCE_ENABLED', '0')
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('a', 'A')
+        service.add_member('b', 'B')
+        memory = service.memory('a')
+        memory.put('fresh', 'experience', 'An actual observation', status='candidate')
+        memory.close()
+        service.dream_run('b', min_fragments=1, min_interval=0)
+        before = {r['member_id']: r for r in snapshot(service, 'a')['member_stats']}
+        assert before['b']['totals']['dream_runs'] == 0
+        assert before['b']['totals']['dream_skipped'] == 1
+        assert service.dream_run('a', min_fragments=1, min_interval=0)['status'] == 'completed'
+        after = snapshot(service, 'a')
+        rows = {r['member_id']: r for r in after['member_stats']}
+        assert rows['a']['totals']['dream_runs'] == 1
+        assert rows['b']['totals'] == before['b']['totals']
+        assert service.dream_run('a', min_fragments=1, min_interval=0)['status'] == 'skipped'
+        rows = {r['member_id']: r for r in snapshot(service, 'a')['member_stats']}
+        assert rows['a']['totals']['dream_runs'] == 1
+        assert rows['a']['totals']['dream_skipped'] == 1
+        assert after['totals']['dream_runs'] == 1
+    finally:
+        service.close()

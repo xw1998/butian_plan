@@ -150,8 +150,14 @@ def run(home=None):
                 elif method == "tools/list":
                     result = {"tools": TOOLS}
                 elif method == "tools/call":
-                    payload = call_tool(service, params.get("name"), params.get("arguments", {}))
-                    result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": False}
+                    from .runtime.mcp_guidance import ToolError
+                    try:
+                        payload = call_tool(service, params.get("name"), params.get("arguments", {}))
+                        result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": False}
+                    except ToolError as exc:
+                        # Tool failures belong in MCP content: some hosts discard JSON-RPC error.data.
+                        payload = {"ok": False, "error": str(exc), "details": exc.details}
+                        result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": True}
                 else:
                     if "id" in req:
                         print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": "method_not_found"}}), flush=True)
@@ -163,7 +169,7 @@ def run(home=None):
                     continue
                 code = -32700 if isinstance(exc, json.JSONDecodeError) else (-32600 if not isinstance(req, dict) else -32000)
                 request_id = req.get("id") if isinstance(req, dict) else None
-                print(json.dumps({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": str(exc)}}, ensure_ascii=False), flush=True)
+                print(json.dumps({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": str(exc), "data": getattr(exc, "details", {"code": str(exc)})}}, ensure_ascii=False), flush=True)
     finally:
         service.close()
 
@@ -254,6 +260,27 @@ def _require_member_arg(service, args, member_id=None):
 
 
 def call_tool(service, name, args):
+    from .runtime.mcp_guidance import ToolError, describe_tool, validate_arguments, recovery_details
+    if name == "butian_tool_schema":
+        validate_arguments(name, args, TOOLS)
+        return describe_tool(args["name"], TOOLS)
+    if name == "butian_tools_catalog":
+        validate_arguments(name, args, TOOLS)
+        offset, limit = args.get("offset", 0), args.get("limit", 20)
+        tools = [tool for tool in TOOLS if args.get("prefix", "") in tool["name"]]
+        return {"tools": [{"name": tool["name"], "description": tool["description"]} for tool in tools[offset:offset+limit]],
+                "total": len(tools), "next_offset": offset+limit if offset+limit < len(tools) else None}
+    # Validate at the public boundary before dictionary indexing; never echo values.
+    validate_arguments(name, args, TOOLS)
+    try:
+        return _call_tool(service, name, args)
+    except ValueError as exc:
+        if isinstance(exc, ToolError):
+            raise
+        raise ToolError(str(exc), recovery_details(service, name, args, str(exc))) from exc
+
+
+def _call_tool(service, name, args):
     if name in {'butian_execution_export', 'butian_execution_submit'}:
         actor = args.get('actor_member_id')
         _require_member_arg(service, args, member_id=actor)
@@ -575,3 +602,9 @@ def call_tool(service, name, args):
         limit = args.get("limit", 20)
         return {"runs": service.list_dream_runs(args["member_id"], limit=limit), "candidates": service.list_dream_candidates(args["member_id"], limit=limit), "hypotheses": service.list_dream_hypotheses(args["member_id"], limit=limit), "distillations": service.list_dream_distillations(args["member_id"], limit=limit), "abstractions": service.list_dream_abstractions(args["member_id"], limit=limit)}
     raise ValueError("unknown_tool")
+
+
+TOOLS.extend([
+    {"name": "butian_tool_schema", "description": "Read one tool schema and its authorization restrictions without executing it", "inputSchema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}},
+    {"name": "butian_tools_catalog", "description": "Read a compact paginated tool catalog; use butian_tool_schema for parameters", "inputSchema": {"type": "object", "properties": {"offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 30}, "prefix": {"type": "string"}}}},
+])

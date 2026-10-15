@@ -363,3 +363,28 @@ python -m butian.assets.export /absolute/new/runtime
 - 项目及 MCP 客户端/服务端版本统一为 0.1.7。现有源码安装使用 `python -m pip install -e .` 更新，AI 应用重新连接 MCP 后加载新代码。
 
 [项目仓库](https://gitee.com/xw19981010/butian_plan) · [v0.1.7 源码](https://gitee.com/xw19981010/butian_plan/tree/v0.1.7)
+
+### MCP 参数发现与失败恢复
+
+- 用 `butian_tools_catalog` 分页查看工具摘要（`offset`、`limit`，每页最多 30 项，可用 `prefix` 筛选名称），再用 `butian_tool_schema(name)` 获取单工具完整参数，避免一次输出全部 schema 被截断。
+- 缺参数或顶层参数类型错误返回 `invalid_tool_arguments`，MCP 工具错误正文 `details.issues` 列出字段与原因，不回显传入值或凭据。业务失败保留原错误码；已认证且可见的任务才附带当前状态、revision、执行模式、缺失条件及恢复动作。
+- 普通任务创建只登记 todo。手动执行流程为 `task_transition(todo→ready)` → `task_claim` → 用新 revision 推进 `claimed→running` → 执行并登记真实证据 → `task_handoff` → 按审核规则进入/处理 review。提示中的动作片段仍需补认证信息与幂等操作键，不能当作完整请求直接重放。
+- 标准 AI 宿主执行应通过 `butian_goal_submit` 建立宿主任务及验收条件，再 `butian_execution_export`；该入口对符合条件的宿主任务可自动推进至 running。`external_execution_required` 指执行模式不匹配，不意味着简单推进 running 即可解决。不要为消除错误擅自重建已有任务。
+- 当前成员 MCP 入口的实验接口受管理员边界限制，不能靠换成员或填写任意 token 解锁。单工具 schema 会明确标示此限制；请由获授权的操作者走受支持的实验入口，本次没有开放管理员能力。
+- 文件登记与 SHA256 核验只证明证据及完整性；不证明实验设计、结论或任务审核已经通过。`evidence_ref` 应填写已登记的证据 ID，不是路径。审核仍需真实交付与授权审核者判断。
+
+### 大模型使用技能与自省计数
+
+仓库附带 `skills/butian-workflow/SKILL.md`，指导大模型发现参数、选择宿主或手动执行路径、登记证据、提交交付与处理权限/状态错误。按宿主的技能安装方式加载；不含成员凭据或固定连接 ID。
+
+看板中的自省完成数只计本成员 `completed`，`skipped` 为门控检查跳过、单独统计；后台定时维护会检查全员，不应把检查数当作完成做梦次数。逐成员页的近期记录不等于累计。
+
+## v0.1.8 更新
+
+- 修正做梦计数：只有 `completed` 计为自省完成，`skipped` 单列为门控跳过；逐成员与团队总量使用同一口径，近期记录不冒充累计数量。
+- 新增 `butian_tool_schema` 单工具参数查询与 `butian_tools_catalog` 分页目录；工具错误返回可见任务的当前状态、缺失条件和后续动作，保留原有身份与权限限制。
+- 提供项目内技能 [butian-workflow](skills/butian-workflow/SKILL.md)，指导大模型完成任务、证据、交付审核与学习反馈流程，并解释单成员自省边界。
+- 默认自省要求至少 3 条符合条件的新材料；初始导入知识可召回，但不计为新实践材料。`insufficient_fragments` 表示材料不足，跳过记录不代表执行了自省。
+- 项目及 MCP 共享版本更新为 **0.1.8**。源码安装后重启 HTTP 后台、重新连接 MCP，分别加载新代码；两者为独立进程。
+
+[v0.1.8 源码](https://gitee.com/xw19981010/butian_plan/tree/v0.1.8)

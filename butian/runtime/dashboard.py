@@ -52,9 +52,15 @@ def snapshot(service, actor):
                 local_practice.update(dict(db.execute('SELECT outcome,COUNT(*) FROM practice_observations GROUP BY outcome')))
             if 'memory_validation_batches' in tables:
                 local['validation_batches'] = db.execute('SELECT COUNT(*) FROM memory_validation_batches').fetchone()[0]
-            for table, metric in [('dream_runs','dream_runs'), ('dream_candidates','dream_candidates'), ('hypotheses','dream_hypotheses'), ('verification_queue','verification_queue'), ('memory_distillations','distillations'), ('memory_abstractions','abstractions'), ('memory_maintenance','maintenance'), ('memory_compositions','compositions'), ('skill_events','skill_events'), ('practice_observations','practice_observations')]:
+            for table, metric in [('dream_candidates','dream_candidates'), ('hypotheses','dream_hypotheses'), ('verification_queue','verification_queue'), ('memory_distillations','distillations'), ('memory_abstractions','abstractions'), ('memory_maintenance','maintenance'), ('memory_compositions','compositions'), ('skill_events','skill_events'), ('practice_observations','practice_observations')]:
                 if table in tables:
                     local[metric] = db.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0]
+            if 'dream_runs' in tables:
+                run_states = dict(db.execute('SELECT status,COUNT(*) FROM dream_runs GROUP BY status'))
+                local['dream_attempts'] = sum(run_states.values())
+                local['dream_runs'] = run_states.get('completed', 0)
+                local['dream_skipped'] = run_states.get('skipped', 0)
+                local['dream_other'] = local['dream_attempts'] - local['dream_runs'] - local['dream_skipped']
             if 'memory_validation_batches' in tables:
                 local['validation_samples'], local['validation_passes'], local['validation_failures'] = db.execute('SELECT COALESCE(SUM(sample_count),0),COALESCE(SUM(pass_count),0),COALESCE(SUM(fail_count),0) FROM memory_validation_batches').fetchone()
             row.update(coverage='readable', totals=dict(local), memory_kinds=dict(local_kinds), memory_states=dict(local_states))
@@ -83,6 +89,7 @@ def snapshot(service, actor):
             'pending_validation': '状态为 candidate 或 pending_validation 的记忆，按记忆条目计数。',
             'useful_evidence': '按成员、记忆和证据摘要去重的有用反馈，非独立任务次数。',
             'recall_hits': '召回日志条数，同一记忆可多次被召回。',
+            'dream_runs': '仅统计本成员库中 completed 的自省；skipped 是门控检查未执行，另记 dream_skipped，dream_attempts 为全部记录。',
             'members': '当前注册成员身份数，不等于在线人数。',
             'coverage': '未初始化的记忆库没有记录；不可读取的库不计入总量，总量可能不完整。',
         },
