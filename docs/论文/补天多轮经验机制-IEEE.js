@@ -58,4 +58,20 @@ h.p('2026年10月15日，对提交1e5cd24执行显式验收后端的仓库回归
 h.p('前轮完整工具测试为114 passed（84.04秒），增加前置失败状态诊断后再次114 passed（86.89秒），历史间歇失败此次未复现但根因未确认；本轮备份专项为20 passed、1 skipped（8.16秒）；四项迁移测试验证产品入口禁用。增加三项根路径检查后，备份、provider配置/runtime及禁用迁移入口的扩展回归合计64 passed、1 skipped（13.94秒）。既有全库1014 passed、1 skipped、2 failed的历史结果仍保留，超时前置绑定间歇失败尚未定位，真实junction创建仍受环境限制。专项通过不能改写历史全库结果，更不能代替尚未完成的宿主AI多轮确认实验。')
 ];}
 
-h.build({sections:[{properties:{column:{count:1}},children:front()},{properties:{type:h.raw.SectionType.CONTINUOUS,column:{count:2,space:468}},children:[...introduction(),...methods(),...experiments(),...results(),...expandedMethodology(),...discussion(),...implementationAppendix(),...backupMigrationAppendix()]}]});
+function mathematicalImplementationAppendix(){return [
+h.h1('附录 C：数学算法的实现契约',{align:'center'}),
+h.h2('A. Beta信念和加权证据'),
+h.p('_unit将输入转为有限的[0,1]浮点数。Beta信念保存正的有限α、β及非负有限观测权重，均值为α/(α+β)，有效样本量为累计观测权重，先验强度为α+β减观测权重；外部直接构造时，后一个派生量并未额外限制为正。update把成功和失败权重分别加到α、β，拒绝负权重和全零更新。bayesian_evidence_update将质量、独立性和环境匹配三项相乘作为权重，乘积为零会报告缺少证据权重；独立性是调用者声明的评价，不由函数自动证明。'),
+h.p('区间计算使用正则化不完全Beta函数的双尾分位。CDF通过lgamma、log及log1p计算前因子，在(a+1)/(a+b+2)两侧选择正向或互补尾部连分式；连分式使用1e-300下界、3e-14收敛阈值及最多200轮，未收敛抛ArithmeticError。分位在[0,1]上执行90次二分，固定轮数不能消除CDF浮点误差。interval要求置信度属于(0,1]，计算两个分位；这类可信区间依赖Beta建模假设，不是经验正确性的绝对保证。'),
+h.h2('B. 转移与信息增益'),
+h.p('transition_distribution按显式候选分数归一化，拒绝空集合、负值、非有限值、零总质量及总和溢出，复杂度O(k)。current不参与分布计算，evidence只做单位区间校验，不改变归一结果。entropy要求非空概率序列、各项在[0,1]及总和误差不超过1e-9，计算以2为底的负概率加权对数和。information_gain返回一个显式后验前后的熵差，后验熵上升时拒绝；这是一项受限单后验契约，不能推成每次Bayes观测都降低熵。'),
+h.p('expected_information_gain要求结果概率归一、后验数量和维度匹配，再检查逐元素p(y)p(s|y)不大于p(s)，以及每状态的后验加权混合等于先验，容差为1e-9。结果为先验熵减期望后验熵，复杂度O(mn)。score_information_action使用单后验信息差减成本权重乘成本；成本和权重拒绝负数，但当前没有对所有乘积统一做有限性后验检查。分数可以为负，不能当作概率。'),
+h.h2('C. 描述差异与效用分配'),
+h.p('difference_in_means要求两组非空、结果有限且在[0,1]，返回均值、均值差和样本数；它不自动解决混杂或随机化。stratified_effect要求权重键和分层键完全一致、各权重非负有限且和为1，再按声明目标权重汇总各层均值。计数是原始计数之和，并非有效样本量。Utility以质量、学习、团队价值的加权和减去成本和风险，字段及权重有限，成本、风险和权重非负；结果不限定单位区间，极大数乘加仍可能溢出。'),
+h.p('allocate_by_utility无预算时按正效用降序选择，排序为O(n log n)；有预算时执行0/1背包的稀疏Pareto前沿枚举，每项扩展可行组合，按成本升序、分数降序排序，并删除分数未超过已有最佳值的受支配状态。前沿超过100000时报错，不能称为一般多项式算法。在正常完成且浮点比较有效时搜索给定分数的最优组合，返回顺序恢复为输入顺序；最坏成本取决于前沿状态数，而非只取决于数值预算。'),
+h.h2('D. 排队、采样与可达性'),
+h.p('queue_metrics只计算ρ=λ/μ，要求有限λ≥0及有限μ>0，ρ≥1返回unstable；没有计算等待时间或队列长度。BanditArm从Beta参数采样，observe只接受二元奖励。ThompsonBandit以唯一臂名、Beta(1,1)及可选seed初始化，每次为K个臂采样并取最大者，选择为O(K)、单臂更新为O(1)。sample只检查参数正性，不能声称覆盖全部非有限构造输入。合成奖励实验检验的是策略机制，不能证明语言模型训练或自主进化。'),
+h.p('本次调用定位发现，score_information_action、transition_distribution、allocate_by_utility及ThompsonBandit的名称引用主要在本模块、测试和研究控制脚本；不能因数学库存在就声称生产服务已按这些模型自动调度。逐函数完整输入输出、异常、分支、复杂度和解释限制保存在配套《核心实现语义说明.md》。本附录增加数学实现细节，不改变既有实验的采集方法，也不把机制运行数量当作真实模型调用数量。')
+];}
+
+h.build({sections:[{properties:{column:{count:1}},children:front()},{properties:{type:h.raw.SectionType.CONTINUOUS,column:{count:2,space:468}},children:[...introduction(),...methods(),...experiments(),...results(),...expandedMethodology(),...discussion(),...implementationAppendix(),...backupMigrationAppendix(),...mathematicalImplementationAppendix()]}]});

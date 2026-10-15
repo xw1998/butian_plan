@@ -329,3 +329,10 @@ Word脚本已加入附录A，具体覆盖服务启动/关闭、任务迁移事�
 ### 当前版本仓库回归
 
 2026-10-15在代码`1e5cd24`上运行`BUTIAN_OPERATOR_ACCEPTANCE=1 python -m pytest -q --ignore=tests/test_backup_reparse.py`，得到1025 passed、1 skipped、0 failed，400.05秒。只排除已被环境禁止创建的真实Windows junction用例，不计为通过；其余测试照常运行。当前覆盖的功能路径未出现失败，历史工具超时前置间歇失败本次未复现但尚未定位根因。此验收不证明所有外部AI应用已经实际接入，不替代真实宿主模型多轮收益实验，也不改变历史迁移产品入口禁用边界。机器可读记录为`experiment_results/functional-regression-20261015.json`。
+
+
+### 2026-10-15数学实现人工核验补充
+
+本次按core/math_models.py逐函数核验并在《核心实现语义说明.md》新增完整章节，覆盖单位区间守卫、Beta连分式/CDF/分位、加权信念更新、显式转移归一、熵、单后验与期望信息增益、分层均值差、效用及Pareto背包、利用率和Thompson采样。对应Word源码新增附录C并重建DOCX。数学与数值边界专项75 passed（0.21秒），属于原有功能的复核，不是新增模型推理实验。
+
+调用定位显示score_information_action、transition_distribution、allocate_by_utility及ThompsonBandit的直接名称引用位于数学库、测试或研究控制脚本；不能因数学实现存在就称其已经接管生产任务调度。transition_distribution的current与evidence不改变分布，后者仅范围验证；information_gain拒绝单次后验熵上升，不能当一般互信息；期望信息增益要求后验混合等于先验。均值差不自动识别因果，排队函数不计算等待时间，采样器不训练语言模型。完整输入输出、失败条件和复杂度见人工说明，静态例程台账不代替人工核验。

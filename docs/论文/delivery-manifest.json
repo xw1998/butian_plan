@@ -120,18 +120,18 @@
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.md",
-      "bytes": 51498,
-      "sha256": "6afcd53ba58f01013064d3c67a9f7e401225659d0ada14ca7e3a55f28473f6b7"
+      "bytes": 52680,
+      "sha256": "889bcd9a7ec596a0666e7de6df36b874aad17fd93fde911ed26f12dbf226c926"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.js",
-      "bytes": 35236,
-      "sha256": "7fea792c7b3bc0258c8a8d07451d49f7f9f38ef170c401999e9aa0b233971d55"
+      "bytes": 39723,
+      "sha256": "7ad61e3833e850c4353b938749f47be28af14dde3f7cc28a4002a31d939c94ce"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.docx",
-      "bytes": 620555,
-      "sha256": "196f61a861088689dcad6accf1cd4e1b70f7c7e876050032ffd969a66934961e"
+      "bytes": 622790,
+      "sha256": "442b4d7ca545d731e01bdbcad42da9521927365b142187b926f15a74ca8c296f"
     },
     {
       "path": "docs/论文/references/ieee-study-references.json",
@@ -140,8 +140,8 @@
     },
     {
       "path": "docs/论文/核心实现语义说明.md",
-      "bytes": 27505,
-      "sha256": "f020a9278d04faecf36d26625f2e84b3cee57cbea30a1c4615132fc12a930f2f"
+      "bytes": 35896,
+      "sha256": "f92ed0164b656b84954eb9cffa94bbd1047ccbb27c80909b3fce310e4743f3a1"
     },
     {
       "path": "docs/论文/逐模块算法与逻辑附录.md",
