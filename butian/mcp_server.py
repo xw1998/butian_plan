@@ -1,4 +1,5 @@
 from __future__ import annotations
+from butian.version import VERSION
 import json
 import sys
 from .runtime.service import ButianService
@@ -143,7 +144,7 @@ def run(home=None):
                 if not isinstance(params, dict):
                     raise ValueError("invalid_jsonrpc_params")
                 if method == "initialize":
-                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": "0.1.2"}}
+                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": VERSION}}
                 elif method.startswith("notifications/"):
                     continue
                 elif method == "tools/list":

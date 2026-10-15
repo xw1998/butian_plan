@@ -337,3 +337,13 @@ python -m butian.assets.export /absolute/new/runtime
 ```
 
 Both commands refuse to overwrite existing targets. Normal service startup imports package JSON and tool resources idempotently. Runtime authentication state is generated locally rather than shipped as a shared database.
+
+## v0.1.7 update
+
+- Password-free member selection on loopback consoles; remote authentication remains required.
+- Team totals and per-member memory statistics, including knowledge, experience, lessons, pending validation, recall, adoption, feedback, skills, dream runs, distillation, abstraction, maintenance and validation samples.
+- Local evolution selection switches the working identity to prevent mismatched-member access errors.
+- Error avoidance remains unrecorded without independent evidence; initial candidate knowledge does not count as verified experience.
+- Package and MCP client/server versions are synchronized to 0.1.7. Update a source installation with `python -m pip install -e .` and reconnect the AI application to reload MCP code.
+
+[Repository](https://gitee.com/xw19981010/butian_plan) · [v0.1.7 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.7)

@@ -9,6 +9,7 @@ import subprocess
 import uuid
 from typing import Any
 
+from ..version import VERSION
 from ..core.models import ModelSelection, ProviderCapabilities
 from .base import ProviderEvent, ProviderResult
 
@@ -126,7 +127,7 @@ class McpProvider:
                     initialize_id = f"{provider_session_id}:initialize"
                     list_id = f"{provider_session_id}:tools-list"
                     call_id = f"{provider_session_id}:tools-call"
-                    initialized = self._request(proc, {"jsonrpc": "2.0", "id": initialize_id, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "butian", "version": "0.1.1"}}})
+                    initialized = self._request(proc, {"jsonrpc": "2.0", "id": initialize_id, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "butian", "version": VERSION}}})
                     if not isinstance(initialized.get("result"), dict):
                         raise RuntimeError("mcp_initialize_missing_result")
                     assert proc.stdin is not None
