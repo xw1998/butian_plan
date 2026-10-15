@@ -1,0 +1,200 @@
+[
+  {
+    "key": "Chen2026",
+    "text": "Kai Chen, Yan Pang, Tianhao Wang. MRMMIA: Membership Inference Attacks on Memory in Chat Agents[EB/OL]. arXiv, 2026. http://arxiv.org/pdf/2605.27825v1.",
+    "authors": "Kai Chen, Yan Pang, Tianhao Wang",
+    "title": "MRMMIA: Membership Inference Attacks on Memory in Chat Agents",
+    "year": "2026",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2605.27825v1",
+    "source": "arxiv"
+  },
+  {
+    "key": "Wahab2026",
+    "text": "Abdul Wahab, Raksha Kumaraswamy, Martha White. Value Bonuses using Ensemble Errors for Exploration in Reinforcement Learning[EB/OL]. arXiv, 2026. http://arxiv.org/pdf/2602.12375v1.",
+    "authors": "Abdul Wahab, Raksha Kumaraswamy, Martha White",
+    "title": "Value Bonuses using Ensemble Errors for Exploration in Reinforcement Learning",
+    "year": "2026",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2602.12375v1",
+    "source": "arxiv"
+  },
+  {
+    "key": "Lupu2026",
+    "text": "Elena Sorina Lupu, Patrick Spieler, Khurram Javed, et al. The Open Ant: A Robot Platform for Reinforcement Learning Research[EB/OL]. arXiv, 2026. http://arxiv.org/pdf/2607.18488v1.",
+    "authors": "Elena Sorina Lupu, Patrick Spieler, Khurram Javed, Kris De Asis, John D. Martin, Martha Steenstrup, Joseph Modayil",
+    "title": "The Open Ant: A Robot Platform for Reinforcement Learning Research",
+    "year": "2026",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2607.18488v1",
+    "source": "arxiv"
+  },
+  {
+    "key": "Çalık2025",
+    "text": "Ethem Yağız Çalık, Talha Rüzgar Akkuş. Enhancing Human-Like Responses in Large Language Models[EB/OL]. arXiv, 2025. http://arxiv.org/pdf/2501.05032v2.",
+    "authors": "Ethem Yağız Çalık, Talha Rüzgar Akkuş",
+    "title": "Enhancing Human-Like Responses in Large Language Models",
+    "year": "2025",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2501.05032v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Lakim2026",
+    "text": "Imad Lakim, Ebtesam Almazrouei, Ibrahim Abu Alhaol, et al. A Holistic Assessment of the Carbon Footprint of Noor, a Very Large Arabic Language Model[EB/OL]. arXiv, 2026. http://arxiv.org/pdf/2610.00223v1.",
+    "authors": "Imad Lakim, Ebtesam Almazrouei, Ibrahim Abu Alhaol, Merouane Debbah, Julien Launay",
+    "title": "A Holistic Assessment of the Carbon Footprint of Noor, a Very Large Arabic Language Model",
+    "year": "2026",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2610.00223v1",
+    "source": "arxiv"
+  },
+  {
+    "key": "Wu2024",
+    "text": "Di Wu, Hongwei Wang, Wenhao Yu, et al. LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory[EB/OL]. arXiv, 2024. http://arxiv.org/pdf/2410.10813v2.",
+    "authors": "Di Wu, Hongwei Wang, Wenhao Yu, Yuwei Zhang, Kai-Wei Chang, Dong Yu",
+    "title": "LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory",
+    "year": "2024",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2410.10813v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Wasi2024",
+    "text": "Azmine Toushik Wasi, Mst Rafia Islam, Raima Islam. LLMs as Writing Assistants: Exploring Perspectives on Sense of Ownership and Reasoning[EB/OL]. arXiv, 2024. http://arxiv.org/pdf/2404.00027v5.",
+    "authors": "Azmine Toushik Wasi, Mst Rafia Islam, Raima Islam",
+    "title": "LLMs as Writing Assistants: Exploring Perspectives on Sense of Ownership and Reasoning",
+    "year": "2024",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2404.00027v5",
+    "source": "arxiv"
+  },
+  {
+    "key": "Shinn2023",
+    "text": "Noah Shinn, Federico Cassano, Edward Berman, et al. Reflexion: Language Agents with Verbal Reinforcement Learning[EB/OL]. arXiv, 2023. http://arxiv.org/pdf/2303.11366v4.",
+    "authors": "Noah Shinn, Federico Cassano, Edward Berman, Ashwin Gopinath, Karthik Narasimhan, Shunyu Yao",
+    "title": "Reflexion: Language Agents with Verbal Reinforcement Learning",
+    "year": "2023",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2303.11366v4",
+    "source": "arxiv"
+  },
+  {
+    "key": "Zhong2023",
+    "text": "Wanjun Zhong, Lianghong Guo, Qiqi Gao, et al. MemoryBank: Enhancing Large Language Models with Long-Term Memory[EB/OL]. arXiv, 2023. http://arxiv.org/pdf/2305.10250v3.",
+    "authors": "Wanjun Zhong, Lianghong Guo, Qiqi Gao, He Ye, Yanlin Wang",
+    "title": "MemoryBank: Enhancing Large Language Models with Long-Term Memory",
+    "year": "2023",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2305.10250v3",
+    "source": "arxiv"
+  },
+  {
+    "key": "Qi2025",
+    "text": "Jingyuan Qi, Zhiyang Xu, Qifan Wang, et al. AR-RAG: Autoregressive Retrieval Augmentation for Image Generation[EB/OL]. arXiv, 2025. http://arxiv.org/pdf/2506.06962v3.",
+    "authors": "Jingyuan Qi, Zhiyang Xu, Qifan Wang, Lifu Huang",
+    "title": "AR-RAG: Autoregressive Retrieval Augmentation for Image Generation",
+    "year": "2025",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2506.06962v3",
+    "source": "arxiv"
+  },
+  {
+    "key": "Xiangrong2025",
+    "text": "Xiangrong, Zhu, Yuan Xu, et al. Intelligent Interaction Strategies for Context-Aware Cognitive Augmentation[EB/OL]. arXiv, 2025. http://arxiv.org/pdf/2504.13684v1.",
+    "authors": " Xiangrong,  Zhu, Yuan Xu, Tianjian Liu, Jingwei Sun, Yu Zhang, Xin Tong",
+    "title": "Intelligent Interaction Strategies for Context-Aware Cognitive Augmentation",
+    "year": "2025",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2504.13684v1",
+    "source": "arxiv"
+  },
+  {
+    "key": "Jang2026",
+    "text": "Sangwon Jang, Taekyung Ki, Jaehyeong Jo, et al. Self-Refining Video Sampling[EB/OL]. arXiv, 2026. http://arxiv.org/pdf/2601.18577v2.",
+    "authors": "Sangwon Jang, Taekyung Ki, Jaehyeong Jo, Saining Xie, Jaehong Yoon, Sung Ju Hwang",
+    "title": "Self-Refining Video Sampling",
+    "year": "2026",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2601.18577v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Ali2024",
+    "text": "Nurshat Fateh Ali, Md. Mahdi Mohtasim, Shakil Mosharrof, et al. Automated Literature Review Using NLP Techniques and LLM-Based Retrieval-Augmented Generation[EB/OL]. arXiv, 2024. http://arxiv.org/pdf/2411.18583v1.",
+    "authors": "Nurshat Fateh Ali, Md. Mahdi Mohtasim, Shakil Mosharrof, T. Gopi Krishna",
+    "title": "Automated Literature Review Using NLP Techniques and LLM-Based Retrieval-Augmented Generation",
+    "year": "2024",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2411.18583v1",
+    "source": "arxiv"
+  },
+  {
+    "key": "Wang2024",
+    "text": "Renxi Wang, Haonan Li, Xudong Han, et al. Learning From Failure: Integrating Negative Examples when Fine-tuning Large Language Models as Agents[EB/OL]. arXiv, 2024. http://arxiv.org/pdf/2402.11651v2.",
+    "authors": "Renxi Wang, Haonan Li, Xudong Han, Yixuan Zhang, Timothy Baldwin",
+    "title": "Learning From Failure: Integrating Negative Examples when Fine-tuning Large Language Models as Agents",
+    "year": "2024",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2402.11651v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Wang2023",
+    "text": "Guanzhi Wang, Yuqi Xie, Yunfan Jiang, et al. Voyager: An Open-Ended Embodied Agent with Large Language Models[EB/OL]. arXiv, 2023. http://arxiv.org/pdf/2305.16291v2.",
+    "authors": "Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Mandlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, Anima Anandkumar",
+    "title": "Voyager: An Open-Ended Embodied Agent with Large Language Models",
+    "year": "2023",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2305.16291v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Team2021",
+    "text": "Open Ended Learning Team, Adam Stooke, Anuj Mahajan, et al. Open-Ended Learning Leads to Generally Capable Agents[EB/OL]. arXiv, 2021. http://arxiv.org/pdf/2107.12808v2.",
+    "authors": " Open Ended Learning Team, Adam Stooke, Anuj Mahajan, Catarina Barros, Charlie Deck, Jakob Bauer, Jakub Sygnowski, Maja Trebacz, Max Jaderberg, Michael Mathieu, Nat McAleese, Nathalie Bradley-Schmieg, Nathaniel Wong, Nicolas Porcel, Roberta Raileanu, Steph Hughes-Fitt, Valentin Dalibard, Wojciech Marian Czarnecki",
+    "title": "Open-Ended Learning Leads to Generally Capable Agents",
+    "year": "2021",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2107.12808v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Brown2014",
+    "text": "Benjamin J. Brown, Daniel Loss, Jiannis K. Pachos, et al. Quantum memories at finite temperature[EB/OL]. arXiv, 2014. http://arxiv.org/pdf/1411.6643v4.",
+    "authors": "Benjamin J. Brown, Daniel Loss, Jiannis K. Pachos, Chris N. Self, James R. Wootton",
+    "title": "Quantum memories at finite temperature",
+    "year": "2014",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/1411.6643v4",
+    "source": "arxiv"
+  },
+  {
+    "key": "Gros2013",
+    "text": "Claudius Gros. Generating functionals for guided self-organization[EB/OL]. arXiv, 2013. http://arxiv.org/pdf/1307.7872v1.",
+    "authors": "Claudius Gros",
+    "title": "Generating functionals for guided self-organization",
+    "year": "2013",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/1307.7872v1",
+    "source": "arxiv"
+  }
+]

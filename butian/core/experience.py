@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
-from math import exp, log1p
+from math import exp, isfinite, log1p
 from typing import Iterable
 
 class SkillPhase(StrEnum):
@@ -24,7 +24,7 @@ class SkillState:
     activation_count: int = 0
 
 def saturated_strength(successes: int, base: float = 1.0, gain: float = 1.0) -> float:
-    if successes < 0 or base < 0 or gain < 0:
+    if any(not isfinite(value) or value < 0 for value in (successes, base, gain)):
         raise ValueError("strength_parameters_must_be_nonnegative")
     return base + gain * log1p(successes)
 
@@ -72,7 +72,7 @@ def composition_gain(component_gains: Iterable[float], *, composition_bonus: flo
                     redundancy_penalty: float = 0.0, conflict_penalty: float = 0.0) -> float:
     """Components must be unique; bonuses are supplied only after observed synergy."""
     gains = [float(x) for x in component_gains]
-    if any(x < 0 for x in gains) or min(composition_bonus, redundancy_penalty, conflict_penalty) < 0:
+    if any(not isfinite(x) or x < 0 for x in (*gains, composition_bonus, redundancy_penalty, conflict_penalty)):
         raise ValueError("composition_values_must_be_nonnegative")
     return max(0.0, sum(gains) + composition_bonus - redundancy_penalty - conflict_penalty)
 
@@ -81,7 +81,8 @@ def decision_value(strength: float, environment_match: float, recall_quality: fl
                    phase: SkillPhase, conflict_penalty: float = 0.0,
                    transfer_risk: float = 0.0) -> float:
     factors = (strength, environment_match, recall_quality, composition_quality, evidence_confidence)
-    if any(x < 0 for x in factors) or any(x > 1 for x in factors[1:]) or min(conflict_penalty, transfer_risk) < 0:
+    if (any(not isfinite(x) or x < 0 for x in (*factors, conflict_penalty, transfer_risk))
+            or any(x > 1 for x in factors[1:])):
         raise ValueError("decision_values_out_of_range")
     phase_factor = {SkillPhase.ESTABLISHING: .7, SkillPhase.DEVELOPING: 1., SkillPhase.STABLE: 1., SkillPhase.ACTIVATING: .8, SkillPhase.INTEGRATING: 1.2, SkillPhase.TRANSCENDING: 1.3}[phase]
     raw = strength * environment_match * recall_quality * composition_quality * evidence_confidence * phase_factor - conflict_penalty - transfer_risk

@@ -110,6 +110,17 @@
     "source": "metaso"
   },
   {
+    "key": "Mao1991Practice",
+    "text": "毛泽东, ‘实践论,’ 毛泽东选集, 第1卷. 北京: 人民出版社, 1991, pp. 282–297. 原作1937年7月; 高校电子转载核验.",
+    "authors": "毛泽东",
+    "title": "实践论",
+    "year": "1991",
+    "journal": "毛泽东选集，第1卷，人民出版社",
+    "doi": "",
+    "url": "https://www.xaipe.edu.cn/szb/info/1086/1290.htm",
+    "source": "primary work; institutional electronic reprint"
+  },
+  {
     "key": "Lewis2020",
     "text": "Patrick Lewis, Ethan Perez, Aleksandara Piktus, et al. Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks[J], 2020.",
     "authors": "Patrick Lewis, Ethan Perez, Aleksandara Piktus, F. Petroni, Vladimir Karpukhin, Naman Goyal, Heinrich Kuttler, M. Lewis, Wen-tau Yih, Tim Rocktäschel, Sebastian Riedel, Douwe Kiela",

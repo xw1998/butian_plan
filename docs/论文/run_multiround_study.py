@@ -224,7 +224,7 @@ def main_study(out):
     dump(out/'summary.json', {'execution_kind':'production_mechanism_benchmark', 'llm_inference_calls':0, 'seeds':SEEDS, 'rounds':12, 'families':FAMILIES, 'methods':METHODS, 'summary':summary, 'paired_seed_bootstrap':bootstrap(rows),
                              'logical_write_definition':'one verified-source commit = append_event + MemoryStore.put; SQL page writes not counted',
                              'scope':'Shared deterministic host resolver. Explicit version admission belongs to host policy; compose_context itself does not enforce version correctness.',
-                             'limitations':['Synthetic contracts, not real user population', 'No measured LLM token, dollar or model-weight improvement', 'Five independent task streams; turns are correlated', 'Logical operation totals do not imply equal wall-clock costs', 'Verifier reads truth after answer for scoring only; repair requires available source', 'No disputed-memory ingestion in this study']})
+                             'limitations':['Synthetic contracts, not real user population', 'No measured LLM token, dollar or model-weight improvement', 'Seed-level task streams (one stream per configured seed); turns are correlated', 'Logical operation totals do not imply equal wall-clock costs', 'Verifier reads truth after answer for scoring only; repair requires available source', 'No disputed-memory ingestion in this study']})
     print(json.dumps(summary, indent=2), flush=True)
     return rows
 

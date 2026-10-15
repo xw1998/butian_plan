@@ -127,12 +127,15 @@ class MarkovTransition:
 def transition_distribution(current: str, candidates: Mapping[str, float], *, evidence: float = 1.0) -> dict[str, float]:
     """Normalize explicitly supplied transition scores; never invents a transition."""
     _unit(evidence, "evidence")
-    if not candidates or any(value < 0 for value in candidates.values()):
+    values = [float(value) for value in candidates.values()]
+    if not candidates or any(not isfinite(value) or value < 0 for value in values):
         raise ValueError("invalid_transition_scores")
-    total = sum(candidates.values())
+    total = sum(values)
+    if not isfinite(total):
+        raise ValueError("invalid_transition_scores")
     if total <= 0:
         raise ValueError("transition_scores_have_zero_mass")
-    return {state: value / total for state, value in candidates.items()}
+    return {state: value / total for state, value in zip(candidates, values)}
 
 
 def entropy(probabilities: Iterable[float]) -> float:
@@ -160,17 +163,24 @@ def expected_information_gain(prior: Sequence[float], posteriors: Sequence[Seque
     if len(posteriors) != len(outcome_probabilities) or not posteriors:
         raise ValueError("posterior_outcome_length_mismatch")
     raw_probabilities = [float(value) for value in outcome_probabilities]
-    if any(value < 0 or value > 1 for value in raw_probabilities):
+    if any(not isfinite(value) or value < 0 or value > 1 for value in raw_probabilities):
         raise ValueError("outcome_probability_out_of_range")
     if abs(sum(raw_probabilities) - 1.0) > 1e-9:
         raise ValueError("outcome_probabilities_must_sum_to_one")
     probabilities = raw_probabilities
     prior_entropy = entropy(prior)
+    if any(len(posterior) != len(prior) for posterior in posteriors):
+        raise ValueError("posterior_state_length_mismatch")
     posterior_entropies = [entropy(posterior) for posterior in posteriors]
     for index, (probability, posterior) in enumerate(zip(probabilities, posteriors)):
         for state_probability, posterior_probability in zip(prior, posterior):
             if probability * posterior_probability > state_probability + 1e-9:
                 raise ValueError(f"posterior_violates_bayes_consistency:{index}")
+    for state, prior_probability in enumerate(prior):
+        mixture = sum(probability * posterior[state]
+                      for probability, posterior in zip(probabilities, posteriors))
+        if abs(mixture - prior_probability) > 1e-9:
+            raise ValueError("posterior_mixture_must_equal_prior")
     expected_posterior_entropy = sum(probability * value for probability, value in zip(probabilities, posterior_entropies))
     if expected_posterior_entropy > prior_entropy + 1e-9:
         raise ValueError("expected_posterior_entropy_exceeds_prior")

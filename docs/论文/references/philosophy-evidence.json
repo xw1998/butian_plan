@@ -1,0 +1,19 @@
+{
+  "key": "Mao1991Practice",
+  "author": "毛泽东",
+  "title": "实践论",
+  "original_date": "1937-07",
+  "collection": "毛泽东选集",
+  "volume": 1,
+  "publisher": "人民出版社",
+  "edition_year": 1991,
+  "pages": "282–297",
+  "electronic_reprint": "https://www.xaipe.edu.cn/szb/info/1086/1290.htm",
+  "reprint_title": "毛泽东选集第一卷实践论",
+  "verification": "先前会话已核验高校电子转载正文与书目信息，未声称亲读纸本。2026-10-15恢复后fetch摘要提取失败，保留该失败，不将此次请求作为新的全文核验证据。",
+  "design_mapping": [
+    {"idea": "实践、认识、再实践、再认识", "implementation": "candidate经验、实践观察、warm升级、反例进入disputed、带父链修订"},
+    {"idea": "以实践结果检验认识", "implementation": "success要求evidence_ref，证据摘要去重，首次结果冻结"}
+  ],
+  "limits": "哲学指导不是统计检验，两个不同证据文件也不自动构成统计独立重复。"
+}

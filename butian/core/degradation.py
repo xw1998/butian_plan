@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import exp
+from math import exp, isfinite
 from typing import Mapping
 
 
 def _unit(value: float, name: str) -> float:
     value = float(value)
-    if not 0.0 <= value <= 1.0:
+    if not isfinite(value) or not 0.0 <= value <= 1.0:
         raise ValueError(f"{name}_out_of_range")
     return value
 
@@ -28,6 +28,12 @@ def multiplicative_freshness(*, age_days: float, half_life_days: float,
                              failure_rate: float = 0.35,
                              contradiction_rate: float = 0.55) -> float:
     """Independent attenuation factors are multiplied; correlated causes must be supplied once."""
+    age_days = float(age_days)
+    half_life_days = float(half_life_days)
+    consecutive_failures = float(consecutive_failures)
+    contradiction_count = float(contradiction_count)
+    if not all(isfinite(value) for value in (age_days, half_life_days, consecutive_failures, contradiction_count)):
+        raise ValueError("invalid_degradation_parameters")
     if age_days < 0 or half_life_days <= 0 or consecutive_failures < 0 or contradiction_count < 0:
         raise ValueError("invalid_degradation_parameters")
     _unit(environment_drift_score, "environment_drift_score")
