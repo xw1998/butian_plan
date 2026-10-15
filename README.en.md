@@ -51,7 +51,7 @@ Research paper **(currently in Chinese)**: [Computational Modeling of Human Expe
 - **Independent memory:** maintain separate long-term experience and lessons for each agent, with hot, warm, cold, and archived stages.
 - **Task lifecycle:** decompose, dispatch, execute, review, revise, block, or cancel work.
 - **General provider interface:** integrate agent runtimes, model APIs, local models, MCP tools, or human execution through capability negotiation.
-- **Initial team:** initialize six agents with independent memory and configurable roles.
+- **Initial team:** initialize ten agents with independent memory, learned method cards, owned tools and configurable roles.
 
 ## Single-agent and team workflows
 
@@ -120,7 +120,7 @@ python -m butian.cli init
 # Add an agent.
 python -m butian.cli member add m1 Alice
 
-# Initialization also creates six agents with independent memory.
+# Initialization creates ten agents and imports their initial method knowledge and tools.
 
 # Start the local HTTP API and web workspace.
 python -m butian.cli serve --host 127.0.0.1 --port 8765
@@ -182,3 +182,22 @@ https://gitee.com/xw19981010/butian_plan
 ## License
 
 Released under the [MIT License](LICENSE).
+
+## Initial knowledge and owned tools
+
+The built-in team covers embedded systems (Xu Wei), instrumentation and DSP (Shen Heng), architecture (Lu Zheng), data analysis (Song Xi), learning and verification (Su Yan), interaction design (He Xi), software and testing (Chen Mo), literature research (Lin Zhi), documents and office work (Wen Lan), and Web and visualization (Ye Qing).
+
+The initial assets contain **32 professional method cards and 19 owned tools**, with recallable usage guides. Methods are synthesized from useful local skills and public TDD and Web testing materials into decision steps, applicability, failure boundaries and verification procedures. `butian/assets/catalog.json` records sources; `professional_tools.json` records ownership, dependencies and input contracts.
+
+Specialized tools cover stack budgets, toolchain checks, sampling sanity, uncertainty, text detectability, CSV structure and identifier preservation, bibliography normalization and DOI deduplication, PDF inspection, and static HTML checks. Each agent also owns a foundation helper for statistics, independent uncertainty contributions, checklists and text fingerprints. PDF inspection optionally requires `pdfplumber`; image analysis optionally requires OpenCV. Browser interaction, Office rendering and proprietary online services remain host capabilities.
+
+Initial knowledge is **unpractised**, with candidate status and zero confidence; tools remain draft and require the existing authorization and execution backend. Imported cards do not automatically count as fresh practice material for dreaming. These assets do not represent model parameter training or successful practical validation. Existing identities and user memories are preserved.
+
+`butian/assets/initial_knowledge.sqlite3` is a portable public interchange database containing only profiles, method knowledge and tool source. It contains no user runtime or credentials. Rebuild it, or create a clean runnable runtime, at a new absolute path:
+
+```bash
+python -m butian.assets.build /absolute/new/initial.sqlite3
+python -m butian.assets.export /absolute/new/runtime
+```
+
+Both commands refuse to overwrite existing targets. Normal service startup imports package JSON and tool resources idempotently. Runtime authentication state is generated locally rather than shipped as a shared database.

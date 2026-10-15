@@ -66,6 +66,8 @@ class ButianService:
         from .tool_workflows import ToolWorkflows
         self.tool_workflows = ToolWorkflows(self.tools)
         self.bootstrap_personas()
+        from .initial_assets import bootstrap_initial_assets
+        self.initial_assets = bootstrap_initial_assets(self)
         # Provider 从 BUTIAN_PROVIDERS_FILE 或 <home>/providers.json 加载；无效条目记录错误、不静默丢弃
         self.providers, self.provider_config_errors, self.provider_config_path = load_registry_from_env(self.home)
         if self.execution_runner is not None:
@@ -925,7 +927,7 @@ class ButianService:
         MemoryStore(self.home / "members" / member_id / "memory.db").close()
 
     def bootstrap_personas(self) -> list[str]:
-        """Create the six built-in Butian identities with fresh empty memories."""
+        """Create missing built-in identities without overwriting existing members."""
         from .personas import seed_default_personas
         return seed_default_personas(self)
 

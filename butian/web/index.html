@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>补天计划 · 团队工作台</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">补</span><div><strong>补天计划</strong><small>Team Runtime</small></div></div>
+    <div class="top-actions"><span class="connection" id="connectionState"><i></i>本地边界</span><button class="icon-button" id="refreshButton" title="刷新数据" aria-label="刷新数据">↻</button></div>
+  </header>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="workspace-label">WORKSPACE</div>
+      <nav>
+        <button class="nav-item active" data-view="overview"><span>⌂</span>总览</button>
+        <button class="nav-item" data-view="tasks"><span>✓</span>任务</button>
+        <button class="nav-item" data-view="validation"><span>◈</span>验证</button>
+        <button class="nav-item" data-view="memory"><span>▤</span>记忆</button>
+        <button class="nav-item" data-view="evolution"><span>✦</span>进化</button>
+        <button class="nav-item" data-view="members"><span>◌</span>成员</button>
+        <button class="nav-item" data-view="escalations"><span>!</span>升级工单</button>
+      </nav>
+      <div class="sidebar-foot"><span class="pulse"></span><span>运行时在线</span><small>Local trusted boundary</small></div>
+    </aside>
+    <main class="main" id="app" aria-live="polite">
+      <section class="page-head"><div><p class="eyebrow">TEAM OPERATIONS</p><h1 id="pageTitle">工作总览</h1><p id="pageSubtitle">把任务、验证与经验放在同一条可审计链路上。</p></div><div class="head-meta"><span id="lastUpdated">尚未同步</span><button class="primary" id="syncButton">同步数据</button></div></section>
+      <div id="notice" class="notice hidden" role="alert"></div>
+      <section id="content"></section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+  <script src="delivery.js"></script>
+</body>
+</html>

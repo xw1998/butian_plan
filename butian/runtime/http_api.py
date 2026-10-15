@@ -97,7 +97,7 @@ class ApiHandler(BaseHTTPRequestHandler):
     def _do_GET(self):
         if not self.path.startswith("/api/"):
             relative = "index.html" if self.path == "/" else self.path.lstrip("/")
-            root = (self.web_root or Path(__file__).resolve().parents[2] / "web").resolve()
+            root = (self.web_root or Path(__file__).resolve().parents[1] / "web").resolve()
             target = (root / relative).resolve()
             if target != root and root not in target.parents:
                 self._send(403, {"error": "path_forbidden"}); return
@@ -490,7 +490,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 def serve(home=None, host="127.0.0.1", port=8765):
     service = ButianService(home); ApiHandler.service = service
     ApiHandler.experiments = ExperimentStore(Path(home or service.home) / "experiments.db")
-    ApiHandler.web_root = Path(__file__).resolve().parents[2] / "web"
+    ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
     try: ThreadingHTTPServer((host, port), ApiHandler).serve_forever()
     finally:
         service.close()

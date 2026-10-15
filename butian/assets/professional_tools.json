@@ -1,0 +1,169 @@
+[
+  {
+    "id": "stack_budget",
+    "owner": "xu_wei",
+    "file": "tools/stack_budget.py",
+    "source_skill": "embedded-systems-expert",
+    "source_sha256": "30f45322b6c35f016e2d1003369fcbc81bd3ec803b194d2483f3a561efc7bd24",
+    "wrapper_sha256": "1426639ed9b77a5f666301e42f39552dab6442c3350c758622762e9d52c670e6",
+    "description": "Cortex-M 内存与栈预算。\n\n回答\"这点 RAM 够不够、栈给多大\"这类问题。算的是**预算下限**，\n真值要用实测水位（填充魔数法或调试器测量）确认。\n\n用法:\n    python stack_budget.py --task app=1024:2 --task shell=512 --tcb 96 \\\n        --he",
+    "dependencies": [
+      "Python standard library"
+    ],
+    "permissions": [
+      "execute"
+    ]
+  },
+  {
+    "id": "toolchain_check",
+    "owner": "xu_wei",
+    "file": "tools/toolchain_check.py",
+    "source_skill": "embedded-systems-expert",
+    "source_sha256": "b6ade3d41dd1657ef7be23647b33e5ec14c0429b76e72d33ba8fdca510da16be",
+    "wrapper_sha256": "37523d6ffeec3d90e164fa47bb34de47499151f47a102df5afb35529dc41ba9a",
+    "description": "嵌入式工具链体检。\n\n接手一个新工程、写移植文档、或判断\"这台机器能不能编这个工程\"之前先跑一遍。\n只依赖标准库。\n\n用法:\n    python toolchain_check.py\n    python toolchain_check.py --json\n    python toolchain_check.py --tools ar",
+    "dependencies": [
+      "Python standard library"
+    ],
+    "permissions": [
+      "execute",
+      "subprocess"
+    ]
+  },
+  {
+    "id": "signal_sanity",
+    "owner": "shen_heng",
+    "file": "tools/signal_sanity.py",
+    "source_skill": "instrument-dsp-expert",
+    "source_sha256": "f73844d0c6395cfdbf218d37c78c1f0c2c1611bce41c4f973fcb6abac7ab4ed8",
+    "wrapper_sha256": "4fbc955140681c58e50469d53adc7500e568e32373cfc17ded6616f0288a0ec7",
+    "description": "采样与谱分析参数体检。\n\n用途：任何谱分析结论落地前，先用它算清 fs / N / 窗 / 分辨率 / 混叠裕量，\n避免\"频率分辨率不够却报频率\"\"已经混叠却当真实信号\"这类看似权威的错答案。\n\n只用标准库。输出 JSON（统一信封 status=\"ok\"/\"error\"）。\n\n约定（口径必须先声明，脚本在输出里一并给出）：\n  df_r",
+    "dependencies": [
+      "Python standard library"
+    ],
+    "permissions": [
+      "execute"
+    ]
+  },
+  {
+    "id": "uncertainty",
+    "owner": "shen_heng",
+    "file": "tools/uncertainty.py",
+    "source_skill": "instrument-dsp-expert",
+    "source_sha256": "907bae14bda225f5dfa694ab9a2be934c20b85dd69e1160f25424df5b606bcce",
+    "wrapper_sha256": "57ecea99b6c66e4b87d4ead6e172238e80c60551d2c312bef173bae2ea20827d",
+    "description": "测量不确定度评定（GUM 合成 + 扩展）。\n\n给不出不确定度的测量结论不可交付；本脚本把 A 类/B 类分量按要求合成并给出 U(k)。\n只用标准库。输出 JSON（统一信封 status=\"ok\"/\"error\"）。\n\nB 类分量写法： --b \"名称:参数1:类型[:参数2][:灵敏度系数]\"\n  类型与参数含义（参数1/参数2 按",
+    "dependencies": [
+      "Python standard library"
+    ],
+    "permissions": [
+      "execute"
+    ]
+  },
+  {
+    "id": "text_detectability",
+    "owner": "shen_heng",
+    "file": "tools/text_detectability.py",
+    "source_skill": "instrument-dsp-expert",
+    "source_sha256": "30c6c19a5ea9fa753f745b23b4345b83cadc193dd8b2d6475c42b977e24a91a5",
+    "wrapper_sha256": "fd2de4193ee800cb41686e06876120c299e425f70420acfe21147d80255094c1",
+    "description": "退化图像文字还原的两个确定性体检：\n\n  mode=resolution  字符可识别性检出限（LOD）体检\n                   给字高/笔画宽（或直接给图，自动测量），判定该区域能否被识别。\n  mode=consensus   多通道读数一致性表决\n                   给同一单元的多次独立读数，输出",
+    "dependencies": [
+      "Python standard library",
+      "optional OpenCV for image analysis"
+    ],
+    "permissions": [
+      "execute",
+      "filesystem_read"
+    ]
+  },
+  {
+    "id": "research_records",
+    "owner": "lin_zhi",
+    "file": "tools/research_records.py",
+    "source_skill": "academic-research",
+    "source_sha256": "4415c8a265cf18e894c42710b1f7073ba3398dc90492b53cd403678bf87254e5",
+    "wrapper_sha256": "4415c8a265cf18e894c42710b1f7073ba3398dc90492b53cd403678bf87254e5",
+    "description": "文献元数据规范化、按DOI去重，保留未核验声明",
+    "dependencies": [
+      "Python standard library"
+    ],
+    "permissions": [
+      "execute"
+    ],
+    "input_contract": {
+      "type": "object",
+      "required": [
+        "records"
+      ]
+    },
+    "implementation": "original implementation of learned workflow; upstream code not copied"
+  },
+  {
+    "id": "pdf_inspect",
+    "owner": "wen_lan",
+    "file": "tools/pdf_inspect.py",
+    "source_skill": "pdf-tools",
+    "source_sha256": "595fa7ed9d2dd9d32c646f38619fb2aba9dee952b244623a1da56da692ba7768",
+    "wrapper_sha256": "595fa7ed9d2dd9d32c646f38619fb2aba9dee952b244623a1da56da692ba7768",
+    "description": "只读PDF页码、尺寸和文字层检查；无效页码明确报错",
+    "dependencies": [
+      "pdfplumber"
+    ],
+    "permissions": [
+      "execute",
+      "filesystem_read"
+    ],
+    "input_contract": {
+      "type": "object",
+      "required": [
+        "path"
+      ]
+    },
+    "implementation": "original implementation of learned workflow; upstream code not copied"
+  },
+  {
+    "id": "table_audit",
+    "owner": "song_xi",
+    "file": "tools/table_audit.py",
+    "source_skill": "excel-xlsx",
+    "source_sha256": "48ec7738f4d76465b217613e84c4615de007cc8381a78929379d1be40596a28c",
+    "wrapper_sha256": "48ec7738f4d76465b217613e84c4615de007cc8381a78929379d1be40596a28c",
+    "description": "CSV结构、长ID、前导零和公式样式检查，不改变类型",
+    "dependencies": [
+      "Python standard library"
+    ],
+    "permissions": [
+      "execute"
+    ],
+    "input_contract": {
+      "type": "object",
+      "required": [
+        "csv_text"
+      ]
+    },
+    "implementation": "original implementation of learned workflow; upstream code not copied"
+  },
+  {
+    "id": "web_audit",
+    "owner": "ye_qing",
+    "file": "tools/web_audit.py",
+    "source_skill": "browser",
+    "source_sha256": "162f58e2c3645053281d94d6b2fc56e6e98b93e2a91aaa3fcafb91cae41549d6",
+    "wrapper_sha256": "162f58e2c3645053281d94d6b2fc56e6e98b93e2a91aaa3fcafb91cae41549d6",
+    "description": "HTML静态结构复核，不冒充浏览器运行验收",
+    "dependencies": [
+      "Python standard library"
+    ],
+    "permissions": [
+      "execute"
+    ],
+    "input_contract": {
+      "type": "object",
+      "required": [
+        "html"
+      ]
+    },
+    "implementation": "original offline helper learned from browser-testing workflow"
+  }
+]

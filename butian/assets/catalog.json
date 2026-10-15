@@ -1,0 +1,710 @@
+{
+  "version": 1,
+  "description": "Original learning summaries from skills; no personal memories or claimed practice successes.",
+  "members": {
+    "xu_wei": [
+      {
+        "id": "embedded-engineering",
+        "content": "嵌入式工程 MCU RTOS 栈预算 调试：先确定板卡、芯片、编译器和运行模式；查手册与同类实现；列RAM、Flash、周期预算；用最小例程验证启动与外设；再扩展功能。异常现场、寄存器、链接布局必须来自当前工程或设备。任务PSP与异常MSP分别预算，最终用实测峰值验证，不能把静态预算当真机结论。",
+        "sources": [
+          {
+            "reference": "embedded-systems-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2f32419579affe7e2c964031560f8a0af6645b8e7655e45e90b274b2f6709f78",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "bellard",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "14180f28638fb0944d1b2ddeff33e4e3d8b837da6b4374db6d5f564d5500df7d",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "xu_wei-rtos",
+        "content": "RTOS内核设计与验证\n任务状态变迁必须包含ready/running/blocked与超时唤醒；中断只记录事件、耗时处理下放任务。共享数据先画并发访问关系，再选择临界区、互斥或消息。验证优先级反转、递归锁、超时与取消；测调度开销时报告时钟、优化档位、插桩开销和往返定义。MPU隔离需要验证非特权访问真的被拒绝。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "embedded-systems-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2f32419579affe7e2c964031560f8a0af6645b8e7655e45e90b274b2f6709f78",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "bellard",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "14180f28638fb0944d1b2ddeff33e4e3d8b837da6b4374db6d5f564d5500df7d",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "xu_wei-port",
+        "content": "移植与工具链\n从芯片完整型号、晶振、启动入口、向量表和链接分区开始核对。编译成功后检查map符号和内存占用，再上板确认串口、节拍和异常入口。编译器扩展、ABI、结构体对齐和浮点调用约定不可凭相同C语法推断兼容。toolchain_check仅探测存在与版本，不证明工程配置正确。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "embedded-systems-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2f32419579affe7e2c964031560f8a0af6645b8e7655e45e90b274b2f6709f78",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "bellard",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "14180f28638fb0944d1b2ddeff33e4e3d8b837da6b4374db6d5f564d5500df7d",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "xu_wei-stack",
+        "content": "栈与内存预算\nstack_budget输入任务栈、实例数、TCB、堆、RAM、嵌套异常和内核路径；先用--help确认参数。Cortex-M基本异常帧32字节，FPU扩展帧104字节；异常路径MSP预算与任务PSP分开，惰性浮点入栈和尾链应结合芯片验证。预算只算下限，最终检查栈水位与最坏调用链。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "embedded-systems-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2f32419579affe7e2c964031560f8a0af6645b8e7655e45e90b274b2f6709f78",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "bellard",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "14180f28638fb0944d1b2ddeff33e4e3d8b837da6b4374db6d5f564d5500df7d",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "shen_heng": [
+      {
+        "id": "measurement-dsp",
+        "content": "仪器信号处理 DSP 采样 不确定度：先检查原始样本、采样率、缺失、削波和单位，再选择滤波或谱分析。fs/N是谱线间隔，不等于窗口实际分辨率。报告窗函数、ENBW、平均次数和延迟补偿；标定与拟合应留出独立验证集。不确定度需要测量方程、灵敏度和协方差，独立分量才可平方和合成。",
+        "sources": [
+          {
+            "reference": "instrument-dsp-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "ab9fbf5db436dfcf48159cbfbfbb763840b704b6c803cfd7261dde4451d4b3c4",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "shen_heng-spectrum",
+        "content": "谱分析与采样体检\nsignal_sanity传入fs、N、频率上界或峰值、窗口和SNR，得到混叠裕量与分辨能力提示。先核时钟与实际采样间隔，再判断工频、泄漏、噪声底和谐波。零填充改善显示采样而不增加观测信息；PSD必须说明单边/双边、带宽与幅度归一化。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "instrument-dsp-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "ab9fbf5db436dfcf48159cbfbfbb763840b704b6c803cfd7261dde4451d4b3c4",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "shen_heng-gum",
+        "content": "GUM不确定度\nuncertainty工具支持A类重复测量及B类标准、扩展、矩形、三角、分辨力分量。每项带单位和灵敏度；已给U的证书应除包含因子。共用标准器与环境引入相关性时必须补协方差，不能直接套独立合成。有限自由度覆盖因子近似要说明，不把默认k=2当无条件精确95%。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "instrument-dsp-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "ab9fbf5db436dfcf48159cbfbfbb763840b704b6c803cfd7261dde4451d4b3c4",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "shen_heng-text",
+        "content": "字符取证与测量边界\ntext_detectability用于字符像素与多读数一致性体检。重复调用同一个模型不是独立通道，一致也不能证明真实。原图不可恢复的信息不得用语言先验补成确定字；需要保留区域坐标、原图、候选字与低置信标记。图像模式依赖OpenCV，缺依赖应报告而非返回虚假空结果。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "instrument-dsp-expert",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "ab9fbf5db436dfcf48159cbfbfbb763840b704b6c803cfd7261dde4451d4b3c4",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "lu_zheng": [
+      {
+        "id": "architecture",
+        "content": "系统架构 接口 状态机：先定义领域对象、所有权和失败状态；按变化原因划分模块，用窄接口封装复杂性。列出正常、超时、重复、重启与恢复路径；比较存储、延迟、依赖和运维成本。评审区分需求缺口、标准违反与设计判断，避免仅凭代码气味重构。",
+        "sources": [
+          {
+            "reference": "codebase-design",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "22d3815e5629ddea7ed7c9f8e7c330f6a1559466ee904e58371e1e8a10be0c4b",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "domain-modeling",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "004d5cb6258658f2e9cbf0d9f90bdc9104f8b83bd296556783800c31d503814f",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "code-review",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "e5507100ac01a04d082ac23ac6311d0fec8699d1ab00c599db7064039b819f63",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "lu_zheng-contracts",
+        "content": "接口与领域对象\n为每个接口写清输入、输出、不变量、调用顺序、错误与性能约束。区分实体身份和值对象，明确数据所有者和跨模块事务边界。通过接口测试完整行为；不可为了测试方便暴露内部字段。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "codebase-design",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "22d3815e5629ddea7ed7c9f8e7c330f6a1559466ee904e58371e1e8a10be0c4b",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "domain-modeling",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "004d5cb6258658f2e9cbf0d9f90bdc9104f8b83bd296556783800c31d503814f",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "code-review",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "e5507100ac01a04d082ac23ac6311d0fec8699d1ab00c599db7064039b819f63",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "lu_zheng-recovery",
+        "content": "分布式与恢复\n超时意味着未知，不能推断远端未执行。外部副作用采用幂等键与持久化状态，恢复时先对账再重试。并发写入先定义冲突规则；断电点测试覆盖准备、提交、回执丢失。架构决策记录采用方案、替代方案、成本与失效条件。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "codebase-design",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "22d3815e5629ddea7ed7c9f8e7c330f6a1559466ee904e58371e1e8a10be0c4b",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "domain-modeling",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "004d5cb6258658f2e9cbf0d9f90bdc9104f8b83bd296556783800c31d503814f",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "code-review",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "e5507100ac01a04d082ac23ac6311d0fec8699d1ab00c599db7064039b819f63",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "song_xi": [
+      {
+        "id": "analysis",
+        "content": "数据分析 实验 统计：保留原始数据与清洗记录；先定义指标、分母、单位与缺失处理。比较前固定基线、样本和随机种子，报告分布、效应量及置信区间；相关性不等于因果。图表必须明确轴单位、时间范围、样本数和不确定性。训练集与测试集分离，负结果和异常不可静默删除。",
+        "sources": [
+          {
+            "reference": "xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c53422150b5d5dc491a13333bb5ee2ae2963707ebdaeffb73d509ce2fe22d49a",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "excel-xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "52421d9fba8fdb64124416c450849434f3639e7b95249ce10fecd209aa90f038",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "song_xi-experiment",
+        "content": "实验与收益归因\n固定任务集、轮数、基线、预算和种子；共同开销与新增验证成本分别记账。效果指标同时报告正确、错误、未知与成本，不以少取源掩盖错误增加。消融一次移除一个机制，配对比较时保留每个种子差值，不能只展示最优一次。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c53422150b5d5dc491a13333bb5ee2ae2963707ebdaeffb73d509ce2fe22d49a",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "excel-xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "52421d9fba8fdb64124416c450849434f3639e7b95249ce10fecd209aa90f038",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "song_xi-spreadsheet",
+        "content": "表格与数据交换\nCSV只是文本交换，不保留工作簿公式、样式和类型。长ID及前导零必须按文本读取；日期核对1900/1904系统。pandas用于分析重排，openpyxl用于模板和公式结构；只读取缓存数值后再保存会破坏公式模型。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c53422150b5d5dc491a13333bb5ee2ae2963707ebdaeffb73d509ce2fe22d49a",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "excel-xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "52421d9fba8fdb64124416c450849434f3639e7b95249ce10fecd209aa90f038",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "su_yan": [
+      {
+        "id": "learning",
+        "content": "经验学习 做梦 假设：将观察、推断和待验证建议分开。一次结果不能证明通用规律；记录前置条件、行动、实际反馈和证据。归纳后主动设计反例与独立验证；未经实践的知识保持候选，失败保留矛盾记录。做梦输出只能是待验证线索，记忆更新不等于模型参数训练。",
+        "sources": [
+          {
+            "reference": "research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "0b6597c453178536b50c044a9e57cbc32dbffa47607a370e40768332f54bf8c2",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "tdd",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2de14b893e7a1bf7030b9eb778a3714a19da70c4284ad18a6e43b2402aa693ef",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "su_yan-practice",
+        "content": "实践记录与经验形成\n初始方法只是候选知识。实际行动记录独立键、前置条件、实际结果、证据引用及内容指纹，unknown不计成功。成功证据必须属于本次行动；失败触发争议与修订，不能修改历史把失败洗成成功。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "0b6597c453178536b50c044a9e57cbc32dbffa47607a370e40768332f54bf8c2",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "tdd",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2de14b893e7a1bf7030b9eb778a3714a19da70c4284ad18a6e43b2402aa693ef",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "su_yan-dream",
+        "content": "做梦与反例验证\n将多条材料抽象成可证伪假设，先写适用条件和拒绝条件，再选未参与归纳的例子。验证结果支持/拒绝/未知分开，归纳和验证耗费都计入收益。假设得到支持后仍要在后续实际任务中积累经验；不能从文本总结直接升为成熟技能。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "0b6597c453178536b50c044a9e57cbc32dbffa47607a370e40768332f54bf8c2",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "tdd",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2de14b893e7a1bf7030b9eb778a3714a19da70c4284ad18a6e43b2402aa693ef",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "he_xi": [
+      {
+        "id": "product",
+        "content": "产品交互 需求 验收：把用户目标转换为可观察的完成条件；画清入口、退出、返回、取消和错误恢复。用实际操作验证按钮、长列表、空态与边界，不用静态截图证明交互成功。布局同时检查对齐、截断、层级与留白；用户编辑过程不要自动切焦点。",
+        "sources": [
+          {
+            "reference": "prototype",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c2a9cc5492e99b4fabe047de8aef02765e241ab77b19db44a3664d385ec881bd",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "diagram-generator",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "24460f6aa9be5f60da0aa25cd2a8109251c5b6c1446cab2e8b53c690716b560d",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "he_xi-workflow",
+        "content": "交互闭环审查\n逐页沿入口、主要操作、成功、取消、返回、失败恢复走真实事件。所有列表检查空、单条、满容量、长文字与滚动底部；删除与导入确认对象和应用真正使用的对象一致。不要把不可点击的图标当已实现功能。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "prototype",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c2a9cc5492e99b4fabe047de8aef02765e241ab77b19db44a3664d385ec881bd",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "diagram-generator",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "24460f6aa9be5f60da0aa25cd2a8109251c5b6c1446cab2e8b53c690716b560d",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "he_xi-layout",
+        "content": "布局与可用性\n先用几何与像素核对内容边界、居中与裁切，再看层级、留白、对比和阅读顺序。触控目标不能只按视觉图标大小判断；输入中禁止自动跳焦点。原型先明确要回答逻辑问题还是视觉问题，验证结论再进入正式实现。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "prototype",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c2a9cc5492e99b4fabe047de8aef02765e241ab77b19db44a3664d385ec881bd",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "diagram-generator",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "24460f6aa9be5f60da0aa25cd2a8109251c5b6c1446cab2e8b53c690716b560d",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "chen_mo": [
+      {
+        "id": "testing",
+        "content": "开发测试 TDD 缺陷诊断：先建立能重现问题的回路，确认测试因目标缺陷失败；再做最小实现，跑相关回归并在通过后整理结构。测试真实可观察行为，不只验证mock调用次数。性能问题先量测，再提出可证伪假设和单变量实验；提交时说明验证范围和未通过项。",
+        "sources": [
+          {
+            "reference": "tdd",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2de14b893e7a1bf7030b9eb778a3714a19da70c4284ad18a6e43b2402aa693ef",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "diagnosing-bugs",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "3dfe5ec16b89a01dbc1bf606a1a1cfc32349e225f3bb75a3fb86117974a83cb8",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "implement",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "30cd7bc1ebfb3891e85a1eed3b3b81aea0fa4ad4553a784de7f8e421b2d223e0",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "git",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "581f262bcb6531fef4d0ce975d2d86998fd13532545aad50ab2f336543836a97",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "https://github.com/obra/superpowers/blob/main/skills/test-driven-development/SKILL.md",
+            "use": "methodology learning; independently composed summary"
+          }
+        ]
+      },
+      {
+        "id": "chen_mo-debug",
+        "content": "缺陷诊断回路\n从真实输入构建可复现的失败信号；随机故障统计复现率与环境，不把一次没复现当修好。列出多个可证伪原因，用单变量日志或插桩区分，先缩小输入再改代码。修复后的用例必须能在修复前失败，且不依赖内部实现细节。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "tdd",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2de14b893e7a1bf7030b9eb778a3714a19da70c4284ad18a6e43b2402aa693ef",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "diagnosing-bugs",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "3dfe5ec16b89a01dbc1bf606a1a1cfc32349e225f3bb75a3fb86117974a83cb8",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "implement",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "30cd7bc1ebfb3891e85a1eed3b3b81aea0fa4ad4553a784de7f8e421b2d223e0",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "git",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "581f262bcb6531fef4d0ce975d2d86998fd13532545aad50ab2f336543836a97",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "https://github.com/obra/superpowers/blob/main/skills/test-driven-development/SKILL.md",
+            "use": "methodology learning; independently composed summary"
+          }
+        ]
+      },
+      {
+        "id": "chen_mo-review",
+        "content": "评审与Git\n评审分标准和需求两条轴；标准违反附规则出处，需求缺口附可观察场景。提交前查看diff与文件清单、精确stage，保留无关改动。合并冲突按双方语义解决，不能全选某一侧；解决后运行相应验证并核对锁文件与生成产物。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "tdd",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "2de14b893e7a1bf7030b9eb778a3714a19da70c4284ad18a6e43b2402aa693ef",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "diagnosing-bugs",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "3dfe5ec16b89a01dbc1bf606a1a1cfc32349e225f3bb75a3fb86117974a83cb8",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "implement",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "30cd7bc1ebfb3891e85a1eed3b3b81aea0fa4ad4553a784de7f8e421b2d223e0",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "git",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "581f262bcb6531fef4d0ce975d2d86998fd13532545aad50ab2f336543836a97",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "https://github.com/obra/superpowers/blob/main/skills/test-driven-development/SKILL.md",
+            "use": "methodology learning; independently composed summary"
+          }
+        ]
+      }
+    ],
+    "lin_zhi": [
+      {
+        "id": "research",
+        "content": "学术研究 检索 引文：将问题拆成可检索概念与同义词；优先原始论文、标准和官方文档，记录检索时间与筛选口径。核对作者、年份、题名、DOI与原文主张，预印本和同行评议分开标注。多来源交叉核验后综合，冲突保留；未读到的证据不当作引用，不能用摘要支持超出摘要的信息。",
+        "sources": [
+          {
+            "reference": "academic-research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "55897354f1dc7f3576f4e3b51af837c8b2f210616bcd46e4c80b50fe51192c05",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "0b6597c453178536b50c044a9e57cbc32dbffa47607a370e40768332f54bf8c2",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-fetch",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "93d9df3e8f65fff3c96999a25109340280364e8974623166eb17d0834b34a320",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "lin_zhi-search",
+        "content": "文献检索与去重\n先做问题—检索词—来源—筛选规则表。arXiv记录预印本版本，Semantic Scholar引用数带查询日期，PubMed检查研究对象与结局。去重优先DOI，其次规范化题名与年份，疑似同名不得自动合并。检索命中不是研究结论。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "academic-research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "55897354f1dc7f3576f4e3b51af837c8b2f210616bcd46e4c80b50fe51192c05",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "0b6597c453178536b50c044a9e57cbc32dbffa47607a370e40768332f54bf8c2",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-fetch",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "93d9df3e8f65fff3c96999a25109340280364e8974623166eb17d0834b34a320",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "lin_zhi-synthesis",
+        "content": "证据综合与引用\n每个关键结论绑定读到的原文范围；区分实验、观察、综述和观点。效应大小、适用人群、数据规模与局限一起摘录。综述按问题组织一致与冲突证据，不按论文逐篇堆砌；引用字段通过原始出版来源核对，不生成看似可信的DOI。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "academic-research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "55897354f1dc7f3576f4e3b51af837c8b2f210616bcd46e4c80b50fe51192c05",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "research",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "0b6597c453178536b50c044a9e57cbc32dbffa47607a370e40768332f54bf8c2",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-fetch",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "93d9df3e8f65fff3c96999a25109340280364e8974623166eb17d0834b34a320",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "wen_lan": [
+      {
+        "id": "office",
+        "content": "办公文档 Word Excel PDF PPT：编辑前核对模板、样式、节、表格、公式和对象关系并保存原件。Excel标识符用文本保护前导零与长数字，公式与缓存值分开验证，openpyxl不负责重算。PDF先区分文字层与扫描图；OCR标注不确定字符。Word和PPT交付需检查页码、溢出、字体与图表引用；文件生成成功不等于视觉验收通过。",
+        "sources": [
+          {
+            "reference": "word-docx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c766da489810acf03290283780ba9d3be798678d689255ace34477caeb6d7541",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "excel-xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "52421d9fba8fdb64124416c450849434f3639e7b95249ce10fecd209aa90f038",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "pdf-tools",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "b75473a85bfca999134edb96dc12886a4e3a0c3ed044d1768ec9900c1e9a5715",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-converter",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "354b8335051b9037e8c23324c33f68b3abbdac5ab9cfa12935c26b53575cf488",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-exporter",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "01fc4f62f6a9f4c8b4171f4180a6a011c4e12ae1d08ee572829d3edc40eabf36",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "wen_lan-docx",
+        "content": "Word结构保持\nDOCX是OOXML包，文本跨run分段，不能假设一句话在单节点。优先命名样式；列表依赖numbering定义，节控制页边距、方向、页眉页脚与页码。修订、书签、域和关系文件改动后检查一致性，再用可用Office引擎渲染验证。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "word-docx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c766da489810acf03290283780ba9d3be798678d689255ace34477caeb6d7541",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "excel-xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "52421d9fba8fdb64124416c450849434f3639e7b95249ce10fecd209aa90f038",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "pdf-tools",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "b75473a85bfca999134edb96dc12886a4e3a0c3ed044d1768ec9900c1e9a5715",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-converter",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "354b8335051b9037e8c23324c33f68b3abbdac5ab9cfa12935c26b53575cf488",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-exporter",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "01fc4f62f6a9f4c8b4171f4180a6a011c4e12ae1d08ee572829d3edc40eabf36",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      },
+      {
+        "id": "wen_lan-pdf",
+        "content": "PDF与演示文稿交付\nPDF先抽文字层，扫描页再OCR；矢量图文字要按坐标配对，不能按提取顺序硬拼。PPT以听众决策和叙事顺序组织，一页一个主张并标数据来源；检查字号、重叠、裁切与对比。格式转换后核对页数、图像、表格、字体和链接。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "word-docx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "c766da489810acf03290283780ba9d3be798678d689255ace34477caeb6d7541",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "excel-xlsx",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "52421d9fba8fdb64124416c450849434f3639e7b95249ce10fecd209aa90f038",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "pdf-tools",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "b75473a85bfca999134edb96dc12886a4e3a0c3ed044d1768ec9900c1e9a5715",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-converter",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "354b8335051b9037e8c23324c33f68b3abbdac5ab9cfa12935c26b53575cf488",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "markdown-exporter",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "01fc4f62f6a9f4c8b4171f4180a6a011c4e12ae1d08ee572829d3edc40eabf36",
+            "scope": "methodology summary; local source is not redistributed"
+          }
+        ]
+      }
+    ],
+    "ye_qing": [
+      {
+        "id": "web-testing",
+        "content": "Web 浏览器测试 可视化：先确认静态页面还是动态应用；动态页面等待目标组件达到可操作状态，再依据实际DOM选择定位器。用真实点击验证状态变化，保留截图与控制台错误；等待明确条件而非任意长睡眠。图表选型由问题决定，比较用条形、趋势用折线，轴从何处起算应透明；浏览器和服务生命周期要收口。",
+        "sources": [
+          {
+            "reference": "browser",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "026eeed30a11fe49f3dc2ec7c2758b131e961e9a7d0c12a11d02bf65af069e13",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "https://github.com/anthropics/skills/blob/main/skills/webapp-testing/SKILL.md",
+            "use": "methodology learning; independently composed summary"
+          }
+        ]
+      },
+      {
+        "id": "ye_qing-browser",
+        "content": "动态页面与浏览器验证\n先确认目标页面与当前状态，优先角色与可访问名称定位；动态组件使用目标可见/可用条件等待。networkidle在长连接页面可能永不满足，应等实际目标状态。点击后断言业务状态变化而非仅没有异常；收集console与网络失败，结束关闭自身启动的浏览器和服务。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "browser",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "026eeed30a11fe49f3dc2ec7c2758b131e961e9a7d0c12a11d02bf65af069e13",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "https://github.com/anthropics/skills/blob/main/skills/webapp-testing/SKILL.md",
+            "use": "methodology learning; independently composed summary"
+          }
+        ]
+      },
+      {
+        "id": "ye_qing-charts",
+        "content": "图表与Web实现\n先列数据字段、缺失、单位和比较目的再选图。趋势用时间轴、类别比较用条形、关系用散点；避免双轴制造相关性。交互状态覆盖加载、失败、空数据和键盘操作；图表容器必须有明确尺寸，无数据给出状态而不是空白图。\n使用原则：先核当前输入与环境，完成后保存实际证据；本卡为初始方法知识，尚无实践成功记录。",
+        "sources": [
+          {
+            "reference": "browser",
+            "use": "methodology learning; independently composed summary",
+            "source_sha256": "026eeed30a11fe49f3dc2ec7c2758b131e961e9a7d0c12a11d02bf65af069e13",
+            "scope": "methodology summary; local source is not redistributed"
+          },
+          {
+            "reference": "https://github.com/anthropics/skills/blob/main/skills/webapp-testing/SKILL.md",
+            "use": "methodology learning; independently composed summary"
+          }
+        ]
+      }
+    ]
+  }
+}

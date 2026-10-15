@@ -63,9 +63,10 @@ class DreamRunner:
             db.execute("DELETE FROM dream_lock WHERE lock_id=1")
             stale = None
         # Read the gate only after acquiring SQLite's writer lock.
-        fragments = db.execute("SELECT COUNT(*) FROM memories WHERE status NOT IN ('invalidated','archived')").fetchone()[0]
+        fragments = db.execute("SELECT COUNT(*) FROM memories WHERE status NOT IN ('invalidated','archived') AND COALESCE(json_extract(environment, '$.origin'), '') != 'butian_initial_asset'").fetchone()[0]
         last = db.execute("SELECT MAX(started_at) FROM dream_runs WHERE status='completed'").fetchone()[0]
-        materials = list(db.execute("SELECT memory_id,content,status,updated_at FROM memories WHERE status IN ('candidate','warm','hot') ORDER BY updated_at DESC"))
+        # Imported methods are recallable knowledge, not fresh practical observations.
+        materials = list(db.execute("SELECT memory_id,content,status,updated_at FROM memories WHERE status IN ('candidate','warm','hot') AND COALESCE(json_extract(environment, '$.origin'), '') != 'butian_initial_asset' ORDER BY updated_at DESC"))
         fingerprints = {row['memory_id']: hashlib.sha256(row['content'].encode('utf-8')).hexdigest() for row in materials}
         processed = {row['memory_id']: row['content_hash'] for row in db.execute('SELECT memory_id,content_hash FROM dream_materials')}
         new_ids = {mid for mid, digest in fingerprints.items() if processed.get(mid) != digest}

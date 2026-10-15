@@ -337,9 +337,9 @@ def test_tool_integrity_and_personas(tmp_path):
         created = service.bootstrap_personas()
         assert created == []
         created = [row[0] for row in service.store.db.execute("SELECT member_id FROM members").fetchall()]
-        assert len(created) == 6
+        assert len(created) == 10
         rows = service.store.db.execute("SELECT name, responsibilities, persona FROM members ORDER BY member_id").fetchall()
-        assert {row["name"] for row in rows} == {"许伟", "沈衡", "陆徵", "宋析", "苏衍", "何溪"}
+        assert {row["name"] for row in rows} == {"许伟", "沈衡", "陆徵", "宋析", "苏衍", "何溪", "陈墨", "林知", "文澜", "叶青"}
         assert all(json.loads(row["persona"])["traits"] and json.loads(row["persona"])["domains"] for row in rows)
         assert all("特质:" not in json.loads(row["responsibilities"])[0] for row in rows)
         assert all((tmp_path / "members" / mid / "memory.db").is_file() for mid in created)
@@ -359,7 +359,7 @@ def test_service_bootstraps_structured_builtin_personas_without_overwriting(tmp_
     service = ButianService(tmp_path)
     try:
         rows = service.store.db.execute("SELECT member_id, persona, responsibilities FROM members ORDER BY member_id").fetchall()
-        assert [row[0] for row in rows] == ["he_xi", "lu_zheng", "shen_heng", "song_xi", "su_yan", "xu_wei"]
+        assert [row[0] for row in rows] == ["chen_mo", "he_xi", "lin_zhi", "lu_zheng", "shen_heng", "song_xi", "su_yan", "wen_lan", "xu_wei", "ye_qing"]
         identities = [json.loads(row[1]) for row in rows]
         assert all(identity["origin"] == "butian_builtin" for identity in identities)
         assert all(identity["traits"] and identity["domains"] for identity in identities)

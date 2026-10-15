@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "butian-plan"
-version = "0.1.4"
+version = "0.1.5"
 description = "Platform-independent AI team orchestration and memory runtime"
 requires-python = ">=3.11"
 dependencies = []
@@ -15,3 +15,10 @@ butian = "butian.cli:main"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+"butian.assets" = ["*.json", "*.sqlite3", "tools/*.py"]
+"butian.web" = ["*.html", "*.js", "*.css"]
+
+[tool.setuptools.packages.find]
+include = ["butian*"]
