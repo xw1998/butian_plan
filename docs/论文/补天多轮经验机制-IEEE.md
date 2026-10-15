@@ -39,7 +39,7 @@ RQ1：人的“行动—结果—反思—验证—复用”过程能否表示�
 设人在时刻$t$面对任务目标$G_t$、环境$E_t$和已有认识$M_t$。人先提出行动方案$A_t$，再通过工具或身体行动改变环境，获得观察$O_t$。预期结果$\hat{O}_t$与实际结果$O_t$之间的差异产生反馈$F_t=O_t-\hat{O}_t$。这个差异不是简单的“对/错”标签：如果行动没有真正执行，结果不可解释；如果环境版本未知，成功不能迁移；如果观测没有来源，结果不能复核；如果结果只发生一次，统计稳定性仍然不足。计算模型因此保留行动、环境快照、观察来源和结果证据，而不是只保存一句总结。
 
 $$
-G_t,E_t,M_t\xrightarrow{A_t}O_t\xrightarrow{\mathrm{compare}}F_t \tag{1}
+(G_t,E_t,M_t,A_t)\rightarrow O_t\rightarrow F_t \tag{1}
 $$
 
 ### B. 从反馈到候选认识
@@ -73,11 +73,11 @@ $$
 candidate表示由一次或少量实践产生、尚未达到稳定使用条件的候选经验；warm表示达到既定成功和证据门槛、可以在匹配条件下参与召回的经验；hot表示近期持续有效且被频繁使用的经验，但热度不是正确性的额外证明；disputed表示出现反例、冲突或环境不匹配，默认不能无条件使用；invalidated表示已知不再成立；unknown表示一次观察或任务的结果尚不能确定；它不是与candidate等并列的经验热度状态。实际记忆还包含cold、archived和pending_validation等维护状态，本文选取与证据形成直接相关的状态解释。状态名描述程序记录，不描述模型的心理状态。
 
 $$
-\mathrm{candidate}\xrightarrow{s\ge2,\ f=0}\mathrm{warm} \tag{3}
+s\ge2,\ f=0:\quad\mathrm{candidate}\rightarrow\mathrm{warm} \tag{3}
 $$
 
 $$
-\mathrm{warm}\xrightarrow{\mathrm{failure}}\mathrm{disputed} \tag{4}
+\mathrm{failure}:\quad\mathrm{warm}\rightarrow\mathrm{disputed} \tag{4}
 $$
 
 ### B. 经验进入系统的条件
