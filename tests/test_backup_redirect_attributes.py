@@ -38,3 +38,26 @@ def test_scan_rejects_reparse_directory_before_descent(tmp_path, monkeypatch):
 
 def test_missing_path_is_not_redirect(tmp_path):
     assert not _is_redirect(tmp_path / 'missing')
+
+
+@pytest.mark.parametrize('operation', ['create', 'verify', 'restore'])
+def test_root_redirect_rejected_before_resolution(tmp_path, monkeypatch, operation):
+    from butian.runtime.backup import create_backup, verify_backup, restore_backup
+    root = tmp_path / 'redirect-root'
+    original = Path.lstat
+
+    def metadata(path):
+        if path == root:
+            return SimpleNamespace(st_mode=stat.S_IFDIR, st_file_attributes=0x400)
+        return original(path)
+
+    monkeypatch.setattr(Path, 'lstat', metadata)
+    with pytest.raises(ValueError, match='backup_symlink_not_allowed'):
+        if operation == 'create':
+            create_backup(root, tmp_path / 'output')
+        elif operation == 'verify':
+            verify_backup(root)
+        else:
+            restore_backup(root, tmp_path / 'restored')
+    assert not (tmp_path / 'output').exists()
+    assert not (tmp_path / 'restored').exists()

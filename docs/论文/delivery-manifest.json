@@ -120,18 +120,18 @@
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.md",
-      "bytes": 49945,
-      "sha256": "856083ec8eda3d021bf2d82759d5a48903d3b84bafe2af593a32e949310b0cbd"
+      "bytes": 50812,
+      "sha256": "ef35cb63aebc83cf65b7300df2210a70225abd7a1cd13b4dbdc4e177bd907d34"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.js",
-      "bytes": 31399,
-      "sha256": "e4c6d9d1f12026c3d82c5692c9c28c937983157afddbd77ea850e05a41dcb58d"
+      "bytes": 34684,
+      "sha256": "d36dfa883ed3bcc625b845bbd421d0c7bcd0c0dd1381979e97559dbdd60d6638"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.docx",
-      "bytes": 618683,
-      "sha256": "82b9b4e252edb4a43a8d49802e6fb8276d888639a393800b8fc45f2788590f2e"
+      "bytes": 620316,
+      "sha256": "f314176b25818803e41661fc37b0d47d9948113739ad4813a9a2d43d471b033b"
     },
     {
       "path": "docs/论文/references/ieee-study-references.json",
@@ -140,8 +140,8 @@
     },
     {
       "path": "docs/论文/核心实现语义说明.md",
-      "bytes": 22614,
-      "sha256": "045c05693ead8a6cae78cbeccbd215589caec5c2810df4b00d521f3857c3aa99"
+      "bytes": 26944,
+      "sha256": "227ae9216fa996828577999d93aec6991c380f137311dfe0fb894957820e7920"
     },
     {
       "path": "docs/论文/逐模块算法与逻辑附录.md",
@@ -216,5 +216,5 @@
     "Exploratory pilot preceded main protocol",
     "Not a model parameter evolution experiment"
   ],
-  "verification_note": "Full suite: 1014 passed, 1 skipped, 2 failed; junction creation denied by environment; intermittent tool verification failure unresolved. Focused explicit-backend rerun: 70 passed; complete tools: 114 passed; backup controls: 20 passed, 1 skipped; migration: 4 passed. Reparse attribute guard added; real junction creation remains blocked. No confirmatory host-LLM benefit experiment completed."
+  "verification_note": "Full suite: 1014 passed, 1 skipped, 2 failed; junction creation denied by environment; intermittent tool verification failure unresolved. Focused explicit-backend rerun: 70 passed; complete tools rerun: 114 passed in 86.89s; expanded backup/provider/config/migration-disabled controls: 64 passed, 1 skipped. Migration tests confirm disabled product entrypoints, not successful imports. Reparse attribute guard added; real junction creation remains blocked. No confirmatory host-LLM benefit experiment completed."
 }

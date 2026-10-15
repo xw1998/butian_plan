@@ -320,3 +320,7 @@ Word脚本已加入附录A，具体覆盖服务启动/关闭、任务迁移事�
 备份遍历原先只检查is_symlink，未覆盖Windows junction。本批增加lstat的FILE_ATTRIBUTE_REPARSE_POINT检查，并在源根与备份根resolve之前检查。新增属性级控制并复跑原有备份测试，20 passed、1 skipped；真实junction创建被环境拒绝的历史限制保留。档案迁移类注释已纠正：公开入口禁止历史记忆导入，保留私有代码不代表公开支持；迁移专项4 passed。前轮完整工具测试114 passed。上述均不把既有全库1014 passed、1 skipped、2 failed改写成通过。
 
 《核心实现语义说明.md》补充备份路径、SQLite逐库快照、清单与恢复路径重绑定、复杂度及风险边界，亦记录迁移的预检/执行查询差异和缺少逐成员保存点。Word新增附录B并重建为604.2KB。Word当前仍未逐字纳入全部人工说明，宿主AI确认性多轮收益也尚未完成；本补记不作完成声明。
+
+补充可达性更正：上述迁移模块为保留实现，当前服务preflight_members/import_members均直接抛historical_identity_migration_out_of_scope，HTTP、CLI、MCP亦禁用，list_migration_runs返回空列表；四项迁移测试验证禁用行为，不能视为导入算法通过。Store以isolation_level=None自动提交，保留模块没有显式BEGIN或逐成员SAVEPOINT，不能宣称导入原子。人工说明与Word均已同步这一边界。
+
+进一步扩展回归：备份、provider配置/runtime与禁用迁移合计64 passed、1 skipped（13.94秒）。工具测试辅助函数新增前置执行必须成功的诊断断言，失败时保留执行ID、状态与终止原因，未改生产成功绑定或退出保护。完整tests/test_tools.py再次114 passed（86.89秒），此次未复现历史间歇失败；其根因仍未确认。

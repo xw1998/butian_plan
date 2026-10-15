@@ -43,6 +43,12 @@ def registered_tool_proofs(service, actor, labels):
 
 def verify_execution(service, owner, tool_id, version, key, input_data=None):
     execution = execute_in_task(service, owner, tool_id, version, input_data or {}, verification_only=True)
+    assert execution['status'] == 'success', {
+        'stage': 'verification_prerequisite',
+        'execution_id': execution['execution_id'],
+        'status': execution['status'],
+        'termination_reason': execution.get('termination_reason'),
+    }
     return service.verify_tool(owner, tool_id, version, "success", independent_key=key,
                                task_id=execution_task_id(service, execution["execution_id"]), environment={"kind": "unit"},
                                evidence_ids=registered_tool_proofs(service, owner, [f"evidence-{key}"]), execution_id=execution["execution_id"],
