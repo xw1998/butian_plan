@@ -44,7 +44,7 @@ Lead agent
 Research paper: **Computational Modeling of Human Experience Formation through Practice**.
 
 - English: [Markdown](docs/论文/补天多轮经验机制-English.md) · [Word](docs/论文/补天多轮经验机制-English.docx) · [PDF](docs/论文/补天多轮经验机制-English.pdf)
-- 中文：[Markdown](docs/论文/补天多轮经验机制.md) · [Word](docs/论文/补天多轮经验机制.docx)
+- 中文：[Markdown](docs/论文/补天多轮经验机制.md) · [Word](docs/论文/补天多轮经验机制.docx) · [PDF](docs/论文/补天多轮经验机制.pdf)
 
 The paper describes experience formation, revision, verification, reuse, experimental costs, and limitations.
 
@@ -150,17 +150,34 @@ The ten profiles include method cards, tool guides, and professional tools. Impo
 
 The paper and scripts report mechanisms, costs, and limitations. Deterministic-host controls, mathematical simulations, production-interface replay, nonblind agent pilots, and confirmatory model experiments must remain distinct. Research modules are not a product prerequisite. Module availability, focused test success, and acceptance across all product scenarios are separate claims.
 
-### Further reading and implementation
+### 17. From one task to reusable experience
 
-| Topic | Documentation and source |
-| --- | --- |
-| Requirements and evidence | [Requirements](docs/需求计划.md), [evidence map](docs/全需求证据映射-20261014.md) |
-| Integration and strategies | [AI integration](docs/通用AI应用接入.md), [strategies](docs/数字人解题策略.md), `butian/adapters/` |
-| Tasks and context | `butian/core/state_machine.py`, `butian/runtime/context.py`, `butian/runtime/external_execution.py`, `butian/runtime/problem.py` |
-| Memory and hypotheses | `butian/runtime/memory.py`, `butian/runtime/dream.py`, `butian/runtime/hypothesis.py`, `butian/runtime/exploration_budget.py` |
-| External learning | [Learning interfaces](docs/外部学习与假设验证接口.md), `butian/runtime/learning.py`, `butian/runtime/extraction.py` |
-| Tools and workflows | [Workflow evidence](docs/工具迁移与工作流验收-20261014.md), `butian/runtime/tools.py`, `butian/runtime/tool_portability.py`, `butian/runtime/tool_workflows.py` |
-| Backup and security | `butian/runtime/backup.py`, `butian/runtime/security.py`, `tests/` |
+The loop begins with a concrete problem, not a saved summary. The host records the goal, environment, constraints, and acceptance conditions, then retrieves potentially applicable methods. Retrieval supplies candidates only: entity, software version, prerequisites, conflicts, and invalidation conditions still require checking. Conflicts require renewed evidence; unavailable sources remain unknown. After real execution, the host preserves the first outcome, tool output, and auditable evidence, then reports success, failure, or unknown without rewriting the first answer after correction.
+
+Production `record_practice_outcome` requires a nonempty independent observation key, and success requires an evidence reference. The service checks ownership and content fingerprints. Keys, references, and evidence digests constrain duplicate counting; renaming a file or observation does not create independent practice. This interface promotes candidate or pending_validation to warm only after at least two deduplicated successes and no failures. Failure of mature experience produces disputed; unknown contributes neither success nor failure. These are program gates, not proof of statistical independence or universal validity, and direct low-level writes do not establish that the gate was followed.
+
+Revisions preserve parents, reasons, environments, sources, and evidence. Old rules cannot establish validation in a new version, and counterexamples cannot be erased to restore confidence. Bounded production-confidence adjustments, weight updates, and the optional Beta module are distinct mechanisms. Warm means that an interface threshold was met, not that a claim was proved. Feedback must actually be submitted by the host; conversation text alone does not tell the service whether an action succeeded.
+
+### 18. Host responsibilities and failure handling
+
+In host-driven operation, the existing AI application supplies the model, session, and tools; Butian supplies identity, task state, candidate context, execution packages, evidence, and feedback interfaces. An execution reads the current task and problem revision, obtains or restores valid execution eligibility, composes context, performs real actions, and submits results for handoff and review. User corrections require resuming against the revised goal. An old execution package, tool validation, or session does not automatically authorize work on the new revision.
+
+Active Provider operation first checks negotiated capabilities and authorization, then starts an independent executor. Consumption and cancellation remain bound to the same task, revision, and session. Successful transport proves delivery, not business acceptance. Timeouts, lost backends, and unconfirmed termination preserve the actual unknown/provider_lost state rather than fabricating cancelled or done. Recovery checks committed records and unresolved actions; side-effecting operations must not be replayed unconditionally.
+
+Single-agent tasks and team subtasks share these evidence boundaries. The lead checks revision, outcome, sources, unfinished work, and next steps before choosing approval, rework, blocking, or user input. Self-reported success is not a final conclusion. Browser interaction, Office layout, and device operation still require corresponding host capabilities; assigning a persona does not create them.
+
+### 19. Connecting sources, hypotheses, and tool admission
+
+External material enters as a located, hashed source snapshot. Extracted claims retain quotations, conditions, limitations, and falsification criteria. Dream consolidation organizes existing material into summaries, abstractions, and hypotheses, with content reasoning supplied by the host. Proposal, scheduling, budgeting, authorization, action start, and observation recording are separate steps; none substitutes for the next. Supported concerns the current verification scope and creates a candidate, while later real practice must still accumulate through the experience interface.
+
+Importing tool source does not authorize execution. Ownership, version, input/output contracts, source hashes, validation eligibility, economic admission, circuit-breaker state, task, budget, and host authorization jointly govern admission. Workflows additionally pin dependency versions and require real combined validation. Packages transfer permitted public assets and contracts, not private memory, runtime databases, credentials, or host authorization. Changed material, expired evidence, revoked access, or invalid dependencies require rechecking; one past pass is not permanent eligibility.
+
+### 20. Deployment, data boundaries, and research conclusions
+
+Initialization creates local runtime state, profiles, and public initial assets. CLI, stdio MCP, and local Web/API expose the same runtime. Use MCP for host calls and configure a Provider only when actively dispatching an independent agent. Runtime databases, original evidence, execution directories, and authorization remain locally managed by the deployer. Restore verified backups into a new destination. This does not itself provide an OS sandbox or complete public-network isolation; actual isolation depends on deployment and backend capabilities.
+
+This README is the self-contained public explanation. Internal requirements history, development acceptance records, and local logs are not public manuals, and documentation allowlists must not be widened merely to repair links. The paper separately reports deterministic rule reuse, interface controls, numerical controls, and dream replay. Fewer source reads do not imply fewer total operations or lower end-to-end latency. Synthetic tasks without model calls do not establish improved model ability, and normal close/reopen does not establish arbitrary power-loss recovery. Runtime experience changes context and method selection, not model parameters automatically.
+
 
 ## Core capabilities
 
