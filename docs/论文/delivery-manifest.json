@@ -120,18 +120,18 @@
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.md",
-      "bytes": 33700,
-      "sha256": "36d1bb40f59b1621ad0b81a694d40f3d06b44a92ca1e0c53ee6dd47d79ec38bc"
+      "bytes": 43511,
+      "sha256": "e331a52f2e0300ee8b4d8d0cfca6efae4d83f2b2589c87f4fd09d05b1c70b092"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.js",
-      "bytes": 14371,
-      "sha256": "7281d7232db361b233c227aa34245fb57c27e11be174f2ec51f49213d59abd05"
+      "bytes": 20560,
+      "sha256": "f7a0b696fb0b9af8836e0d2d6f4abc9c59776d2890d22f7ebcd2a09a96868400"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.docx",
-      "bytes": 610207,
-      "sha256": "30a09748b128f36320aadd8cad0251e18c2e29908cad55727681f1abea38f458"
+      "bytes": 613491,
+      "sha256": "c681606f5845f59e895032737c1ccab2eb0db37ae9edf27f2ca808293089dc8f"
     },
     {
       "path": "docs/论文/references/ieee-study-references.json",
