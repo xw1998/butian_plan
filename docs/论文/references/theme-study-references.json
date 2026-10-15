@@ -1,0 +1,178 @@
+[
+  {
+    "key": "Wu2024",
+    "text": "Di Wu, Hongwei Wang, Wenhao Yu, et al. LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory[EB/OL]. arXiv, 2024. http://arxiv.org/pdf/2410.10813v2.",
+    "authors": "Di Wu, Hongwei Wang, Wenhao Yu, Yuwei Zhang, Kai-Wei Chang, Dong Yu",
+    "title": "LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory",
+    "year": "2024",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2410.10813v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Shinn2023",
+    "text": "Noah Shinn, Federico Cassano, Edward Berman, et al. Reflexion: Language Agents with Verbal Reinforcement Learning[EB/OL]. arXiv, 2023. http://arxiv.org/pdf/2303.11366v4.",
+    "authors": "Noah Shinn, Federico Cassano, Edward Berman, Ashwin Gopinath, Karthik Narasimhan, Shunyu Yao",
+    "title": "Reflexion: Language Agents with Verbal Reinforcement Learning",
+    "year": "2023",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2303.11366v4",
+    "source": "arxiv"
+  },
+  {
+    "key": "Zhong2023",
+    "text": "Wanjun Zhong, Lianghong Guo, Qiqi Gao, et al. MemoryBank: Enhancing Large Language Models with Long-Term Memory[EB/OL]. arXiv, 2023. http://arxiv.org/pdf/2305.10250v3.",
+    "authors": "Wanjun Zhong, Lianghong Guo, Qiqi Gao, He Ye, Yanlin Wang",
+    "title": "MemoryBank: Enhancing Large Language Models with Long-Term Memory",
+    "year": "2023",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2305.10250v3",
+    "source": "arxiv"
+  },
+  {
+    "key": "Wang2023",
+    "text": "Guanzhi Wang, Yuqi Xie, Yunfan Jiang, et al. Voyager: An Open-Ended Embodied Agent with Large Language Models[EB/OL]. arXiv, 2023. http://arxiv.org/pdf/2305.16291v2.",
+    "authors": "Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Mandlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, Anima Anandkumar",
+    "title": "Voyager: An Open-Ended Embodied Agent with Large Language Models",
+    "year": "2023",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2305.16291v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Lin2021",
+    "text": "Stephanie Lin, Jacob Hilton, Owain Evans. TruthfulQA: Measuring How Models Mimic Human Falsehoods[EB/OL]. arXiv, 2021. http://arxiv.org/pdf/2109.07958v2.",
+    "authors": "Stephanie Lin, Jacob Hilton, Owain Evans",
+    "title": "TruthfulQA: Measuring How Models Mimic Human Falsehoods",
+    "year": "2021",
+    "journal": "arXiv",
+    "doi": "",
+    "url": "http://arxiv.org/pdf/2109.07958v2",
+    "source": "arxiv"
+  },
+  {
+    "key": "Rafailov2024",
+    "text": "Rafael Rafailov*, Archit Sharma*, Eric Mitchell†, et al. Direct Preference Optimization: Your Language Model is Secretly a Reward Model[J], 2024.",
+    "authors": "Rafael Rafailov*, Archit Sharma*, Eric Mitchell†, Stefano Ermon††, Christopher D. Manning†, Chelsea Finn†",
+    "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward  Model",
+    "year": "2024",
+    "journal": "",
+    "doi": "",
+    "url": "https://arxiv.org/abs/2305.18290",
+    "source": "metaso"
+  },
+  {
+    "key": "Ouyang2022",
+    "text": "Long Ouyang, Jeff Wu, Xu Jiang, et al. Training language models to follow instructions with human feedback[J], 2022.",
+    "authors": "Long Ouyang, Jeff Wu, Xu Jiang, Diogo Almeida, Carroll L. Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex Ray, John Schulman, Jacob Hilton, Fraser Kelton, Luke Miller, Maddie Simens, Amanda Askell, Peter Welinder, Paul Christiano, Jan Leike, Ryan Lowe",
+    "title": "Training language models to follow instructions with human feedback",
+    "year": "2022",
+    "journal": "",
+    "doi": "",
+    "url": "https://arxiv.org/abs/2203.02155",
+    "source": "metaso"
+  },
+  {
+    "key": "Chung2022",
+    "text": "Hyung Won Chung, Le Hou, Shayne Longpre, et al. Scaling Instruction-Finetuned Language Models[J], 2022.",
+    "authors": "Hyung Won Chung, Le Hou, Shayne Longpre, Barret Zoph, Yi Tai, William Fedus, Yunxuan Li, Xuezhi Wang, Mostafa Dehghani, Siddhartha Brahma, Albert Webson, Shixiang Shane Gu, Zhuyun Dai, Mirac Suzgun, Xinyun Chen, Aakanksha Chowdhery, Alex Castro-Ros, Marie Pellerin, Kevin Robinson, Dasha Valter, Sharan Narang, Gaurav Mishra, Adams Yu, Vincent Zhao, Yanping Huang, Andrew Dai, Hongkun Yu, Slav Petrov, Ed H. Chi, Jeff Dean, Jacob Devlin, Adam Roberts, Denny Zhou, Quoc V. Le, Jason Wei",
+    "title": "Scaling Instruction-Finetuned Language Models",
+    "year": "2022",
+    "journal": "",
+    "doi": "",
+    "url": "https://doi.org/10.48550/arXiv.2210.11416",
+    "source": "metaso"
+  },
+  {
+    "key": "Ji2022",
+    "text": "Ziwei Ji, Nayeon Lee, Rita Frieske, et al. Survey of Hallucination in Natural Language Generation[J], 2022.",
+    "authors": "Ziwei Ji, Nayeon Lee, Rita Frieske, Tiezheng Yu, D. Su, Yan Xu, Etsuko Ishii, Yejin Bang, Delong Chen, Wenliang Dai, Andrea Madotto, Pascale Fung",
+    "title": "Survey of Hallucination in Natural Language Generation",
+    "year": "2022",
+    "journal": "",
+    "doi": "",
+    "url": "https://doi.org/10.1145/3571730",
+    "source": "metaso"
+  },
+  {
+    "key": "Scialom2022",
+    "text": "Thomas Scialom, Tuhin Chakrabarty, S. Muresan. Continual-T0: Progressively Instructing 50+ Tasks to Language Models Without Forgetting[J], 2022.",
+    "authors": "Thomas Scialom, Tuhin Chakrabarty, S. Muresan",
+    "title": "Continual-T0: Progressively Instructing 50+ Tasks to Language Models Without Forgetting",
+    "year": "2022",
+    "journal": "",
+    "doi": "",
+    "url": "https://doi.org/10.48550/arXiv.2205.12393",
+    "source": "metaso"
+  },
+  {
+    "key": "Mao1991Practice",
+    "text": "毛泽东, ‘实践论,’ 毛泽东选集, 第1卷. 北京: 人民出版社, 1991, pp. 282–297. 原作1937年7月; 高校电子转载核验.",
+    "authors": "毛泽东",
+    "title": "实践论",
+    "year": "1991",
+    "journal": "毛泽东选集，第1卷，人民出版社",
+    "doi": "",
+    "url": "https://www.xaipe.edu.cn/szb/info/1086/1290.htm",
+    "source": "primary work; institutional electronic reprint"
+  },
+  {
+    "key": "Lewis2020",
+    "text": "Patrick Lewis, Ethan Perez, Aleksandara Piktus, et al. Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks[J], 2020.",
+    "authors": "Patrick Lewis, Ethan Perez, Aleksandara Piktus, F. Petroni, Vladimir Karpukhin, Naman Goyal, Heinrich Kuttler, M. Lewis, Wen-tau Yih, Tim Rocktäschel, Sebastian Riedel, Douwe Kiela",
+    "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+    "year": "2020",
+    "journal": "",
+    "doi": "",
+    "url": "https://arxiv.org/abs/2005.11401",
+    "source": "metaso"
+  },
+  {
+    "key": "Howard2020",
+    "text": "M. T. Howard, \"Experiential learning – a systematic review and revision of Kolb’s model,\" Interactive Learning Environments, 2020, doi: 10.1080/10494820.2019.1570279.",
+    "authors": "Morris Thomas Howard",
+    "title": "Experiential learning – a systematic review and revision of Kolb’s model",
+    "year": "2020",
+    "journal": "Interactive Learning Environments",
+    "doi": "10.1080/10494820.2019.1570279",
+    "url": "",
+    "source": "crossref"
+  },
+  {
+    "key": "W2002",
+    "text": "H. M. W., K. M. J, \"A Distributed Representation of Temporal Context,\" Journal of Mathematical Psychology, 2002, doi: 10.1006/jmps.2001.1388.",
+    "authors": "Howard Marc W., Kahana Michael J.",
+    "title": "A Distributed Representation of Temporal Context",
+    "year": "2002",
+    "journal": "Journal of Mathematical Psychology",
+    "doi": "10.1006/jmps.2001.1388",
+    "url": "",
+    "source": "crossref"
+  },
+  {
+    "key": "J2018",
+    "text": "R. D. J., V. R. Benjamin, K. Abbas, O. Ian, W. Zheng, \"A Tutorial on Thompson Sampling,\" 2018, doi: 10.1561/9781680834710.",
+    "authors": "Russo Daniel J., Van Roy Benjamin, Kazerouni Abbas, Osband Ian, Wen Zheng",
+    "title": "A Tutorial on Thompson Sampling",
+    "year": "2018",
+    "journal": "",
+    "doi": "10.1561/9781680834710",
+    "url": "",
+    "source": "crossref"
+  },
+  {
+    "key": "W2005",
+    "text": "H. M. W., N. V. S, \"Place from time: Reconstructing position from a distributed representation of temporal context,\" Neural Networks, 2005, doi: 10.1016/j.neunet.2005.08.002.",
+    "authors": "Howard Marc W., Natu Vaidehi S.",
+    "title": "Place from time: Reconstructing position from a distributed representation of temporal context",
+    "year": "2005",
+    "journal": "Neural Networks",
+    "doi": "10.1016/j.neunet.2005.08.002",
+    "url": "",
+    "source": "crossref"
+  }
+]

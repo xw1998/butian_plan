@@ -120,18 +120,18 @@
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.md",
-      "bytes": 55783,
-      "sha256": "f0c8013d814fa19eebd92fc5128cc9d0d815df9c32ad6e9921224fa6e79b603e"
+      "bytes": 29540,
+      "sha256": "b10258093d500a70e540c454d0a19c94cbdb5379d31083ad6eedafbe156deb28"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.js",
-      "bytes": 45137,
-      "sha256": "34ac017793997aadc4f7d33363baeeca6cb3d6dc319f454cca26f1e6b6c97e47"
+      "bytes": 30632,
+      "sha256": "fb0b7b523e1f7363f2515c9c5e6797a61063eca52f89e79c8260248db0d058ac"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.docx",
-      "bytes": 714077,
-      "sha256": "821108621f6d6d8ff7aed84bf2eb0b5226818f651c83c14d8be6a89e6d6bc044"
+      "bytes": 476232,
+      "sha256": "75a0b87ecba280ea319af932cfdebb4989c1dd20e7ee46ced8d951b6afd98f40"
     },
     {
       "path": "docs/论文/references/ieee-study-references.json",
@@ -210,8 +210,8 @@
     },
     {
       "path": "docs/论文/README.md",
-      "bytes": 5396,
-      "sha256": "122e1eb035b8e710d5c182409041db43a749ad8e4e15406fbe840129dea79189"
+      "bytes": 6473,
+      "sha256": "3545c939e08bf074464a24728cd94e159e8303431c3511f2593264063bf54f36"
     },
     {
       "path": "docs/论文/experiment_results/functional-regression-20261015.json",
@@ -252,6 +252,16 @@
       "path": "docs/论文/experiment_results/bayesian-bandit-20261015/manifest.json",
       "bytes": 473,
       "sha256": "ff330b3763ee706e25d0bc5076c6b549573cd94ea2c444c9c12e62ed484e303f"
+    },
+    {
+      "path": "docs/论文/references/practice-learning-references.json",
+      "bytes": 1955,
+      "sha256": "9fbcab11ea4c3d561f0926aef7abb67c192ea8092c1d5f06f469247e14489cbd"
+    },
+    {
+      "path": "docs/论文/references/theme-study-references.json",
+      "bytes": 8621,
+      "sha256": "3de5e61d6923932965dc33758c5f37be5568dac3558e9dc3b45230c3111486da"
     }
   ],
   "limitations": [
