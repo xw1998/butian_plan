@@ -134,6 +134,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(200, {"authorizations": self.service.list_host_authorizations(member_id, status=(q.get("status") or [None])[0])}); return
         if self.path == "/api/tools/executions/running":
             self._send(200, {"executions": self.service.list_running_tool_executions(self._visible_member_id())}); return
+        if self.path == "/api/dashboard":
+            from .dashboard import snapshot
+            self._send(200, snapshot(self.service, self._visible_member_id())); return
         if self.path == "/api/tasks":
             self._send(200, {"tasks": self._visible_tasks(self._visible_member_id())}); return
         if urlparse(self.path).path == "/api/tools":
