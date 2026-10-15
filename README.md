@@ -164,7 +164,7 @@ https://gitee.com/xw19981010/butian_plan.git
 本项目采用 [MIT License](LICENSE) 开源协议。
 
 
-内部研究论文与复现实验见 [论文及实验索引](docs/论文/README.md)。当前完成数学论证与机制控制，同一宿主Agent B0/B1/B2 对照尚未执行。
+内部研究论文与复现实验见 [论文及实验索引](docs/论文/README.md)。新增 [IEEE 风格多轮研究稿（DOCX）](docs/论文/补天多轮经验机制-IEEE.docx)：10种子×12轮×7条件，共10080次生产记忆机制执行，8幅科研图。完整策略相对精确索引减少81.60%源读取，首次完成率增加4.51个百分点，同时逻辑操作增加41.53%、本地无时延优势。实验使用同一确定性宿主求解器，模型推理调用为0；真实宿主Agent自由文本多轮收益仍未完成。
 
 
 2026-10-15：当前宿主 Agent 已完成五类任务各 B0/B1/B2 共15条非盲测条件回答，原始记录见 `docs/论文/experiment_results/within-agent-pilot-20261015/agent-responses.json`。结果仅作同Agent机制试跑；上下文携带、先前答案暴露、model_calls和cost已如实记录，不能当作独立样本或第三方审计。

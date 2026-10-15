@@ -1,0 +1,404 @@
+{
+  "execution_kind": "production_mechanism_benchmark",
+  "llm_inference_calls": 0,
+  "seeds": [
+    1103,
+    2207,
+    3301,
+    4409,
+    5519,
+    6619,
+    7723,
+    8837,
+    9941,
+    10151
+  ],
+  "rounds": 12,
+  "families": [
+    "calibration",
+    "schema",
+    "tool"
+  ],
+  "methods": [
+    "B0-scan",
+    "B0-index",
+    "B1-static",
+    "B2-full",
+    "A-no-version",
+    "A-no-write",
+    "A-no-persist"
+  ],
+  "summary": {
+    "A-no-persist": {
+      "tasks": 1440,
+      "correct": 1440,
+      "wrong": 0,
+      "unknown": 0,
+      "coverage": 1.0,
+      "accuracy": 1.0,
+      "conditional_accuracy": 1.0,
+      "source_reads": 373,
+      "queries": 1440,
+      "writes": 373,
+      "source_chars": 41538,
+      "context_chars": 454324,
+      "memory_hits": 1067,
+      "mean_ms": 8.830500625001353,
+      "operations": 2186
+    },
+    "A-no-version": {
+      "tasks": 1440,
+      "correct": 1307,
+      "wrong": 133,
+      "unknown": 0,
+      "coverage": 1.0,
+      "accuracy": 0.9076388888888889,
+      "conditional_accuracy": 0.9076388888888889,
+      "source_reads": 253,
+      "queries": 1440,
+      "writes": 253,
+      "source_chars": 28214,
+      "context_chars": 472688,
+      "memory_hits": 1320,
+      "mean_ms": 8.40549986110975,
+      "operations": 1946
+    },
+    "A-no-write": {
+      "tasks": 1440,
+      "correct": 1375,
+      "wrong": 0,
+      "unknown": 65,
+      "coverage": 0.9548611111111112,
+      "accuracy": 0.9548611111111112,
+      "conditional_accuracy": 1.0,
+      "source_reads": 1375,
+      "queries": 1440,
+      "writes": 0,
+      "source_chars": 152663,
+      "context_chars": 270720,
+      "memory_hits": 0,
+      "mean_ms": 3.074012152765388,
+      "operations": 2815
+    },
+    "B0-index": {
+      "tasks": 1440,
+      "correct": 1375,
+      "wrong": 0,
+      "unknown": 65,
+      "coverage": 0.9548611111111112,
+      "accuracy": 0.9548611111111112,
+      "conditional_accuracy": 1.0,
+      "source_reads": 1375,
+      "queries": 0,
+      "writes": 0,
+      "source_chars": 152663,
+      "context_chars": 0,
+      "memory_hits": 0,
+      "mean_ms": 0.010196111098695029,
+      "operations": 1375
+    },
+    "B0-scan": {
+      "tasks": 1440,
+      "correct": 1375,
+      "wrong": 0,
+      "unknown": 65,
+      "coverage": 0.9548611111111112,
+      "accuracy": 0.9548611111111112,
+      "conditional_accuracy": 1.0,
+      "source_reads": 42287,
+      "queries": 0,
+      "writes": 0,
+      "source_chars": 4426732,
+      "context_chars": 0,
+      "memory_hits": 0,
+      "mean_ms": 0.14294826389750093,
+      "operations": 42287
+    },
+    "B1-static": {
+      "tasks": 1440,
+      "correct": 1400,
+      "wrong": 0,
+      "unknown": 40,
+      "coverage": 0.9722222222222222,
+      "accuracy": 0.9722222222222222,
+      "conditional_accuracy": 1.0,
+      "source_reads": 752,
+      "queries": 1440,
+      "writes": 120,
+      "source_chars": 84348,
+      "context_chars": 472658,
+      "memory_hits": 648,
+      "mean_ms": 7.814137638877128,
+      "operations": 2312
+    },
+    "B2-full": {
+      "tasks": 1440,
+      "correct": 1440,
+      "wrong": 0,
+      "unknown": 0,
+      "coverage": 1.0,
+      "accuracy": 1.0,
+      "conditional_accuracy": 1.0,
+      "source_reads": 253,
+      "queries": 1440,
+      "writes": 253,
+      "source_chars": 28214,
+      "context_chars": 472688,
+      "memory_hits": 1187,
+      "mean_ms": 8.4401755555512,
+      "operations": 1946
+    }
+  },
+  "paired_seed_bootstrap": {
+    "B0-scan": {
+      "accuracy_delta": {
+        "mean": 0.04513888888888888,
+        "cluster_bootstrap_95_percentile": [
+          0.03611111111111113,
+          0.05416666666666666
+        ],
+        "seed_values": [
+          0.0625,
+          0.0625,
+          0.0625,
+          0.04166666666666663,
+          0.03472222222222221,
+          0.03472222222222221,
+          0.05555555555555558,
+          0.04166666666666663,
+          0.03472222222222221,
+          0.02083333333333337
+        ]
+      },
+      "operation_reduction": {
+        "mean": 0.9539487027077467,
+        "cluster_bootstrap_95_percentile": [
+          0.9534142616768776,
+          0.9545834393057667
+        ],
+        "seed_values": [
+          0.9532246633593197,
+          0.9532246633593197,
+          0.9535984848484849,
+          0.9535113748763601,
+          0.9534199558715372,
+          0.9540066382171646,
+          0.9539473684210527,
+          0.953023488255872,
+          0.9559144478393714,
+          0.9556159420289855
+        ]
+      }
+    },
+    "B0-index": {
+      "accuracy_delta": {
+        "mean": 0.04513888888888888,
+        "cluster_bootstrap_95_percentile": [
+          0.03680555555555555,
+          0.05347222222222222
+        ],
+        "seed_values": [
+          0.0625,
+          0.0625,
+          0.0625,
+          0.04166666666666663,
+          0.03472222222222221,
+          0.03472222222222221,
+          0.05555555555555558,
+          0.04166666666666663,
+          0.03472222222222221,
+          0.02083333333333337
+        ]
+      },
+      "operation_reduction": {
+        "mean": -0.4156897597048153,
+        "cluster_bootstrap_95_percentile": [
+          -0.4415330480713468,
+          -0.39008751686140886
+        ],
+        "seed_values": [
+          -0.46666666666666656,
+          -0.46666666666666656,
+          -0.45185185185185195,
+          -0.3623188405797102,
+          -0.3669064748201438,
+          -0.39568345323741005,
+          -0.4411764705882353,
+          -0.3623188405797102,
+          -0.4532374100719425,
+          -0.3900709219858156
+        ]
+      }
+    },
+    "B1-static": {
+      "accuracy_delta": {
+        "mean": 0.02777777777777779,
+        "cluster_bootstrap_95_percentile": [
+          0.02083333333333335,
+          0.03472222222222223
+        ],
+        "seed_values": [
+          0.02777777777777779,
+          0.03472222222222221,
+          0.03472222222222221,
+          0.02083333333333337,
+          0.02083333333333337,
+          0.02777777777777779,
+          0.04861111111111116,
+          0.00694444444444442,
+          0.03472222222222221,
+          0.02083333333333337
+        ]
+      },
+      "operation_reduction": {
+        "mean": 0.15798309544196928,
+        "cluster_bootstrap_95_percentile": [
+          0.14988680928921783,
+          0.16806692424836467
+        ],
+        "seed_values": [
+          0.14655172413793105,
+          0.1574468085106383,
+          0.1934156378600823,
+          0.1644444444444444,
+          0.14027149321266963,
+          0.14912280701754388,
+          0.14410480349344978,
+          0.15695067264573992,
+          0.16872427983539096,
+          0.15879828326180256
+        ]
+      }
+    },
+    "A-no-version": {
+      "accuracy_delta": {
+        "mean": 0.09236111111111109,
+        "cluster_bootstrap_95_percentile": [
+          0.0833333333333333,
+          0.10138888888888889
+        ],
+        "seed_values": [
+          0.10416666666666663,
+          0.10416666666666663,
+          0.09722222222222221,
+          0.06944444444444442,
+          0.07638888888888884,
+          0.09027777777777779,
+          0.09722222222222221,
+          0.06944444444444442,
+          0.11805555555555558,
+          0.09722222222222221
+        ]
+      },
+      "operation_reduction": {
+        "mean": 0.0,
+        "cluster_bootstrap_95_percentile": [
+          0.0,
+          0.0
+        ],
+        "seed_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "A-no-write": {
+      "accuracy_delta": {
+        "mean": 0.04513888888888888,
+        "cluster_bootstrap_95_percentile": [
+          0.03680555555555555,
+          0.05347222222222222
+        ],
+        "seed_values": [
+          0.0625,
+          0.0625,
+          0.0625,
+          0.04166666666666663,
+          0.03472222222222221,
+          0.03472222222222221,
+          0.05555555555555558,
+          0.04166666666666663,
+          0.03472222222222221,
+          0.02083333333333337
+        ]
+      },
+      "operation_reduction": {
+        "mean": 0.30864121910460257,
+        "cluster_bootstrap_95_percentile": [
+          0.29799283154121864,
+          0.3195736253510405
+        ],
+        "seed_values": [
+          0.29032258064516125,
+          0.29032258064516125,
+          0.29749103942652333,
+          0.33333333333333337,
+          0.3286219081272085,
+          0.31448763250883394,
+          0.30000000000000004,
+          0.33333333333333337,
+          0.28621908127208484,
+          0.31228070175438594
+        ]
+      }
+    },
+    "A-no-persist": {
+      "accuracy_delta": {
+        "mean": 0.0,
+        "cluster_bootstrap_95_percentile": [
+          0.0,
+          0.0
+        ],
+        "seed_values": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "operation_reduction": {
+        "mean": 0.10983400039235995,
+        "cluster_bootstrap_95_percentile": [
+          0.10850825021808216,
+          0.11125100894806414
+        ],
+        "seed_values": [
+          0.10810810810810811,
+          0.10810810810810811,
+          0.10909090909090913,
+          0.1132075471698113,
+          0.11214953271028039,
+          0.11009174311926606,
+          0.10909090909090913,
+          0.1132075471698113,
+          0.10619469026548678,
+          0.10909090909090913
+        ]
+      }
+    }
+  },
+  "logical_write_definition": "one verified-source commit = append_event + MemoryStore.put; SQL page writes not counted",
+  "scope": "Shared deterministic host resolver. Explicit version admission belongs to host policy; compose_context itself does not enforce version correctness.",
+  "limitations": [
+    "Synthetic contracts, not real user population",
+    "No measured LLM token, dollar or model-weight improvement",
+    "Five independent task streams; turns are correlated",
+    "Logical operation totals do not imply equal wall-clock costs",
+    "Verifier reads truth after answer for scoring only; repair requires available source",
+    "No disputed-memory ingestion in this study"
+  ]
+}

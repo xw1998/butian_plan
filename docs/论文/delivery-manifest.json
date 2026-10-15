@@ -1,0 +1,149 @@
+{
+  "study": "multiround-ieee-20261015-r2",
+  "execution_kind": "deterministic_host_mechanism_control",
+  "llm_inference_calls": 0,
+  "records": 10080,
+  "paired_tasks": 1440,
+  "seeds": 10,
+  "rounds": 12,
+  "figures": 8,
+  "deliverables": [
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/summary.json",
+      "bytes": 10595,
+      "sha256": "521d9c3110b6b2156f5fa89f258c45278b023794eb3129c8b79bd3593f9097ed"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/analysis.json",
+      "bytes": 383,
+      "sha256": "1808976139728a9fe4a55bffcd682e1b31fef47eece99dd737bef7cec7523e58"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/sensitivity.json",
+      "bytes": 39164,
+      "sha256": "ae8580106e92f0bf2e25c29acb4cad068d0211c94a3c37b851215959fb467ab2"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/environment.json",
+      "bytes": 221,
+      "sha256": "15258613b96c536b9c2879782ed84a065070eb0bc9951158675606d7a5c83006"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/manifest.json",
+      "bytes": 723,
+      "sha256": "c0e1f41db21f546aaff51520dac761c4467d65f90406cde42a7089902fefb968"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/round-summary.csv",
+      "bytes": 2720,
+      "sha256": "365f185bb32c5d39e02aec40de624351c08cff8a06760f376bb2b15f70846d1f"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig1_round_dynamics.pdf",
+      "bytes": 21950,
+      "sha256": "19d977bc3b64ca60dc6c52e37f602276e61fc92479ba4462eb42d304ae2d4cf9"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig1_round_dynamics.png",
+      "bytes": 215500,
+      "sha256": "243105b1dba9b6c8d13ba3c952f1051659e3a30620a04dc9d7ca70b01c8a8303"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig2_cumulative_reads.pdf",
+      "bytes": 14583,
+      "sha256": "3a9b731849540b3a6603f6c9fcccb62830e10056baa9b2f1b4afb29eafa849a3"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig2_cumulative_reads.png",
+      "bytes": 74444,
+      "sha256": "4cacf4513d9a47d91056abc7061b5faccb91011c2c8c2364d1b70783bb6b457c"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig3_operation_accounting.pdf",
+      "bytes": 16522,
+      "sha256": "bf40351bf83da3eac48e7645c86a6b9de746d40c5ca5cdfe45fd3e5ab2b75883"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig3_operation_accounting.png",
+      "bytes": 69394,
+      "sha256": "7dd1a37191ff38f8e54b7ffe3d07be8b365564f890237b38e47a78138d281c0f"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig4_local_latency.pdf",
+      "bytes": 15746,
+      "sha256": "fed3bc96bf5842137ff5e970b0d4649a118c10d5c309221f6abf5963e4af9b87"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig4_local_latency.png",
+      "bytes": 58411,
+      "sha256": "c574105bf95aec15b1982a50e0f43b8638b173d1186b7ea7b8f91fd5f1f6d170"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig5_family_ablation.pdf",
+      "bytes": 19993,
+      "sha256": "2a53d1add40df244034a603d583b677ff21da6b09ee83597371fbfb541126608"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig5_family_ablation.png",
+      "bytes": 92042,
+      "sha256": "2a604c20800ef54001e635c81b9e101efba3cf32ee8ee7d39100497c5dd6dcea"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig6_budget_sensitivity.pdf",
+      "bytes": 13869,
+      "sha256": "4a6a9ed87139709b218375436b6cc3afb5c5de5a5d50fc66c2ffa5273420dab6"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig6_budget_sensitivity.png",
+      "bytes": 47992,
+      "sha256": "4f3547c3354e077ecc3968c82d644f1e11eb3edc45f708f883e5ab97880b3f76"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig7_cost_threshold.pdf",
+      "bytes": 15996,
+      "sha256": "57c434defdc0376ac567006b9e0126b299da37aebe658770375ef4dbe8b3e1ed"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig7_cost_threshold.png",
+      "bytes": 52036,
+      "sha256": "27d3e9a2151e8bdd1bb1c89b1da813ec3f82d23c4c749d9d0518622908749c7f"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig8_paired_effects.pdf",
+      "bytes": 13002,
+      "sha256": "3d76ee3b60eb2ae870a0a8238ddeaca39f8d1fa482562d1e425818edf3df2779"
+    },
+    {
+      "path": "docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig8_paired_effects.png",
+      "bytes": 30694,
+      "sha256": "7d128b1483b4b278e6339497ea5e9c443ced169ee2c2885b1c41ad1b2f661370"
+    },
+    {
+      "path": "docs/论文/补天多轮经验机制-IEEE.md",
+      "bytes": 33313,
+      "sha256": "284e87d3bc3411868b709dfb80230b1d4f5f0215ae4ddac7cced7f1bd4e365ef"
+    },
+    {
+      "path": "docs/论文/补天多轮经验机制-IEEE.js",
+      "bytes": 13859,
+      "sha256": "2e8e93cccb147443d9729744cc93d97e723bf92ec191a3e590a31461715c7c43"
+    },
+    {
+      "path": "docs/论文/补天多轮经验机制-IEEE.docx",
+      "bytes": 609954,
+      "sha256": "e4bc8940c0f700d5e48e9dafaccdc7e4cf40568521bcf2c76a9ab5bb50138e52"
+    },
+    {
+      "path": "docs/论文/references/ieee-study-references.json",
+      "bytes": 6359,
+      "sha256": "4106305906e597ecfaf0315d5b158af7c7b50c203105bd49be76f09494bb9ea7"
+    }
+  ],
+  "limitations": [
+    "No free-form LLM inference",
+    "Synthetic contract tasks",
+    "No remote request sent",
+    "Exploratory pilot preceded main protocol",
+    "Not a model parameter evolution experiment"
+  ]
+}

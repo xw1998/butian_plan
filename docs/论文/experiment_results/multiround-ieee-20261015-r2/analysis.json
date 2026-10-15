@@ -1,0 +1,10 @@
+{
+  "records_validated": 10080,
+  "paired_tasks": 1440,
+  "version_chains_validated": 480,
+  "figures": 8,
+  "source_read_reduction_vs_index": 0.8160000000000001,
+  "cost_threshold_source_to_query_when_write_cost_two": 1.7344028520499108,
+  "modeled_cost_warning": "Figure 7 uses assumed cost weights; not measured dollars or network latency",
+  "sensitivity_queries": 216
+}
