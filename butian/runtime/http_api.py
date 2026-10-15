@@ -107,7 +107,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(404, {"error": "not_found"}); return
         if self.path == "/api/migration/runs":
             self._send(409, {"error": "historical_identity_migration_out_of_scope"}); return
-        public_get = {"/api/status"}
+        public_get = {"/api/status", "/api/auth/options"}
         member_query_get = {"/api/tools", "/api/evolution"}
         if self.path not in public_get and urlparse(self.path).path not in member_query_get:
             if not self._require_member():
@@ -120,6 +120,12 @@ class ApiHandler(BaseHTTPRequestHandler):
         if self.path.startswith("/api/experiments/") and self.path.count("/") == 3:
             experiment_id = self.path.split("/")[3]
             self._send(200, self.experiments.get(experiment_id)); return
+        if self.path == "/api/auth/options":
+            rows = self.service.store.db.execute(
+                "SELECT m.member_id,m.name,m.role,CASE WHEN a.member_id IS NULL THEN 0 ELSE 1 END AS configured "
+                "FROM members m LEFT JOIN members_auth a ON a.member_id=m.member_id ORDER BY m.name"
+            )
+            self._send(200, {"members": [dict(row) for row in rows]}); return
         if self.path == "/api/status":
             latest = self.service.store.db.execute("SELECT event_type, payload, created_at FROM events WHERE event_type IN ('maintenance_tick','maintenance_failed') ORDER BY created_at DESC LIMIT 1").fetchone()
             latest_maintenance = None
