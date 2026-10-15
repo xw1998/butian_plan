@@ -120,18 +120,18 @@
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.md",
-      "bytes": 52680,
-      "sha256": "889bcd9a7ec596a0666e7de6df36b874aad17fd93fde911ed26f12dbf226c926"
+      "bytes": 55783,
+      "sha256": "f0c8013d814fa19eebd92fc5128cc9d0d815df9c32ad6e9921224fa6e79b603e"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.js",
-      "bytes": 39723,
-      "sha256": "7ad61e3833e850c4353b938749f47be28af14dde3f7cc28a4002a31d939c94ce"
+      "bytes": 45137,
+      "sha256": "34ac017793997aadc4f7d33363baeeca6cb3d6dc319f454cca26f1e6b6c97e47"
     },
     {
       "path": "docs/论文/补天多轮经验机制-IEEE.docx",
-      "bytes": 622790,
-      "sha256": "442b4d7ca545d731e01bdbcad42da9521927365b142187b926f15a74ca8c296f"
+      "bytes": 714077,
+      "sha256": "821108621f6d6d8ff7aed84bf2eb0b5226818f651c83c14d8be6a89e6d6bc044"
     },
     {
       "path": "docs/论文/references/ieee-study-references.json",
@@ -217,6 +217,41 @@
       "path": "docs/论文/experiment_results/functional-regression-20261015.json",
       "bytes": 879,
       "sha256": "e3799ad08572ec0c76da3f28843abaa9973cb15ba99cbf4c04a9eb2f2a977c72"
+    },
+    {
+      "path": "docs/论文/run_bayesian_bandit_experiments.py",
+      "bytes": 6675,
+      "sha256": "eb1740057dc8bccd0345a882c279628d8c306193c15bef4af1b1cf5d7ca824f7"
+    },
+    {
+      "path": "docs/论文/experiment_results/bayesian-bandit-20261015/results.json",
+      "bytes": 1154,
+      "sha256": "268f87684da55469afedbc39babc1ff0a4bb1d98d91bc1029c7779100b0a0e1e"
+    },
+    {
+      "path": "docs/论文/experiment_results/bayesian-bandit-20261015/rows.csv",
+      "bytes": 1483599,
+      "sha256": "9b612ec98f910f9a92c26da68270e6712e6e45d7039ceb09b00eead676ac8a75"
+    },
+    {
+      "path": "docs/论文/experiment_results/bayesian-bandit-20261015/fig_posterior_convergence.png",
+      "bytes": 36447,
+      "sha256": "c7f722c79d7ea0610a611627e6faa9c83ee1ef0745874321eff27f9536f42ff1"
+    },
+    {
+      "path": "docs/论文/experiment_results/bayesian-bandit-20261015/fig_cumulative_reward.png",
+      "bytes": 38958,
+      "sha256": "29782c261f8df32b4bc27cc18f5d7cb4ec60a323eafdfbe9c581c082e91ca9ff"
+    },
+    {
+      "path": "docs/论文/experiment_results/bayesian-bandit-20261015/fig_pseudo_regret.png",
+      "bytes": 35333,
+      "sha256": "db40cd45eedef502476cb08dc6d2351da563b0de5efaebc3aaa46929d6b2d382"
+    },
+    {
+      "path": "docs/论文/experiment_results/bayesian-bandit-20261015/manifest.json",
+      "bytes": 473,
+      "sha256": "ff330b3763ee706e25d0bc5076c6b549573cd94ea2c444c9c12e62ed484e303f"
     }
   ],
   "limitations": [

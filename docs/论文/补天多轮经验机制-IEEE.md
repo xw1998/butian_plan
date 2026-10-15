@@ -336,3 +336,42 @@ Word脚本已加入附录A，具体覆盖服务启动/关闭、任务迁移事�
 本次按core/math_models.py逐函数核验并在《核心实现语义说明.md》新增完整章节，覆盖单位区间守卫、Beta连分式/CDF/分位、加权信念更新、显式转移归一、熵、单后验与期望信息增益、分层均值差、效用及Pareto背包、利用率和Thompson采样。对应Word源码新增附录C并重建DOCX。数学与数值边界专项75 passed（0.21秒），属于原有功能的复核，不是新增模型推理实验。
 
 调用定位显示score_information_action、transition_distribution、allocate_by_utility及ThompsonBandit的直接名称引用位于数学库、测试或研究控制脚本；不能因数学实现存在就称其已经接管生产任务调度。transition_distribution的current与evidence不改变分布，后者仅范围验证；information_gain拒绝单次后验熵上升，不能当一般互信息；期望信息增益要求后验混合等于先验。均值差不自动识别因果，排队函数不计算等待时间，采样器不训练语言模型。完整输入输出、失败条件和复杂度见人工说明，静态例程台账不代替人工核验。
+
+
+### 贝叶斯证据、Thompson采样与强化学习边界补充
+
+上一版对数学函数有说明，但没有把它们组织成算法论文中的方法和实验。本次补充如下。
+
+#### 1. Beta-Bernoulli证据后验
+
+令经验在给定实体、版本和环境下再次有效的概率为 θ，先验为 θ∼Beta(α0,β0)，每次结果 yi∈{0,1}。加权实践证据更新为：
+
+α=α0+Σws，β=β0+Σwf，E[θ]=α/(α+β)，Var(θ)=αβ/[(α+β)^2(α+β+1)]。
+
+代码中 evidence_quality、independence、environment_match 三个单位量相乘形成权重。该乘积是证据质量折减，不是自动的独立性检验；零权重被拒绝。candidate、warm、disputed 是离散生命周期状态，Beta 后验是连续信念摘要，后验不能绕过来源、独立键、版本和至少两次成功的准入条件。
+
+#### 2. Thompson Sampling与Bayesian RL边界
+
+对候选臂 ak，Thompson Sampling每轮从 θk∼Beta(αk,βk)采样 θ̃k，选择 argmax θ̃k；观察Bernoulli奖励后只更新被选择臂。当前 `ThompsonBandit` 正是这种上下文无关的 Beta-Bernoulli bandit，选择复杂度 O(K)，更新复杂度 O(1)。
+
+严格说，当前程序不是完整 Bayesian reinforcement learning。完整 Bayesian RL 至少需要状态 st、动作 at、状态转移模型 P(st+1|st,at)、奖励模型 R，以及针对长期折扣回报的后验推断。当前实现没有状态转移和长期价值函数，不能用“强化学习”泛称替代实际边界。更准确的论文术语是“贝叶斯Bandit控制”或“上下文无关的贝叶斯决策机制”。未来接入状态、转移和折扣回报后，才应增加 Bayesian RL 实验。
+
+#### 3. 新增可重复对照实验
+
+新增 `run_bayesian_bandit_experiments.py`，设置两个臂，真实奖励概率分别为0.30和0.70，10个固定随机种子，每个种子1000轮，对比 Thompson Sampling、ε-greedy（ε=0.1）和均匀随机策略。实验只使用合成Bernoulli奖励，`actual_model_runs=0`，不代表语言模型实验。伪遗憾定义为：
+
+R*=T·maxkθk−Σtθat。
+
+结果如下：
+
+| 策略 | 平均总奖励 | 平均伪遗憾 | 总奖励范围 |
+|---|---:|---:|---:|
+| Thompson Sampling | 704.4 | 4.32 | 678–727 |
+| ε-greedy | 672.8 | 25.44 | 629–697 |
+| Uniform | 494.3 | 202.60 | 459–519 |
+
+实验生成 `fig_posterior_convergence.png`、`fig_cumulative_reward.png` 和 `fig_pseudo_regret.png` 三张300 dpi图，并已插入IEEE DOCX作为图9至图11。结果只支持在该两臂、平稳、Bernoulli奖励控制中，当前 Thompson 实现能够较快集中到高奖励臂；不支持真实Agent回答质量提升、长期任务收益、模型参数更新或自主进化结论。
+
+#### 4. 与主实验的关系
+
+贝叶斯Bandit实验验证数值更新和选择机制；10080次多轮实验验证版本约束经验复用、断源回退和持久化。两组实验不合并样本量，均没有语言模型训练或权重更新。当前生产任务调度尚未接入 Thompson 采样，因此控制实验结果不能写成生产系统已经自动按该策略调度。
