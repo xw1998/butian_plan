@@ -1,8 +1,0 @@
-【L0 当前指令】
-针对两个不同固件版本的比例系数选择当前适用方法，并保留冲突历史。 conflict-scale-v1
-
-【身份与权限】
-{"name":"Current host Agent","role":"member","responsibilities":[],"persona":"{}","tool_policy":{},"authorization":"工具调用仍须通过运行时授权与撤销校验"}
-
-【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）
-- {"case": "conflict-scale-v1", "training": {"firmware": "1.0", "raw": 230, "scale": 100, "method": "divide raw by scale"}, "constraints": ["不平均不同版本系数", "不删除旧证据", "对无法确定的硬件版本保留unknown"]}

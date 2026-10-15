@@ -1,3 +1,0 @@
-Fixed retrieval only; no lifecycle update.
-{"source": "NIST fixed snapshot", "status": "external claim candidate"}
-{"samples": [1, 2, 3, 4, 5], "confidence": 0.95}

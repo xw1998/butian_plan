@@ -1,3 +1,0 @@
-Fixed retrieval only; no lifecycle update.
-{"absolute_pressure_pa": 103325, "ambient_pressure_pa": 101325, "previous_failure": "将绝对压力直接当作表压"}
-{"absolute_pressure_pa": 104725, "ambient_pressure_pa": 101325}

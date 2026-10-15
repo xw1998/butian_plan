@@ -18,3 +18,22 @@ docs/*审计与完善计划-*.md
 docs/*实际审计与修复指导-*.md
 docs/*实际复审与分批修复指导-*.md
 _tmp_*.py
+
+# Public documentation allowlist: paper and its embedded figures only.
+/docs/**
+!/docs/论文/
+!/docs/论文/experiment_results/
+!/docs/论文/experiment_results/bayesian-bandit-20261015/
+!/docs/论文/experiment_results/dream-effect-20261015/
+!/docs/论文/experiment_results/multiround-ieee-20261015-r2/
+!/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/
+!/docs/论文/experiment_results/bayesian-bandit-20261015/fig_cumulative_reward.png
+!/docs/论文/experiment_results/bayesian-bandit-20261015/fig_posterior_convergence.png
+!/docs/论文/experiment_results/bayesian-bandit-20261015/fig_pseudo_regret.png
+!/docs/论文/experiment_results/dream-effect-20261015/effects.png
+!/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig1_round_dynamics.png
+!/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig2_cumulative_reads.png
+!/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig3_operation_accounting.png
+!/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig8_paired_effects.png
+!/docs/论文/补天多轮经验机制-IEEE.docx
+!/docs/论文/补天多轮经验机制-IEEE.md

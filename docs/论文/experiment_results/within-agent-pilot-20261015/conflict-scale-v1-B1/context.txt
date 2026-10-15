@@ -1,3 +1,0 @@
-Fixed retrieval only; no lifecycle update.
-{"firmware": "1.0", "raw": 230, "scale": 100, "method": "divide raw by scale"}
-{"firmware": "2.0", "raw": 340, "current_calibration": {"scale": 1000, "evidence": "calibration-v2"}, "old_memory": {"firmware": "1.0", "scale": 100}}

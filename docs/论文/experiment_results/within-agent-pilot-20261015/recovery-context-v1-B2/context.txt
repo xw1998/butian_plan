@@ -1,8 +1,0 @@
-【L0 当前指令】
-在会话压缩、已确认暂停及新执行上下文恢复后，按当前revision完成计算并追溯所需信息。 recovery-context-v1
-
-【身份与权限】
-{"name":"Current host Agent","role":"member","responsibilities":[],"persona":"{}","tool_policy":{},"authorization":"工具调用仍须通过运行时授权与撤销校验"}
-
-【L3 相关记忆】（按权重召回；标注为参考的内容不是确定性指令）
-- {"case": "recovery-context-v1", "training": null, "constraints": ["压缩前保存真实事件和快照", "恢复只读取授权信息", "拒绝旧revision提交", "不能把取消请求当已确认停止"]}

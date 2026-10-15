@@ -1,2 +1,0 @@
-No additional long-term memory supplied.
-{"firmware": "2.0", "raw": 340, "current_calibration": {"scale": 1000, "evidence": "calibration-v2"}, "old_memory": {"firmware": "1.0", "scale": 100}}
