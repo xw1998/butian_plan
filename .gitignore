@@ -35,5 +35,16 @@ _tmp_*.py
 !/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig2_cumulative_reads.png
 !/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig3_operation_accounting.png
 !/docs/论文/experiment_results/multiround-ieee-20261015-r2/figures/fig8_paired_effects.png
-!/docs/论文/补天多轮经验机制-IEEE.docx
-!/docs/论文/补天多轮经验机制-IEEE.md
+!/docs/论文/补天多轮经验机制.docx
+!/docs/论文/补天多轮经验机制.md
+
+# Public README targets and translated paper deliveries.
+!/docs/论文/补天多轮经验机制-English.md
+!/docs/论文/补天多轮经验机制-English.docx
+!/docs/论文/补天多轮经验机制-English.pdf
+!/docs/需求计划.md
+!/docs/全需求证据映射-20261014.md
+!/docs/通用AI应用接入.md
+!/docs/数字人解题策略.md
+!/docs/外部学习与假设验证接口.md
+!/docs/工具迁移与工作流验收-20261014.md

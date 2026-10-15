@@ -41,7 +41,126 @@ Lead agent
  └─ Review agent
 ```
 
-Research paper **(currently in Chinese)**: [Computational Modeling of Human Experience Formation through Practice](docs/论文/补天多轮经验机制-IEEE.md) · [Word document](docs/论文/补天多轮经验机制-IEEE.docx). The paper describes the formation, revision, verification, and reuse of experience, together with the corresponding experiments.
+Research paper: **Computational Modeling of Human Experience Formation through Practice**.
+
+- English: [Markdown](docs/论文/补天多轮经验机制-English.md) · [Word](docs/论文/补天多轮经验机制-English.docx) · [PDF](docs/论文/补天多轮经验机制-English.pdf)
+- 中文：[Markdown](docs/论文/补天多轮经验机制.md) · [Word](docs/论文/补天多轮经验机制.docx)
+
+The paper describes experience formation, revision, verification, reuse, experimental costs, and limitations.
+
+## Features and mechanisms in detail
+
+The following describes the current business modules. The host AI supplies reasoning and content generation; Butian persists state, coordinates execution, checks admission, and records evidence. Actual execution depends on the configured host, provider capabilities, and current permissions.
+
+### 1. Agent identity, roles, and problem-solving strategies
+
+Members have independent IDs, names, persona descriptions, responsibilities, providers, models, and default strategies. Initialization imports the ten public profiles and their method knowledge idempotently, preserving existing identity changes and user memories. Identity participates in task ownership, memory access, tool ownership, and evidence checks.
+
+Eight strategies cover experience reuse, model building, evidence review, experimental iteration, design synthesis, risk-first exploration, user context, and adversarial audit. Strategies can be recommended or composed from task features. Dispatcher overrides retain the strategy version, stages, reason, and decision maker; execution records the stages actually used. A strategy changes investigation order and cannot bypass evidence, acceptance, or authorization. No strategy is claimed to have established statistical superiority.
+
+### 2. Problem definitions, clarification, and corrected requirements
+
+Tasks retain structured problem definitions, including goals, constraints, and acceptance requirements, with revisions. Questions create persistent records and a waiting-user state; answers link to recovery. When requirements change, task revisions, problem revisions, and execution bindings prevent an old result from silently satisfying the new request.
+
+Exported execution packages bind the actor, task, problem revision, context, and explicitly referenced methods. Method content and verification information are snapshotted and checked again at submission. Archived, disputed, replaced, or altered methods cannot masquerade as the original verified procedure. Recovery checks current eligibility rather than assuming an old session remains valid.
+
+### 3. Solo work, team coordination, and review
+
+Solo mode assigns a goal to one member. Team mode lets a dispatcher organize plans and subtasks, assign workers, collect structured handoffs, and assemble a delivery. Both host-driven teamwork and optional provider execution are supported. Peer questions, answers, methods, and verification records support learning between members.
+
+The task state machine covers todo, ready, claimed, running, review, and done, plus blocked, failed, waiting_user, cancelling, cancelled, provider_lost, and unknown. Transitions check allowed paths and revisions. Submitted work requires review before approval; reviewers can request bounded rework. A tool response, agent narrative, or successful echo is not itself acceptance evidence.
+
+### 4. Context budgets, handoffs, and restart recovery
+
+Context composition budgets current instructions, task state, recent events, relevant memory, and historical indexes, reporting trimming. Explicit methods also consume a budget. Requirements, corrections, open questions, and next steps must be persisted rather than entrusted solely to the conversation window.
+
+Snapshots retain parent relationships, event ranges, and integrity information. Handoffs include task revisions, state, environment, evidence, unfinished work, and next steps. Recovery distinguishes completed work, active executions, and uncertain outcomes. Unconfirmed side effects remain unknown rather than being reported as success or automatically replayed.
+
+### 5. Independent memory, practice feedback, and recall audits
+
+Members have isolated memory spaces containing methods, experience, lessons, provenance, environment, evidence, applicability, and invalidation conditions. Recall uses the query and environment. Unconfirmed software versions remain unknown rather than silently merging behavior across incompatible environments.
+
+Practice records success, failure, or unknown with independent observation identifiers and duplicate checks. Repeated outcomes use log1p saturation, limiting the benefit of repetition. Recall feedback records which memories were used, useful, harmful, or missed and retains supporting evidence, making practical usefulness auditable.
+
+User objections can become counterevidence leads. Disputes require checking inputs, versions, configuration, reproduction, and alternative explanations. An unverified objection is not conclusive falsification, while a disputed old method must not continue as an unquestioned fact.
+
+### 6. Aging, rewarming, revision chains, and skill evolution
+
+Memory moves through hot, warm, cold, and archived stages. Maintenance considers age, verification, repeated failure, contradiction, dependency drift, and environment changes. Cooling preserves history; rewarming needs new practice and evidence. Improved methods retain revision chains instead of merely restoring an old score.
+
+Memory composition references component memories and records combination benefits, redundancy, and conflicts. Domain skills retain stages, marginal changes, contradictions, new environments, independent successes, composition successes, and regression evidence. Validation batches track samples, passes, failures, and evidence. This is runtime knowledge and method evolution, not neural parameter training.
+
+### 7. Dreaming, distillation, abstraction, and verification
+
+Dreaming uses existing fragments and is gated by new material, minimum fragment counts, intervals, locks, operation limits, and cost budgets. Material is organized using weight, evidence, and recent verification. Maintenance can dispatch work for the host AI; it does not acquire a model automatically.
+
+The workflow supports candidate generation, distillation, merge and conflict records, abstraction, applicability and failure conditions, hypotheses, verification actions, and observations. Dream outputs remain candidates until tested. Subsequent real tasks provide the independent practice needed for experience promotion; counterexamples trigger dispute and revision.
+
+### 8. External sources and traceable extraction
+
+Sources record locators, titles, SHA-256 hashes, capture time, and metadata. Explicit public-URL capture stores and verifies body snapshots with bounded reading. A learning queue records claims, leases, renewals, runs, and failures. Address, redirect, and response-size checks do not constitute complete network isolation.
+
+Claims retain conditions, limitations, predictions, and falsifiers. Extraction tasks bind their original source; publication checks source identity and quotations to prevent substituted sources or fabricated citations. Claims can become priors for separately prepared practice hypotheses. Captured text and initial method cards remain unverified knowledge rather than demonstrated experience.
+
+### 9. Hypotheses, exploration budgets, and observations
+
+Hypotheses retain priors, rationale, conditions, predictions, and falsifiers. Actions declare cost, risk, and expected information gain and require explicit authorization before starting. Creating an action or having budget does not grant tool permissions. Global and member policies limit action counts, declared costs, and risks within a time window; started attempts remain charged after failure or unknown outcomes.
+
+Observations use independent identifiers. Support and rejection require valid evidence accessible to the caller. Changed sources are rechecked before validation. Beta updates, information gain, and Thompson Sampling have mathematical modules and research controls; they are not automatically the posterior behind every production confidence field or a complete Bayesian RL system.
+
+### 10. Evidence ownership, access, and validity
+
+File evidence records its path, owner, content fingerprint, and optional expiry. Owners can grant or revoke member access. Reviews, observations, tool verification, and workflow admission apply the relevant evidence checks. Changed content at the same path, expiry, or revoked access can invalidate earlier proof.
+
+The ledger supports traceability but does not replace business judgment: an existing file is not necessarily a correct result, and a self-reported success is not independent verification. Current actors and task ownership participate in access checks; old permissions do not automatically transfer to a new task or version.
+
+### 11. Owned tools, economic admission, and execution
+
+Tools retain owners, purposes, source versions, manifests, input/output contracts, and hashes. Proposals record costs and expected benefits. Verification, economic admission, and lifecycle state determine eligibility; bundled tools begin as draft. A new version requires the applicable checks again.
+
+Before execution, checks cover actor, task, version, source and contract, verification, circuit breakers, host authorization, and budgets. Records retain inputs, outputs, duration, state, and audit information. Running executions can be queried or cancelled; audit replay and recovery preserve uncertainty. Cancellation and timeout claims depend on actual backend results. Work-directory accounting occurs before and after execution and is not an operating-system runtime hard limit; isolation guarantees depend on the backend's real capabilities.
+
+### 12. Sharing, trials, repair, and escalation
+
+Owners share tools with named recipients, who accept and trial them with evidence. Sharing does not transfer the owner's host authorization. Issue workflows cover reporting, triage, requests for information, responses, duplicate links, repair versions, confirmation by the original reporter, and independent security review.
+
+Due issues can generate escalation work items for eligible members to claim, resolve, or return, with persistent linkage and deduplication. Circuit breakers prevent continued use of affected versions and require recovery conditions. Archival checks active executions and workflow references. Restoration does not bypass unresolved faults, invalid evidence, or current admission requirements.
+
+### 13. Portable tool bundles and versioned workflows
+
+Bundles export source, continuous versions, and allowlisted public contracts with source, manifest, and bundle hashes. Imports check format, size, versions, and declarations and create draft tools requiring fresh verification and authorization. Private memories, runtime databases, and host permissions do not migrate. License and scan declarations are caller assertions, not proof of an external security scan.
+
+Workflows pin tool versions and source/contract hashes and declare permissions, failure conditions, total timeout, and output budgets. Every step uses existing tool admission and auditing. Activation requires real composite validation from at least two different tasks with nonoverlapping evidence content. Individual tool verification is insufficient. Invalid dependencies or evidence require reassessment. Interrupted work becomes unknown without side-effect replay; multi-step dry runs without real intermediate output cannot claim successful rehearsal.
+
+### 14. Providers and host-application integration
+
+The provider layer negotiates capabilities and offers local-process, HTTP, MCP, and manual handoff paths. Start, consume, cancellation, session ownership, and task revisions remain bound. Host MCP mode uses the current AI's reasoning and tools without deploying another model. Independent execution requires the corresponding optional provider configuration.
+
+Missing capabilities return unsupported or unknown. Echo providers prove transport and state handling only. Real model responses, browser interaction, Office rendering, device work, and external services require capable hosts or backends with their own evidence. Historical member migration is explicitly disabled; initial public-asset import is not user-history migration.
+
+### 15. Local services, transactions, audits, and backups
+
+CLI, stdio MCP, and local HTTP share the runtime. The Web workspace exposes Overview, Tasks, Verification, Memory, Evolution, and Members. SQLite stores tasks, events, execution ledgers, and member indexes; separate member stores retain knowledge. Critical operations use locks, write reservations, or savepoints. There is no universal atomic transaction across independent databases, filesystems, and service events; recovery records address partial completion.
+
+Backup creation, verification, and restoration are supported, with restoration into a new destination to avoid overwriting the live runtime. Integrity and path/link/reparse-point checks protect boundaries subject to platform capabilities. Runtime databases and credentials remain local user state; the public exchange database contains public profiles, knowledge, and tools only.
+
+### 16. Initial knowledge, research, and evidence boundaries
+
+The ten profiles include method cards, tool guides, and professional tools. Imports remain candidate knowledge with zero confidence and draft tools. The asset catalog is authoritative for current contents: `butian/assets/catalog.json` records sources and `butian/assets/professional_tools.json` records contracts. Real practice creates experience later.
+
+The paper and scripts report mechanisms, costs, and limitations. Deterministic-host controls, mathematical simulations, production-interface replay, nonblind agent pilots, and confirmatory model experiments must remain distinct. Research modules are not a product prerequisite. Module availability, focused test success, and acceptance across all product scenarios are separate claims.
+
+### Further reading and implementation
+
+| Topic | Documentation and source |
+| --- | --- |
+| Requirements and evidence | [Requirements](docs/需求计划.md), [evidence map](docs/全需求证据映射-20261014.md) |
+| Integration and strategies | [AI integration](docs/通用AI应用接入.md), [strategies](docs/数字人解题策略.md), `butian/adapters/` |
+| Tasks and context | `butian/core/state_machine.py`, `butian/runtime/context.py`, `butian/runtime/external_execution.py`, `butian/runtime/problem.py` |
+| Memory and hypotheses | `butian/runtime/memory.py`, `butian/runtime/dream.py`, `butian/runtime/hypothesis.py`, `butian/runtime/exploration_budget.py` |
+| External learning | [Learning interfaces](docs/外部学习与假设验证接口.md), `butian/runtime/learning.py`, `butian/runtime/extraction.py` |
+| Tools and workflows | [Workflow evidence](docs/工具迁移与工作流验收-20261014.md), `butian/runtime/tools.py`, `butian/runtime/tool_portability.py`, `butian/runtime/tool_workflows.py` |
+| Backup and security | `butian/runtime/backup.py`, `butian/runtime/security.py`, `tests/` |
 
 ## Core capabilities
 
