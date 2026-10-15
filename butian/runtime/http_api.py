@@ -30,6 +30,21 @@ class ApiHandler(BaseHTTPRequestHandler):
         token = self.headers.get("X-Butian-Token") or body.get("token")
         return member_id, token
 
+    def _local_mode(self):
+        # Only a loopback-bound server may trust local identity selection.
+        import ipaddress
+        try:
+            bound = ipaddress.ip_address(self.server.server_address[0])
+            peer = ipaddress.ip_address(self.client_address[0])
+            return bound.is_loopback and peer.is_loopback
+        except ValueError:
+            return False
+
+    def _authenticate_actor(self, actor, token):
+        if self._local_mode():
+            return bool(self.service.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (actor,)).fetchone())
+        return self.service.store.authenticate_member(actor, token)
+
     def _require_member(self, body=None, target_member_id=None):
         actor, token = self._member_credentials(body)
         task_id = (body or {}).get("task_id")
@@ -51,7 +66,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         if target and target != actor:
             self._send(403, {"error": "member_access_denied"})
             return False
-        if not self.service.store.authenticate_member(actor, token):
+        if not self._authenticate_actor(actor, token):
             self._send(401, {"error": "member_authentication_failed"})
             return False
         self._authenticated_member_id = actor
@@ -125,7 +140,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 "SELECT m.member_id,m.name,m.role,CASE WHEN a.member_id IS NULL THEN 0 ELSE 1 END AS configured "
                 "FROM members m LEFT JOIN members_auth a ON a.member_id=m.member_id ORDER BY m.name"
             )
-            self._send(200, {"members": [dict(row) for row in rows]}); return
+            self._send(200, {"members": [dict(row) for row in rows], "local_mode": self._local_mode()}); return
         if self.path == "/api/status":
             latest = self.service.store.db.execute("SELECT event_type, payload, created_at FROM events WHERE event_type IN ('maintenance_tick','maintenance_failed') ORDER BY created_at DESC LIMIT 1").fetchone()
             latest_maintenance = None
@@ -231,7 +246,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 actor, token = self._member_credentials(body)
                 if not actor:
                     self._send(401, {"error": "actor_member_id_required"}); return
-                if not self.service.store.authenticate_member(actor, token):
+                if not self._authenticate_actor(actor, token):
                     self._send(401, {"error": "member_authentication_failed"}); return
                 if actor != body.get("member_id") and self.service.store.db.execute("SELECT role FROM members WHERE member_id=?", (actor,)).fetchone()["role"] != "bootstrap_admin":
                     self._send(403, {"error": "member_creation_forbidden"}); return
@@ -392,7 +407,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self._send(200, self.service.run_team_goal(body["task_id"])); return
             if path == "/api/providers/start":
                 actor, token = self._member_credentials(body)
-                if not actor or not self.service.store.authenticate_member(actor, token):
+                if not actor or not self._authenticate_actor(actor, token):
                     self._send(401, {"error": "member_authentication_failed"}); return
                 target_member_id = body.get("member_id")
                 if not target_member_id or target_member_id != actor:

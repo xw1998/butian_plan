@@ -65,6 +65,9 @@ def test_dashboard_http_authentication(tmp_path):
     thread.start()
     url = 'http://127.0.0.1:' + str(server.server_port) + '/api/dashboard'
     try:
+        with urlopen(Request(url, headers={'X-Butian-Member': 'shen_heng'})) as response:
+            assert json.load(response)['status'] == 'ok'
+        handler._local_mode = lambda self: False
         for headers in ({}, {'X-Butian-Member': 'xu_wei', 'X-Butian-Token': 'invalid'}):
             try:
                 urlopen(Request(url, headers=headers))
