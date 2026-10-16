@@ -388,3 +388,15 @@ python -m butian.assets.export /absolute/new/runtime
 - 项目及 MCP 共享版本更新为 **0.1.8**。源码安装后重启 HTTP 后台、重新连接 MCP，分别加载新代码；两者为独立进程。
 
 [v0.1.8 源码](https://gitee.com/xw19981010/butian_plan/tree/v0.1.8)
+
+### 协作就绪预检（开发中）
+
+开始委派前调用 `butian_collaboration_preflight`，提供当前已认证的 `actor_member_id`，可选目标 `member_id` 和可见的 `task_id`。直连 MCP 仍须提供对应 token；受信本地桥可内部注入，不能把本机网页免令牌规则套用到任意 MCP。
+
+预检只读检查成员边界、记忆可读性、Provider 配置以及已有任务的认领/审核条件。跨成员未授权时立即返回 `member_memory_access_denied`，不检查或泄露目标成员的记忆、Provider 配置。配置检查通过不等于模型可实际调用：`execution_verified=false` 明确表示尚未执行。证据登记、哈希核验和独立审核未经实际执行时保持 `unchecked`，不会把健康检查当作协作验收。
+
+`butian_status` 区分服务存活与协作就绪，并给出预检入口。标准 MCP `tools/list` 每页返回最多 8 个完整 schema，首屏优先展示状态、目录、schema、预检与目标接口；宿主应按 `nextCursor` 继续翻页。若宿主自动聚合所有页，仍可能展示全部工具；需要简短查询时使用 `butian_tools_catalog`。补天自带 MCP Provider 已支持分页消费。
+
+当前认证模型要求成员操作的 actor 与 member 相同，没有跨成员委派授权接口。真实数字人执行需要其自身已认证连接与可用 Provider。任务审核还受会话调度员/执行者身份限制；第三位成员并不自动获得审核权。以上预检不会新增授权、自动换身份或伪造独立审核。
+
+`butian_collaboration_start` 是最小高层执行入口：先执行只读预检，问题仍需澄清或 Provider/权限不满足时不创建任务；条件满足才创建并启动当前已认证成员的 Provider，并返回下一步消费入口。它不模拟分析结果，也不把启动成功当成独立审核完成。当前隔离验收库若成员没有 Provider，预检会明确返回 `provider_unavailable`。

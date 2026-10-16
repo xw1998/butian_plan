@@ -148,7 +148,7 @@ def run(home=None):
                 elif method.startswith("notifications/"):
                     continue
                 elif method == "tools/list":
-                    result = {"tools": TOOLS}
+                    result = list_tools_page(params.get("cursor"))
                 elif method == "tools/call":
                     from .runtime.mcp_guidance import ToolError
                     try:
@@ -281,6 +281,12 @@ def call_tool(service, name, args):
 
 
 def _call_tool(service, name, args):
+    if name == "butian_collaboration_start":
+        from .runtime.readiness import collaboration_start
+        return collaboration_start(service, args)
+    if name == "butian_collaboration_preflight":
+        from .runtime.readiness import collaboration_preflight
+        return collaboration_preflight(service, args)
     if name in {'butian_execution_export', 'butian_execution_submit'}:
         actor = args.get('actor_member_id')
         _require_member_arg(service, args, member_id=actor)
@@ -325,7 +331,7 @@ def _call_tool(service, name, args):
         return service.update_problem(task, args['expected_revision'], args['changes'], actor_member_id=actor, reason=args['reason'])
     if name in {"butian_member_preflight", "butian_member_import", "butian_migration_runs"}:
         raise ValueError("historical_identity_migration_out_of_scope")
-    if name == "butian_status": return {"ok": True, "service": "butian"}
+    if name == "butian_status": return {"ok": True, "service": "butian", "version": VERSION, "liveness": True, "collaboration_ready": "unchecked", "next_tool": "butian_collaboration_preflight"}
     member_tools = {tool["name"] for tool in TOOLS if tool["name"].startswith(("butian_memory_", "butian_evolution_", "butian_dream_"))}
     member_tools.update({"butian_knowledge_source_enqueue", "butian_knowledge_source_queue", "butian_tool_execution_audit_replay"})
     member_tools.update({"butian_context_recover", "butian_context_compose", "butian_evidence_record", "butian_task_handoff"})
@@ -608,3 +614,25 @@ TOOLS.extend([
     {"name": "butian_tool_schema", "description": "Read one tool schema and its authorization restrictions without executing it", "inputSchema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}},
     {"name": "butian_tools_catalog", "description": "Read a compact paginated tool catalog; use butian_tool_schema for parameters", "inputSchema": {"type": "object", "properties": {"offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 30}, "prefix": {"type": "string"}}}},
 ])
+
+TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-only member permission, Provider configuration and task/reviewer readiness checks; never claims execution success", "inputSchema": {"type": "object", "required": ["actor_member_id", "token"], "properties": {key: {"type": "string"} for key in ("actor_member_id", "token", "member_id", "task_id")}}})
+
+
+def list_tools_page(cursor=None):
+    """Standard MCP pagination: bounded schemas without hiding callable tools."""
+    offset = 0
+    if cursor is not None:
+        if not isinstance(cursor, str) or not cursor.startswith("tools:") or not cursor[6:].isdigit():
+            raise ValueError("invalid_tools_cursor")
+        offset = int(cursor[6:])
+        if offset >= len(TOOLS) or offset % 8:
+            raise ValueError("invalid_tools_cursor")
+    first = ("butian_status", "butian_tools_catalog", "butian_tool_schema", "butian_collaboration_preflight",
+             "butian_goal_submit", "butian_problem_get", "butian_problem_update", "butian_memory_recall")
+    ordered = sorted(TOOLS, key=lambda tool: first.index(tool['name']) if tool['name'] in first else len(first))
+    result = {"tools": ordered[offset:offset + 8]}
+    if offset + 8 < len(TOOLS):
+        result["nextCursor"] = "tools:" + str(offset + 8)
+    return result
+
+TOOLS.append({"name": "butian_collaboration_start", "description": "Preflight then create, claim and start a Provider task for the authenticated member; blocked requests create no task; independent review remains required", "inputSchema": {"type": "object", "required": ["actor_member_id", "token", "goal"], "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}, "member_id": {"type": "string"}, "goal": {"type": "string"}, "problem": {"type": "object"}}}})

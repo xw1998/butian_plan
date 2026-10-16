@@ -133,9 +133,25 @@ class McpProvider:
                     assert proc.stdin is not None
                     proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
                     proc.stdin.flush()
-                    listed = self._request(proc, {"jsonrpc": "2.0", "id": list_id, "method": "tools/list", "params": {}})
-                    tools = listed.get("result", {}).get("tools", [])
-                    selected = self._select_tool(tools if isinstance(tools, list) else [])
+                    tools = []
+                    cursor = None
+                    seen_cursors = set()
+                    for page_index in range(100):
+                        params = {} if cursor is None else {"cursor": cursor}
+                        listed = self._request(proc, {"jsonrpc": "2.0", "id": f"{list_id}:{page_index}", "method": "tools/list", "params": params})
+                        page = listed.get("result")
+                        if not isinstance(page, dict) or not isinstance(page.get("tools"), list):
+                            raise RuntimeError("mcp_tools_list_invalid_page")
+                        tools.extend(page["tools"])
+                        cursor = page.get("nextCursor")
+                        if cursor is None:
+                            break
+                        if not isinstance(cursor, str) or cursor in seen_cursors:
+                            raise RuntimeError("mcp_tools_list_invalid_cursor")
+                        seen_cursors.add(cursor)
+                    else:
+                        raise RuntimeError("mcp_tools_list_page_limit")
+                    selected = self._select_tool(tools)
                     if selected is None:
                         yield ProviderEvent(f"{provider_session_id}:unknown", "status", status="unknown", reason="mcp_no_unambiguous_prompt_tool")
                         return

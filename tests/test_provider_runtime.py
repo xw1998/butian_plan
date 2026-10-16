@@ -510,3 +510,20 @@ def test_executor_provider_factory_failure_is_reported_without_launch():
     events = list(provider.stream('session', 'prompt'))
     assert events[-1].status == 'failed'
     assert events[-1].reason == 'provider_execution_permit_invalid'
+
+def test_mcp_provider_finds_executable_tool_on_second_page():
+    from butian.adapters.mcp import McpProvider
+    code = """import json,sys
+for line in sys.stdin:
+ r=json.loads(line); i=r.get('id'); m=r.get('method')
+ if i is None: continue
+ if m=='tools/list':
+  if not r.get('params',{}).get('cursor'): out={'tools':[],'nextCursor':'second'}
+  else: out={'tools':[{'name':'execute_task','inputSchema':{'type':'object','required':['task'],'properties':{'task':{'type':'string'}}}}]}
+ elif m=='tools/call': out={'content':[{'type':'text','text':'page-two:'+r['params']['arguments']['task']}]}
+ else: out={}
+ print(json.dumps({'jsonrpc':'2.0','id':i,'result':out}),flush=True)
+"""
+    events = list(McpProvider([sys.executable, '-c', code]).stream('paged', 'work'))
+    assert any(e.kind == 'output' and e.text == 'page-two:work' for e in events)
+    assert events[-1].status == 'completed'

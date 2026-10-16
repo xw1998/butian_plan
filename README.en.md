@@ -377,3 +377,13 @@ See `skills/butian-workflow/SKILL.md` for schema discovery, host/manual executio
 - Package and shared MCP version: **0.1.8**. Restart the HTTP backend and reconnect MCP after updating a source installation; these are separate processes.
 
 [v0.1.8 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.8)
+
+### Collaboration preflight (development)
+
+Call `butian_collaboration_preflight` with an authenticated `actor_member_id`, optionally a target `member_id` and visible `task_id`. Direct MCP requires that actor's token; a trusted local bridge may inject it. This read-only check reports member boundaries, memory readability, Provider configuration and existing task/reviewer eligibility. Unauthorized cross-member requests are rejected before inspecting target bindings or memory.
+
+Configuration availability is not execution success: `execution_verified=false` stays explicit. Evidence registration/hash verification and independent review remain unverified until actually performed. `butian_status` now distinguishes liveness from collaboration readiness. Standard MCP tool discovery returns at most eight complete schemas per page, with common discovery/goal tools first. Follow `nextCursor`; hosts that aggregate all pages may still display every tool. Use `butian_tools_catalog` for compact discovery. The built-in MCP Provider consumes pagination.
+
+The current authorization model has no cross-member delegation grant. Real member execution requires its authenticated connection and an available Provider. Task review is restricted to its session dispatcher or assignee; an arbitrary third reviewer is not automatically authorized. Preflight does not grant access, switch identities or certify independent execution.
+
+`butian_collaboration_start` is the minimal high-level execution entry: it runs read-only preflight first, creates no task while clarification, Provider, or authorization conditions are missing, and only then creates and starts the authenticated member's Provider task. It never fabricates analysis output or treats startup as independent review. In the current isolated acceptance store, unbound members explicitly return `provider_unavailable`.
