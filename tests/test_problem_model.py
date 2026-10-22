@@ -84,7 +84,16 @@ def test_standard_stdio_goal_without_provider(tmp_path):
     proc = subprocess.run([sys.executable, '-m', 'butian.cli', 'mcp'], cwd=Path(__file__).resolve().parents[1], env=env, input='\n'.join(json.dumps(x) for x in requests) + '\n', text=True, encoding='utf-8', capture_output=True, timeout=15)
     assert proc.returncode == 0, proc.stderr
     replies = {x['id']: x for x in map(json.loads, proc.stdout.splitlines())}
-    names = {x['name'] for x in replies[2]['result']['tools']}
+    # tools/list 按 MCP 规范分页：首页只放高频入口，断言要看全量而不是首页顺序。
+    # 分页函数是纯函数，直接收页即可，不必为每页各起一个 MCP 进程。
+    from butian.mcp_server import list_tools_page
+    names, cursor = set(), None
+    while True:
+        page = list_tools_page(cursor)
+        names.update(t['name'] for t in page['tools'])
+        cursor = page.get('nextCursor')
+        if cursor is None:
+            break
     assert {'butian_goal_submit', 'butian_problem_get', 'butian_problem_update'} <= names
     wire = replies[3]['result']
     assert not wire['isError']

@@ -50,7 +50,9 @@ def test_tools_pagination_has_no_loss_or_duplicates():
             break
     assert len(names) == len(set(names)) == len(TOOLS)
     assert set(names) == {t['name'] for t in TOOLS}
-    assert 'butian_collaboration_preflight' in names[:8]
+    # 首屏放日常闭环（含任务推进入口），执行预检下沉到后续页但不得丢失。
+    assert 'butian_task_list' in names[:8]
+    assert 'butian_collaboration_preflight' in names
     with pytest.raises(ValueError):
         list_tools_page('tools:1')
 

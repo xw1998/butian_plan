@@ -24,6 +24,8 @@ class ButianService:
         self.home = Path(home or os.environ.get("BUTIAN_HOME", Path.home() / ".butian"))
         self.home.mkdir(parents=True, exist_ok=True)
         self._claim_practice_lock = threading.RLock()
+        # 仅 MCP 本机信任模式下由 butian_connect 设置；None 表示仍逐步校验口令。
+        self.local_actor: str | None = None
         self.store = Store(self.home / "team.db")
         # 启动先收口崩溃前的 prepared 操作，再回收过期租约；结果保留供状态页和审计使用。
         self.startup_recovery = {
@@ -940,12 +942,22 @@ class ButianService:
     def list_migration_runs(self, *, limit: int = 50) -> list[dict]:
         return []
 
+    def enable_local_actor(self, member_id: str) -> None:
+        """本机信任模式下绑定唯一可代表成员；共享部署可设 BUTIAN_MCP_TOKEN_REQUIRED=1 关闭。"""
+        if os.environ.get("BUTIAN_MCP_TOKEN_REQUIRED", "0") == "1":
+            raise ValueError("token_required_by_configuration")
+        if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
+            raise ValueError("member_not_found")
+        self.local_actor = member_id
+
     def require_member_access(self, member_id: str, *, actor_member_id: str | None, token: str | None = None) -> None:
         """Enforce an explicit actor boundary for external member-scoped calls."""
         if not actor_member_id:
             raise ValueError("actor_member_id_required")
         if actor_member_id != member_id:
             raise ValueError("member_memory_access_denied")
+        if self.local_actor and actor_member_id == member_id == self.local_actor:
+            return
         if not self.store.authenticate_member(actor_member_id, token):
             raise ValueError("member_authentication_failed")
 

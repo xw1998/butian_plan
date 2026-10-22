@@ -5,6 +5,22 @@ description: 正确使用补天 Butian MCP 完成任务执行、经验召回、�
 
 # 补天工作流
 
+## 最快路径（先看这里）
+
+让模型少走弯路的三步，取代逐个拼接身份、会话与子任务：
+
+1. `butian_connect`：绑定当前成员一次。本机默认不需要口令；多个成员时必须显式指定，不会替你猜。之后所有调用自动继承身份，不必重复传 `actor_member_id`/`token`。
+2. `butian_mode`：`{"action":"get"}` 看当前模式，`{"action":"set","mode":"team"}` 切换。**不需要 session_id**，只影响后续目标；运行中任务保留不取消。
+3. `butian_context`：一次拿到当前成员、模式、可见任务及其 revision、以及下一步合法动作。用它代替自己维护 session_id 与 revision。
+
+提交目标时 `mode` 可省略，默认用 `butian_mode` 当前值。团队模式省略 `subtasks` 会按成员职责生成**确定性分工**（`plan_source=deterministic_role_split`，未调用模型）；要更细的拆解就显式传 `subtasks`，此时 `plan_source=host`。省略 `member_ids` 会把全部其他成员都排进分工（`worker_selection=all_other_members`），只想少数人参与时显式指定。**单人模式传 `member_ids` 会报 `member_ids_require_team_mode`，先切模式再提交。**
+
+`butian_context` 的 `next_actions` 就是可复制的调用参数：`todo→ready`、`ready→认领`、`claimed→running`、`running→review` 四步直接给 `task_id`/`expected_revision`/`target`/`operation_key`，照抄即可，不必自己算 operation_key 或猜 revision；有可推进任务时它不会再劝你新建目标。派发者只拿到 `butian_task_tree`（别人名下的任务不该你代做），审核建议只给非本人任务。
+
+工具第一页固定为「状态 / 连接 / 上下文 / 模式 / 提交目标 / 任务列表 / 目录 / schema」，不是全部工具；找工具用 `butian_tools_catalog`（支持 `query` 子串过滤名称与描述，无匹配返回 `catalog_query_no_match`），再用 `butian_tool_schema` 取单个 schema。`butian_task_claim` 的 `member_id` 默认取已连接成员，`butian_task_transition` 的 `operation_key` 缺省派生，`actor_member_id`/`token` 不是这些工具的必填项。
+
+这些便利不放宽边界：跨成员访问仍返回 `member_memory_access_denied`；共享部署可设 `BUTIAN_MCP_TOKEN_REQUIRED=1` 恢复逐次口令校验；启动成功不等于执行成功，也不等于独立审核完成。
+
 ## 先确认连接与权限
 
 1. 使用宿主提供的连接器发现功能确认实际连接；不要硬编码某个用户的连接 ID、工作目录、成员或凭据。
@@ -28,7 +44,7 @@ description: 正确使用补天 Butian MCP 完成任务执行、经验召回、�
 ### 已有普通任务 / 手动交付
 
 - `butian_task_create` 仅登记 todo，不等于执行成功。
-- 查询最新 revision → transition todo→ready（唯一 operation_key）→ claim 给获授权执行者 → 查询新 revision → transition claimed→running。
+- 查询最新 revision → transition todo→ready（`operation_key` 可省略，服务端按 `task:revision:target` 派生；显式传时须与操作内容一一对应）→ claim 给获授权执行者（`member_id` 可省略，默认取已连接成员）→ 查询新 revision → transition claimed→running。
 - 实际执行后登记证据，按 `butian_task_handoff` 的实际 schema 交付；再按合法状态与审核策略处理 review。handoff 不一定自动改变任务状态，必须查询返回及最新状态。
 - 不直接改数据库、绕过状态机、覆盖归属或强行把终态任务恢复 running。
 

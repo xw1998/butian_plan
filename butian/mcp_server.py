@@ -23,8 +23,8 @@ TOOLS = [
     {"name": "butian_task_tree", "description": "Return the task tree (roots with nested children)", "inputSchema": {"type": "object", "properties": {"session_id": {"type": "string"}}}},
     {"name": "butian_task_review", "description": "Review a task in review status: approve (done, gated by handoff evidence) or rework (back to ready, capped by rework limit)", "inputSchema": {"type": "object", "required": ["task_id", "revision", "verdict"], "properties": {"task_id": {"type": "string"}, "revision": {"type": "integer"}, "verdict": {"type": "string", "enum": ["approve", "rework"]}, "reviewer_member_id": {"type": "string"}, "notes": {"type": "string"}, "rework_limit": {"type": "integer"}}}},
     {"name": "butian_task_create", "description": "Create a task", "inputSchema": {"type": "object", "required": ["session_id", "title"], "properties": {"session_id": {"type": "string"}, "title": {"type": "string"}, "assignee_id": {"type": "string"}}}},
-    {"name": "butian_task_transition", "description": "Transition a task with revision guard", "inputSchema": {"type": "object", "required": ["task_id", "expected_revision", "target", "operation_key"], "properties": {"task_id": {"type": "string"}, "expected_revision": {"type": "integer"}, "target": {"type": "string"}, "operation_key": {"type": "string"}}}},
-    {"name": "butian_task_claim", "description": "Claim a ready task with a lease", "inputSchema": {"type": "object", "required": ["task_id", "member_id"], "properties": {"task_id": {"type": "string"}, "member_id": {"type": "string"}, "lease_seconds": {"type": "integer"}, "token": {"type": "string"}}}},
+    {"name": "butian_task_transition", "description": "Transition a task with revision guard; todo->ready->claimed->running->review->done", "inputSchema": {"type": "object", "required": ["task_id", "expected_revision", "target"], "properties": {"task_id": {"type": "string"}, "expected_revision": {"type": "integer"}, "target": {"type": "string", "enum": ["ready", "claimed", "running", "review", "done", "blocked", "failed", "cancelled", "waiting_user"]}, "operation_key": {"type": "string", "description": "idempotency key; derived from task/revision/target when omitted"}}}},
+    {"name": "butian_task_claim", "description": "Claim a ready task with a lease; member_id defaults to the connected member", "inputSchema": {"type": "object", "required": ["task_id"], "properties": {"task_id": {"type": "string"}, "member_id": {"type": "string", "description": "defaults to the connected member"}, "lease_seconds": {"type": "integer"}, "token": {"type": "string"}}}},
     {"name": "butian_task_release", "description": "Release a task lease and requeue claimed work", "inputSchema": {"type": "object", "required": ["task_id", "lease_id"], "properties": {"task_id": {"type": "string"}, "lease_id": {"type": "string"}}}},
     {"name": "butian_task_heartbeat", "description": "Renew a task lease", "inputSchema": {"type": "object", "required": ["task_id", "lease_id"], "properties": {"task_id": {"type": "string"}, "lease_id": {"type": "string"}, "lease_seconds": {"type": "integer"}}}},
     {"name": "butian_strategy_recommend", "description": "Recommend explainable strategies from task features", "inputSchema": {"type": "object", "required": ["task_features"], "properties": {"task_features": {"type": "object"}}}},
@@ -132,6 +132,7 @@ for _name, _description, _fields, _required in [
 
 def run(home=None):
     service = ButianService(home)
+    state = {"actor": None, "token": None}
     try:
         for line in sys.stdin:
             req = None
@@ -152,7 +153,7 @@ def run(home=None):
                 elif method == "tools/call":
                     from .runtime.mcp_guidance import ToolError
                     try:
-                        payload = call_tool(service, params.get("name"), params.get("arguments", {}))
+                        payload = call_tool(service, params.get("name"), params.get("arguments", {}), state)
                         result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": False}
                     except ToolError as exc:
                         # Tool failures belong in MCP content: some hosts discard JSON-RPC error.data.
@@ -251,6 +252,17 @@ for _tool in TOOLS:
             if _field not in _required:
                 _required.append(_field)
 
+# 这些字段由连接继承或可安全派生，不在 schema 上强制要求，
+# 避免宿主以为必须自己准备一份凭据或重复交代身份。
+for _relaxed_name, _relaxed_required in (
+        ("butian_task_claim", ["task_id"]),
+        ("butian_task_transition", ["task_id", "expected_revision", "target"]),
+        ("butian_task_list", []),
+        ("butian_task_tree", [])):
+    _relaxed = next((tool for tool in TOOLS if tool["name"] == _relaxed_name), None)
+    if _relaxed is not None:
+        _relaxed["inputSchema"]["required"] = list(_relaxed_required)
+
 def _require_member_arg(service, args, member_id=None):
     target = member_id or args.get("member_id")
     if not target:
@@ -259,28 +271,63 @@ def _require_member_arg(service, args, member_id=None):
     return target
 
 
-def call_tool(service, name, args):
+def call_tool(service, name, args, state=None):
     from .runtime.mcp_guidance import ToolError, describe_tool, validate_arguments, recovery_details
+    if state is not None and isinstance(args, dict):
+        # 身份只在本连接内继承，避免每次调用重复交代；不会放宽成员边界。
+        if not args.get("actor_member_id") and state.get("actor"):
+            args["actor_member_id"] = state["actor"]
+        if "token" not in args:
+            args["token"] = state.get("token") or ""
     if name == "butian_tool_schema":
         validate_arguments(name, args, TOOLS)
         return describe_tool(args["name"], TOOLS)
     if name == "butian_tools_catalog":
         validate_arguments(name, args, TOOLS)
         offset, limit = args.get("offset", 0), args.get("limit", 20)
+        query = str(args.get("query") or "").strip().lower()
         tools = [tool for tool in TOOLS if args.get("prefix", "") in tool["name"]]
+        if query:
+            tools = [tool for tool in tools
+                     if query in tool["name"].lower() or query in str(tool.get("description", "")).lower()]
+            if not tools:
+                raise ToolError('catalog_query_no_match', {
+                    'code': 'catalog_query_no_match', 'query': args.get("query"),
+                    'next_actions': [{'tool': 'butian_tools_catalog'},
+                                     {'tool': 'butian_tools_catalog', 'arguments': {'prefix': 'butian_task_'}}]})
         return {"tools": [{"name": tool["name"], "description": tool["description"]} for tool in tools[offset:offset+limit]],
                 "total": len(tools), "next_offset": offset+limit if offset+limit < len(tools) else None}
     # Validate at the public boundary before dictionary indexing; never echo values.
     validate_arguments(name, args, TOOLS)
     try:
-        return _call_tool(service, name, args)
+        return _call_tool(service, name, args, state)
     except ValueError as exc:
         if isinstance(exc, ToolError):
             raise
         raise ToolError(str(exc), recovery_details(service, name, args, str(exc))) from exc
 
 
-def _call_tool(service, name, args):
+def _call_tool(service, name, args, state=None):
+    from .runtime.mcp_guidance import ToolError  # 局部作用域外不导入，直接引用会 NameError
+    if name == "butian_connect":
+        from .runtime.usability import connect
+        if state is None:
+            raise ValueError("session_state_unavailable")
+        return connect(service, args, state)
+    if name == "butian_mode":
+        from .runtime.usability import current_mode, set_current_mode
+        action = args.get("action", "get")
+        if action == "get":
+            return {"mode": current_mode(service), "scope": "default_for_new_goals"}
+        if action != "set":
+            raise ValueError("invalid_action")
+        if not args.get("mode"):
+            raise ValueError("mode_required")
+        return set_current_mode(service, args["mode"], actor=args.get("actor_member_id"),
+                                session_id=args.get("session_id"))
+    if name == "butian_context":
+        from .runtime.usability import build_context
+        return build_context(service, actor=args.get("actor_member_id"))
     if name == "butian_collaboration_start":
         from .runtime.readiness import collaboration_start
         return collaboration_start(service, args)
@@ -302,12 +349,37 @@ def _call_tool(service, name, args):
         _require_member_arg(service, args, member_id=actor)
         models = ProblemModels(service.store)
         if name == 'butian_goal_submit':
-            if args.get('mode', 'solo') not in {'solo', 'team'}:
+            from .runtime.usability import current_mode, role_split_plan
+            mode = args.get('mode') or current_mode(service)
+            args['mode'] = mode
+            if mode not in {'solo', 'team'}:
                 raise ValueError('invalid_session_mode')
             if args.get('dispatcher_member_id') not in {None, actor}:
                 raise ValueError('dispatcher_identity_mismatch')
-            if args.get('mode', 'solo') == 'team':
-                return service.submit_host_team_goal(args['goal'], actor_member_id=actor, member_ids=args.get('member_ids'), subtasks=args.get('subtasks'), problem=args.get('problem'))
+            if mode == 'team':
+                subtasks, plan_source = args.get('subtasks'), 'host'
+                if not subtasks:
+                    subtasks = role_split_plan(service, args['goal'], service._team_workers(actor, args.get('member_ids')))
+                    plan_source = 'deterministic_role_split'
+                result = service.submit_host_team_goal(args['goal'], actor_member_id=actor, member_ids=args.get('member_ids'), subtasks=subtasks, problem=args.get('problem'))
+                result['plan_source'] = plan_source
+                result['worker_selection'] = 'explicit' if args.get('member_ids') else 'all_other_members'
+                if not args.get('member_ids'):
+                    result['worker_selection_note'] = '未指定 member_ids，已按全部其他成员分工；只想少数人参与时显式传 member_ids。'
+                if plan_source == 'deterministic_role_split':
+                    result['plan_note'] = '分工按成员职责确定性生成（未调用模型）；需要更强拆解时显式传 subtasks。'
+                return result
+            if args.get('member_ids'):
+                raise ToolError('member_ids_require_team_mode', {
+                    'code': 'member_ids_require_team_mode',
+                    'mode': 'solo',
+                    'member_ids': args.get('member_ids'),
+                    'reason': '单人模式下目标只能交给当前成员，member_ids 会被忽略；这里直接报错而不是静默丢弃。',
+                    'next_actions': [
+                        {'tool': 'butian_mode', 'arguments': {'action': 'set', 'mode': 'team'},
+                         'why': '要让指定成员参与，先切到团队模式。'},
+                        {'tool': 'butian_goal_submit', 'arguments': {'goal': args.get('goal', '<your goal>')},
+                         'why': '留在单人模式时不要传 member_ids，目标归当前成员。'}]})
             model = normalize(args['goal'], args.get('problem'))
             with service.store._write_lock:
                 service.store.db.execute('SAVEPOINT host_goal')
@@ -331,7 +403,13 @@ def _call_tool(service, name, args):
         return service.update_problem(task, args['expected_revision'], args['changes'], actor_member_id=actor, reason=args['reason'])
     if name in {"butian_member_preflight", "butian_member_import", "butian_migration_runs"}:
         raise ValueError("historical_identity_migration_out_of_scope")
-    if name == "butian_status": return {"ok": True, "service": "butian", "version": VERSION, "liveness": True, "collaboration_ready": "unchecked", "next_tool": "butian_collaboration_preflight"}
+    if name == "butian_status":
+        from .runtime.usability import current_mode, token_required
+        actor = (state or {}).get("actor")
+        return {"ok": True, "service": "butian", "version": VERSION, "liveness": True,
+                "collaboration_ready": "unchecked", "actor_member_id": actor,
+                "mode": current_mode(service), "token_required": token_required(),
+                "next_tool": "butian_context" if actor else "butian_connect"}
     member_tools = {tool["name"] for tool in TOOLS if tool["name"].startswith(("butian_memory_", "butian_evolution_", "butian_dream_"))}
     member_tools.update({"butian_knowledge_source_enqueue", "butian_knowledge_source_queue", "butian_tool_execution_audit_replay"})
     member_tools.update({"butian_context_recover", "butian_context_compose", "butian_evidence_record", "butian_task_handoff"})
@@ -450,7 +528,7 @@ def _call_tool(service, name, args):
         context, report = service.compose_context(args["member_id"], args["instruction"], task_id=args.get("task_id"), environment=args.get("environment"), budgets=args.get("budgets"), include_tools=args.get("include_tools", False))
         return {"context": context, "report": asdict(report)}
     if name == "butian_evidence_record":
-        return {"evidence_id": service.record_evidence(args["path"], owner_member_id=args["member_id"], actor_member_id=args["actor_member_id"], token=args.get("token"))}
+        return {"evidence_id": service.record_evidence(args["path"], owner_member_id=args["member_id"], actor_member_id=args["actor_member_id"], token=args.get("token") or None)}
     if name == "butian_task_handoff":
         with service.store._write_lock:
             task = service.store.db.execute("SELECT assignee_id,status FROM tasks WHERE task_id=?", (args["task_id"],)).fetchone()
@@ -493,12 +571,16 @@ def _call_tool(service, name, args):
             raise ValueError("task_create_forbidden")
         return {"task_id": service.store.create_task(args["session_id"], args["title"], args.get("assignee_id"), args.get("parent_id"), args.get("payload"))}
     if name == "butian_task_transition":
-        service.store.transition_task(args["task_id"], args["expected_revision"], args["target"], args["operation_key"]); return {"ok": True}
+        key = args.get("operation_key") or f"{args['task_id']}:{args['expected_revision']}:{args['target']}"
+        service.store.transition_task(args["task_id"], args["expected_revision"], args["target"], key)
+        return {"ok": True, "task_id": args["task_id"], "target": args["target"], "operation_key": key}
     if name == "butian_task_claim":
         actor = args.get("actor_member_id")
+        args["member_id"] = args.get("member_id") or actor
         if args["member_id"] != actor or not service.store.task_access(args["task_id"], actor):
             raise ValueError("member_task_access_denied")
-        return service.store.claim_task(args["task_id"], actor, args.get("lease_seconds", 300), args.get("token"))
+        # 空串会走进 authenticate_member 并失败；本机信任下应为 None，远程空 token 已被 _require_member_arg 拦截。
+        return service.store.claim_task(args["task_id"], actor, args.get("lease_seconds", 300), args.get("token") or None)
     if name == "butian_task_release":
         service.store.release_lease(args["task_id"], args["lease_id"]); return {"ok": True}
     if name == "butian_task_heartbeat":
@@ -612,10 +694,10 @@ def _call_tool(service, name, args):
 
 TOOLS.extend([
     {"name": "butian_tool_schema", "description": "Read one tool schema and its authorization restrictions without executing it", "inputSchema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}},
-    {"name": "butian_tools_catalog", "description": "Read a compact paginated tool catalog; use butian_tool_schema for parameters", "inputSchema": {"type": "object", "properties": {"offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 30}, "prefix": {"type": "string"}}}},
+    {"name": "butian_tools_catalog", "description": "Read a compact paginated tool catalog; filter with query or prefix; use butian_tool_schema for parameters", "inputSchema": {"type": "object", "properties": {"offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 30}, "prefix": {"type": "string"}, "query": {"type": "string", "description": "case-insensitive substring match on tool name or description"}}}},
 ])
 
-TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-only member permission, Provider configuration and task/reviewer readiness checks; never claims execution success", "inputSchema": {"type": "object", "required": ["actor_member_id", "token"], "properties": {key: {"type": "string"} for key in ("actor_member_id", "token", "member_id", "task_id")}}})
+TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-only member permission, Provider configuration and task/reviewer readiness checks; never claims execution success", "inputSchema": {"type": "object", "properties": {key: {"type": "string"} for key in ("actor_member_id", "token", "member_id", "task_id")}}})
 
 
 def list_tools_page(cursor=None):
@@ -627,12 +709,17 @@ def list_tools_page(cursor=None):
         offset = int(cursor[6:])
         if offset >= len(TOOLS) or offset % 8:
             raise ValueError("invalid_tools_cursor")
-    first = ("butian_status", "butian_tools_catalog", "butian_tool_schema", "butian_collaboration_preflight",
-             "butian_goal_submit", "butian_problem_get", "butian_problem_update", "butian_memory_recall")
+    first = ("butian_status", "butian_connect", "butian_context", "butian_mode",
+             "butian_goal_submit", "butian_task_list", "butian_tools_catalog",
+             "butian_tool_schema")
     ordered = sorted(TOOLS, key=lambda tool: first.index(tool['name']) if tool['name'] in first else len(first))
     result = {"tools": ordered[offset:offset + 8]}
     if offset + 8 < len(TOOLS):
         result["nextCursor"] = "tools:" + str(offset + 8)
     return result
 
-TOOLS.append({"name": "butian_collaboration_start", "description": "Preflight then create, claim and start a Provider task for the authenticated member; blocked requests create no task; independent review remains required", "inputSchema": {"type": "object", "required": ["actor_member_id", "token", "goal"], "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}, "member_id": {"type": "string"}, "goal": {"type": "string"}, "problem": {"type": "object"}}}})
+TOOLS.append({"name": "butian_collaboration_start", "description": "Preflight then create, claim and start a Provider task for the authenticated member; blocked requests create no task; independent review remains required", "inputSchema": {"type": "object", "required": ["goal"], "properties": {"actor_member_id": {"type": "string", "description": "inherited from butian_connect when omitted"}, "token": {"type": "string", "description": "inherited from butian_connect; not required on local trust"}, "member_id": {"type": "string"}, "goal": {"type": "string"}, "problem": {"type": "object"}}}})
+
+TOOLS.append({"name": "butian_connect", "description": "Bind this connection to one member once; later calls inherit actor and, on local trust, need no token. Never guesses among multiple members", "inputSchema": {"type": "object", "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
+TOOLS.append({"name": "butian_context", "description": "One call returns current member, mode, visible tasks with revisions and the next legal action", "inputSchema": {"type": "object", "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
+TOOLS.append({"name": "butian_mode", "description": "Read or switch solo/team for upcoming goals without a session_id; running tasks are preserved", "inputSchema": {"type": "object", "properties": {"action": {"type": "string", "enum": ["get", "set"]}, "mode": {"type": "string", "enum": ["solo", "team"]}, "session_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})

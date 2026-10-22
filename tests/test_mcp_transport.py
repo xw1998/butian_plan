@@ -73,8 +73,15 @@ def test_real_stdio_host_without_model_provider_and_restart(tmp_path):
             assert request("initialize", {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "generic-host-test", "version": "1"}})["capabilities"]["tools"] == {}
             proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
             proc.stdin.flush()
-            tools = request("tools/list", {})["tools"]
+            tools, cursor = [], None
+            while True:
+                page = request("tools/list", {} if cursor is None else {"cursor": cursor})
+                tools.extend(page["tools"])
+                cursor = page.get("nextCursor")
+                if cursor is None:
+                    break
             assert any(t["name"] == "butian_memory_recall" for t in tools)
+            assert any(t["name"] == "butian_connect" for t in tools)
             if restart:
                 memories = call("butian_memory_search", query="calibration")["memories"]
                 assert any(m["memory_id"] == "host-memory" for m in memories)

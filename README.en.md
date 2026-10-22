@@ -387,3 +387,24 @@ Configuration availability is not execution success: `execution_verified=false` 
 The current authorization model has no cross-member delegation grant. Real member execution requires its authenticated connection and an available Provider. Task review is restricted to its session dispatcher or assignee; an arbitrary third reviewer is not automatically authorized. Preflight does not grant access, switch identities or certify independent execution.
 
 `butian_collaboration_start` is the minimal high-level execution entry: it runs read-only preflight first, creates no task while clarification, Provider, or authorization conditions are missing, and only then creates and starts the authenticated member's Provider task. It never fabricates analysis output or treats startup as independent review. In the current isolated acceptance store, unbound members explicitly return `provider_unavailable`.
+
+## AI entry points (from 0.1.8)
+
+Three calls replace re-sending credentials, session ids and subtasks on every request:
+
+1. `butian_connect` binds the connection to one member. Local trust needs no token; with several members the server requires an explicit choice and never guesses. Later member-scoped calls inherit the identity.
+2. `butian_mode` reads or switches solo/team **without a session_id**. The change applies to upcoming goals; running tasks are preserved.
+3. `butian_context` returns the current member, mode, visible tasks with revisions, and the next legal action.
+
+`butian_goal_submit` may omit `mode` (uses the current one). In team mode, omitting `subtasks` produces a deterministic role-based split (`plan_source=deterministic_role_split`, explicitly not model-generated); omitting `member_ids` drafts every other member and reports `worker_selection=all_other_members`. **Passing `member_ids` in solo mode now fails loudly with `member_ids_require_team_mode` and a switch-mode action instead of silently dropping them.**
+
+`butian_context` returns `next_actions` keyed by task status instead of always selling a new goal: `todo->ready`, `ready->claim`, `claimed->running`, `running->review` each come with a ready-to-copy `task_id`, `expected_revision`, `target` and `operation_key`. When an actionable task exists no new-goal hint is offered. A dispatcher is never told to do another member's work (it gets `butian_task_tree` for progress only), and review suggestions only cover tasks not owned by the caller.
+
+The first tool page is fixed to status / connect / context / mode / goal_submit / task_list / catalog / schema; further tools follow `nextCursor`. `butian_tools_catalog` accepts `query` (case-insensitive substring over name and description) and returns `catalog_query_no_match` with usable entry points when nothing matches. `butian_task_claim` defaults `member_id` to the connected member, `butian_task_transition` derives `operation_key` from `task:revision:target` when omitted, and `actor_member_id`/`token` are no longer required fields on these tools.
+
+Convenience does not relax boundaries: cross-member access still returns `member_memory_access_denied`, shared deployments can restore per-call tokens with `BUTIAN_MCP_TOKEN_REQUIRED=1`, and a started Provider is neither a completed execution nor an independent review.
+
+```bash
+butian mcp                               # local stdio, no token by default
+BUTIAN_MCP_TOKEN_REQUIRED=1 butian mcp   # shared deployment, token enforced
+```

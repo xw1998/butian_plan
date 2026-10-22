@@ -400,3 +400,24 @@ python -m butian.assets.export /absolute/new/runtime
 当前认证模型要求成员操作的 actor 与 member 相同，没有跨成员委派授权接口。真实数字人执行需要其自身已认证连接与可用 Provider。任务审核还受会话调度员/执行者身份限制；第三位成员并不自动获得审核权。以上预检不会新增授权、自动换身份或伪造独立审核。
 
 `butian_collaboration_start` 是最小高层执行入口：先执行只读预检，问题仍需澄清或 Provider/权限不满足时不创建任务；条件满足才创建并启动当前已认证成员的 Provider，并返回下一步消费入口。它不模拟分析结果，也不把启动成功当成独立审核完成。当前隔离验收库若成员没有 Provider，预检会明确返回 `provider_unavailable`。
+
+## AI 使用入口（0.1.8 起）
+
+面向 AI 宿主收敛为三步，避免每次调用重复拼身份、会话与子任务：
+
+1. `butian_connect` 绑定当前成员一次。本机默认不需要口令；存在多个成员时必须显式指定，服务端不猜。此后成员类工具自动继承身份。
+2. `butian_mode` 读写单人/多人模式，**不需要 session_id**；切换只影响后续目标，运行中任务保留。
+3. `butian_context` 一次返回当前成员、模式、可见任务（含 revision）与下一步合法动作，替代宿主自行追踪 session_id 与 revision。
+
+`butian_goal_submit` 的 `mode` 可省略，默认取当前模式。团队模式省略 `subtasks` 时按成员职责生成确定性分工（`plan_source=deterministic_role_split`，明确标注未调用模型）；省略 `member_ids` 时把全部其他成员纳入分工并回显 `worker_selection=all_other_members`。**单人模式传 `member_ids` 会直接报 `member_ids_require_team_mode` 并给出切模式的动作，不再静默丢弃**。
+
+`butian_context` 的 `next_actions` 按任务状态给，不是一律兜售“再建一个目标”：`todo→ready`、`ready→认领`、`claimed→running`、`running→review` 都直接给好 `task_id`、`expected_revision`、`target` 与 `operation_key`，复制即可执行；已有可推进任务时不再提示新建目标。派发者不会被建议代做其他成员的任务（只给 `butian_task_tree` 看进度），审核建议只给非本人任务。
+
+工具第一页固定为“状态 / 连接 / 上下文 / 模式 / 提交目标 / 任务列表 / 目录 / schema”，其余工具按 `nextCursor` 翻页；`butian_tools_catalog` 支持 `query` 子串过滤（匹配名称与描述），无匹配时返回 `catalog_query_no_match` 并给出可用入口。`butian_task_claim` 的 `member_id` 默认取已连接成员，`butian_task_transition` 的 `operation_key` 缺省按 `task:revision:target` 派生，`actor_member_id` 与 `token` 也不再出现在这些工具的必填项里。
+
+便利不改变边界：跨成员仍是 `member_memory_access_denied`；共享部署可设 `BUTIAN_MCP_TOKEN_REQUIRED=1` 恢复逐次口令；启动成功不代表执行成功，也不代表独立审核。
+
+```bash
+butian mcp                      # 本机 stdio，默认免口令
+BUTIAN_MCP_TOKEN_REQUIRED=1 butian mcp   # 共享部署，恢复口令校验
+```
