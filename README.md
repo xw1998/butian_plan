@@ -197,6 +197,8 @@ CLI、stdio MCP 和本地 HTTP API 共用运行时，Web 提供总览、任务�
 
 可以按任务复杂度选择协作方式，任务与记忆持续保留，便于追踪进展和接续工作。
 
+网页工作台的“提交目标”是一张表：顶部的「单人执行 / 团队分工」可以随时切换，**已填的目标与验收条件不会丢**。切到团队时，执行成员是逐个勾选的，每个人后面就跟着自己的子任务输入框——分工按“成员→子任务”直接配对，不会再出现“子任务行数必须等于成员人数”这类对不上的错误。执行方式（当前 AI 应用/人工交付，或已配置 Provider）两种模式共用：没有配置 Provider 也能提交团队目标并派活，任务会停在等待外部执行。
+
 ## 防止上下文黑洞
 
 补天计划不把 AI 对话窗口当作唯一事实来源。当前任务状态、用户纠正、未决问题、证据、任务交接和下一步动作都会写入结构化状态包与追加事件日志。
@@ -414,6 +416,16 @@ python -m butian.assets.export /absolute/new/runtime
 `butian_context` 的 `next_actions` 按任务状态给，不是一律兜售“再建一个目标”：`todo→ready`、`ready→认领`、`claimed→running`、`running→review` 都直接给好 `task_id`、`expected_revision`、`target` 与 `operation_key`，复制即可执行；已有可推进任务时不再提示新建目标。派发者不会被建议代做其他成员的任务（只给 `butian_task_tree` 看进度），审核建议只给非本人任务。
 
 工具第一页固定为“状态 / 连接 / 上下文 / 模式 / 提交目标 / 任务列表 / 目录 / schema”，其余工具按 `nextCursor` 翻页；`butian_tools_catalog` 支持 `query` 子串过滤（匹配名称与描述），无匹配时返回 `catalog_query_no_match` 并给出可用入口。`butian_task_claim` 的 `member_id` 默认取已连接成员，`butian_task_transition` 的 `operation_key` 缺省按 `task:revision:target` 派生，`actor_member_id` 与 `token` 也不再出现在这些工具的必填项里。
+
+身份与口令仍写在工具的 schema 必填里（这些工具确实需要认证），但 `butian_connect` 之后由连接自动注入，**连一次就不必每次重传** `member_id`/`actor_member_id`/`token`；没连接时缺身份会直接得到“先 `butian_connect`”的下一步，而不是让人猜。只有 `butian_hypothesis_action_grant`、`butian_tool_security_review`、`butian_tool_repair_confirm`、`butian_dispatcher_set`、`butian_host_authorization_*` 这些 **member_id 指向别人或独立角色**的工具不会被注入——默认成自己会把“授权、独立复核”变成自我授权。可选参数传 `null` 视为未提供，不会因模板留空被判类型错。
+
+同一执行者重复提交同名目标不会失败，但会在返回里带 `duplicate_of` 与 `duplicate_note`（指出已有任务的 `task_id` 与状态）——静默产生两份互相看不见的工作才是真问题；刻意并行时改一句目标描述即可。
+
+本机回环工作台在 `/api/goals/host-submit` 这类走工具层的接口上同样不需要口令（服务端为当前请求绑定本机代表），**但显式传了口令就按口令校验**：错口令仍然失败，本机免口令不等于“错口令也算对”。
+
+`butian_goal_submit` 接受把问题模型字段直接写在顶层（如 `acceptance_criteria`），与写在 `problem` 里等价；同一字段两处取值不同会报 `problem_field_conflict`，**拼错或未知的参数会报 `unknown_argument` 并列出被接受的参数名**，不再静默忽略（以前顶层 `acceptance_criteria` 会被丢掉，目标莫名停在 `needs_clarification`）。
+
+报错一律带“缺什么、下一步调用什么”：对象不存在（`knowledge_source_not_found`、`source_snapshot_not_found`、`memory_not_found`、`tool_version_not_found` 等）会给出能看见/建立该对象的工具；`butian_knowledge_source_add` 只登记哈希，读过正文前需先 `butian_knowledge_source_verify`（校验通过即落可读快照）或 `butian_knowledge_source_capture`；`butian_task_tree` 的 `payload` 直接返回解析后的对象，不再是二次编码字符串。
 
 便利不改变边界：跨成员仍是 `member_memory_access_denied`；共享部署可设 `BUTIAN_MCP_TOKEN_REQUIRED=1` 恢复逐次口令；启动成功不代表执行成功，也不代表独立审核。
 

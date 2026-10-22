@@ -13,11 +13,17 @@ description: 正确使用补天 Butian MCP 完成任务执行、经验召回、�
 2. `butian_mode`：`{"action":"get"}` 看当前模式，`{"action":"set","mode":"team"}` 切换。**不需要 session_id**，只影响后续目标；运行中任务保留不取消。
 3. `butian_context`：一次拿到当前成员、模式、可见任务及其 revision、以及下一步合法动作。用它代替自己维护 session_id 与 revision。
 
-提交目标时 `mode` 可省略，默认用 `butian_mode` 当前值。团队模式省略 `subtasks` 会按成员职责生成**确定性分工**（`plan_source=deterministic_role_split`，未调用模型）；要更细的拆解就显式传 `subtasks`，此时 `plan_source=host`。省略 `member_ids` 会把全部其他成员都排进分工（`worker_selection=all_other_members`），只想少数人参与时显式指定。**单人模式传 `member_ids` 会报 `member_ids_require_team_mode`，先切模式再提交。**
+提交目标时 `mode` 可省略，默认用 `butian_mode` 当前值。重复提交同一句目标不会失败，但返回里会带 `duplicate_of`（已有 `task_id` 与状态）和 `duplicate_note`：先判断是不是同一件事，是就接着用旧任务，真要做并行任务就改一句目标描述。团队模式省略 `subtasks` 会按成员职责生成**确定性分工**（`plan_source=deterministic_role_split`，未调用模型）；要更细的拆解就显式传 `subtasks`，此时 `plan_source=host`。省略 `member_ids` 会把全部其他成员都排进分工（`worker_selection=all_other_members`），只想少数人参与时显式指定。**单人模式传 `member_ids` 会报 `member_ids_require_team_mode`，先切模式再提交。**
 
 `butian_context` 的 `next_actions` 就是可复制的调用参数：`todo→ready`、`ready→认领`、`claimed→running`、`running→review` 四步直接给 `task_id`/`expected_revision`/`target`/`operation_key`，照抄即可，不必自己算 operation_key 或猜 revision；有可推进任务时它不会再劝你新建目标。派发者只拿到 `butian_task_tree`（别人名下的任务不该你代做），审核建议只给非本人任务。
 
 工具第一页固定为「状态 / 连接 / 上下文 / 模式 / 提交目标 / 任务列表 / 目录 / schema」，不是全部工具；找工具用 `butian_tools_catalog`（支持 `query` 子串过滤名称与描述，无匹配返回 `catalog_query_no_match`），再用 `butian_tool_schema` 取单个 schema。`butian_task_claim` 的 `member_id` 默认取已连接成员，`butian_task_transition` 的 `operation_key` 缺省派生，`actor_member_id`/`token` 不是这些工具的必填项。
+
+说了“我是谁”就不用再说：`butian_connect` 建立连接后，`member_id`/`actor_member_id`/`token` 由连接注入（schema 里仍声明必填，因为脱开连接它们确实必需）。没连接就调用成员类工具，会直接得到“先 `butian_connect`”的下一步。只有 `butian_hypothesis_action_grant`、`butian_tool_security_review`、`butian_tool_repair_confirm`、`butian_dispatcher_set`、`butian_host_authorization_*` 不会被注入——那里 `member_id` 指的是别人或独立角色，默认成自己会把授权与独立复核变成自我授权。可选参数传 `null` 视为未提供。
+
+提交目标时问题模型字段可以直接写顶层（如 `acceptance_criteria`），与写在 `problem` 里等价；两处取值不同报 `problem_field_conflict`，**拼错或未知的参数报 `unknown_argument` 并列出可接受的参数名**——不会被静默忽略。验收标准为空会让任务停在 `needs_clarification`，此时按 `clarification.next_actions` 调 `butian_problem_update`（`expected_revision` 是问题定义 revision，不是任务 revision）。
+
+报错统一带下一步：对象不存在（`knowledge_source_not_found`、`source_snapshot_not_found`、`memory_not_found`、`tool_version_not_found` 等）会指向能列出/建立该对象的工具；`butian_knowledge_source_add` 只登记哈希，正文要先 `butian_knowledge_source_verify`（哈希一致即落可读快照）或 `butian_knowledge_source_capture` 才能读；`butian_task_tree` 的 `payload` 已是解析后的对象。
 
 这些便利不放宽边界：跨成员访问仍返回 `member_memory_access_denied`；共享部署可设 `BUTIAN_MCP_TOKEN_REQUIRED=1` 恢复逐次口令校验；启动成功不等于执行成功，也不等于独立审核完成。
 

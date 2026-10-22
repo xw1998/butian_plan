@@ -1156,6 +1156,29 @@ class ButianService:
                 self.store.db.execute("RELEASE host_team_goal")
                 raise
 
+    def active_goal_duplicate(self, assignee: str, goal: str) -> dict[str, Any] | None:
+        """同一执行者已有未结束的同名目标时给出提示：重复提交会产生两份互相看不见的工作。
+
+        只提示、不拦截——刻意并行或重建目标时仍然允许提交，避免把合法操作判死。
+        """
+        if not assignee or not goal:
+            return None
+        row = self.store.db.execute(
+            "SELECT task_id, status FROM tasks WHERE assignee_id=? AND TRIM(title)=? "
+            "AND status NOT IN ('done','cancelled','failed') ORDER BY rowid DESC LIMIT 1",
+            (assignee, goal),
+        ).fetchone()
+        return {'task_id': row['task_id'], 'status': row['status']} if row else None
+
+    def annotate_duplicate(self, result: dict[str, Any], duplicate: dict[str, Any] | None) -> dict[str, Any]:
+        if duplicate:
+            result['duplicate_of'] = duplicate
+            result['duplicate_note'] = (
+                f"同一执行者已有未结束的同目标任务 {duplicate['task_id']}（{duplicate['status']}）。"
+                "若要并行推进，请把目标描述改到能区分；否则建议直接在这个任务上继续。"
+            )
+        return result
+
     def submit_goal(self, goal: str, *, mode: str = "solo", member_id: str | None = None, dispatcher_member_id: str | None = None, requested_model: str | None = None, capabilities=None, environment=None, member_ids: list[str] | None = None, subtasks: list[str] | None = None, problem: dict | None = None) -> dict[str, Any]:
         """把自然语言目标接入执行主链；所有输入及Provider绑定先验验证后再创建任务。"""
         if not isinstance(goal, str) or not goal.strip():
@@ -1170,6 +1193,7 @@ class ButianService:
         assignee = resolved_dispatcher if mode == "team" else (member_id or resolved_dispatcher)
         if not assignee:
             raise ValueError("member_required")
+        duplicate = self.active_goal_duplicate(assignee, goal.strip())
         if problem_model['definition_status'] == 'needs_clarification':
             clarification_payload = {'goal': goal.strip(), 'mode': mode, 'environment': environment or {}}
             if mode == 'team':
@@ -1189,7 +1213,7 @@ class ButianService:
                     self.store.db.execute('ROLLBACK TO goal_clarification')
                     self.store.db.execute('RELEASE goal_clarification')
                     raise
-            return {'session': session, 'task_id': root_id, 'assignee_id': assignee, 'status': 'needs_clarification', 'problem': saved}
+            return self.annotate_duplicate({'session': session, 'task_id': root_id, 'assignee_id': assignee, 'status': 'needs_clarification', 'problem': saved}, duplicate)
         workers: list[str] = []
         plans: list[str] = []
         if mode == "team":
@@ -1210,7 +1234,7 @@ class ButianService:
             lease = self.store.claim_task(root_id, assignee, lease_seconds=300, internal=True)
             self.store.transition_task(root_id, lease["revision"], "running", f"goal:{root_id}:running")
             execution = self.start_provider_task(assignee, goal.strip(), task_id=root_id, environment=environment, model=requested_model)
-            return {"session": session, "task_id": root_id, "assignee_id": assignee, "execution": execution}
+            return self.annotate_duplicate({"session": session, "task_id": root_id, "assignee_id": assignee, "execution": execution}, duplicate)
         if planning is not None:
             self.store.append_event(root_id, "team_plan_generated", planning, f"team-plan:{root_id}")
         children = []
@@ -1232,7 +1256,7 @@ class ButianService:
             children.append({"task_id": child_id, "member_id": worker, "instruction": instruction, "execution": execution})
         self.store.append_event(root_id, "team_goal_dispatched", {"worker_count": len(children), "child_task_ids": [x["task_id"] for x in children]}, f"goal:{root_id}:dispatched")
         status = "partial_dispatch" if any(item["execution"].get("status") != "running" for item in children) else "dispatched"
-        return {"session": session, "task_id": root_id, "assignee_id": assignee, "mode": "team", "children": children, "status": status}
+        return self.annotate_duplicate({"session": session, "task_id": root_id, "assignee_id": assignee, "mode": "team", "children": children, "status": status}, duplicate)
 
     def run_team_goal(self, task_id: str) -> dict[str, Any]:
         root = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
@@ -1288,7 +1312,23 @@ class ButianService:
                 continue
             if child["status"] in {"review", "done"}:
                 child_payload = json.loads(child["payload"] or "{}")
-                results.append({"task_id": child["task_id"], "status": child["status"], "text": child_payload.get("provider_output", ""), "evidence_ids": child_payload.get("evidence_ids") or ([child_payload["evidence_id"]] if child_payload.get("evidence_id") else [])})
+                text = child_payload.get("provider_output", "")
+                evidence_ids = child_payload.get("evidence_ids") or ([child_payload["evidence_id"]] if child_payload.get("evidence_id") else [])
+                source = "provider_output" if text or evidence_ids else None
+                if not text or not evidence_ids:
+                    # 宿主/人工交付写在 handoffs 里，不在 payload：汇总时必须回退到交付内容，
+                    # 否则团队汇总会把“已交付”的子任务显示成空文本、零证据。
+                    handoff_row = self.store.db.execute(
+                        "SELECT payload FROM handoffs WHERE task_id=? ORDER BY revision DESC LIMIT 1", (child["task_id"],)).fetchone()
+                    if handoff_row:
+                        handoff = json.loads(handoff_row["payload"])
+                        text = text or handoff.get("summary", "")
+                        evidence_ids = evidence_ids or handoff.get("evidence_ids") or []
+                        source = "handoff"
+                entry = {"task_id": child["task_id"], "status": child["status"], "text": text, "evidence_ids": evidence_ids}
+                if source:
+                    entry["source"] = source
+                results.append(entry)
                 continue
             if json.loads(child["payload"] or "{}").get("execution_mode") == "host":
                 results.append({"task_id": child["task_id"], "status": "awaiting_external_execution"})
@@ -1365,7 +1405,26 @@ class ButianService:
                 self.store.transition_task(task_id, root_now["revision"], "running", f"team:{task_id}:running")
                 root_now = self.store.db.execute("SELECT revision,status FROM tasks WHERE task_id=?", (task_id,)).fetchone()
             if root_now["status"] == "running":
-                outputs = [{"task_id": row["task_id"], "member_id": row["assignee_id"], "output": json.loads(row["payload"]).get("provider_output", ""), "evidence_id": json.loads(row["payload"]).get("evidence_id"), "evidence_ids": json.loads(row["payload"]).get("evidence_ids", [])} for row in refreshed]
+                outputs = []
+                for row in refreshed:
+                    payload_row = json.loads(row["payload"] or "{}")
+                    output_text = payload_row.get("provider_output", "")
+                    evidence_ids = payload_row.get("evidence_ids") or ([payload_row["evidence_id"]] if payload_row.get("evidence_id") else [])
+                    source = "provider_output" if output_text or evidence_ids else None
+                    if not output_text or not evidence_ids:
+                        # 与 children 汇总同源：宿主/人工交付写在 handoffs 里，
+                        # 父级汇总不能把已交付的子任务显示成空文本、零证据。
+                        handoff_row = self.store.db.execute(
+                            "SELECT payload FROM handoffs WHERE task_id=? ORDER BY revision DESC LIMIT 1", (row["task_id"],)).fetchone()
+                        if handoff_row:
+                            handoff = json.loads(handoff_row["payload"] or "{}")
+                            output_text = output_text or handoff.get("summary", "")
+                            evidence_ids = evidence_ids or handoff.get("evidence_ids") or []
+                            source = "handoff"
+                    entry = {"task_id": row["task_id"], "member_id": row["assignee_id"], "output": output_text, "evidence_id": payload_row.get("evidence_id"), "evidence_ids": evidence_ids}
+                    if source:
+                        entry["source"] = source
+                    outputs.append(entry)
                 root_owner = root["assignee_id"] or session.get("dispatcher_member_id")
                 instruction = (
                     "请对团队目标进行最终综合验收与汇总。逐项核对子任务证据，说明冲突、"

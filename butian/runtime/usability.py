@@ -52,8 +52,8 @@ def connect(service, args: dict, state: dict) -> dict:
         if len(rows) != 1:
             return {"connected": False, "reason": "member_id_required",
                     "members": [row["member_id"] for row in rows],
-                    "next_actions": [{"tool": "butian_connect", "arguments": {"member_id": "<choose>"}}],
-                    "note": "存在多个成员时必须显式指定，不会替你猜。"}
+                    "next_actions": [{"tool": "butian_connect", "arguments": {"member_id": "<one of members>"}}],
+                    "note": "存在多个成员时必须显式指定（arguments.member_id 填 members 里的某个 id），不会替你猜。"}
         member = rows[0]["member_id"]
     if not service.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member,)).fetchone():
         raise ValueError("member_not_found")
@@ -64,10 +64,15 @@ def connect(service, args: dict, state: dict) -> dict:
         service.local_actor = None
     else:
         service.enable_local_actor(member)
-    state["actor"], state["token"] = member, token
-    return {"connected": True, "actor_member_id": member, "token_required": token_required(),
-            "mode": current_mode(service),
-            "next_actions": [{"tool": "butian_context"}, {"tool": "butian_mode", "arguments": {"action": "get"}}]}
+    previous, state["actor"], state["token"] = state.get("actor"), member, token
+    result = {"connected": True, "actor_member_id": member, "token_required": token_required(),
+              "mode": current_mode(service),
+              "next_actions": [{"tool": "butian_context"}, {"tool": "butian_mode", "arguments": {"action": "get"}}]}
+    if previous and previous != member:
+        # 静默换身份会让后续调用落到另一个人名下，必须回显。
+        result["previous_member_id"] = previous
+        result["note"] = f"身份已从 {previous} 切换为 {member}；此前以 {previous} 作出的判断不要算到 {member} 名下。"
+    return result
 
 
 _STEP_BY_STATUS = {
@@ -78,12 +83,37 @@ _STEP_BY_STATUS = {
 }
 
 
-def next_step_for_task(task: dict, actor: str | None) -> dict | None:
+def latest_problem(service, task_id: str) -> dict | None:
+    """取任务最新一版问题定义；没有定义时返回 None（不是错误）。"""
+    try:
+        row = service.store.db.execute(
+            "SELECT body FROM problem_models WHERE task_id=? ORDER BY revision DESC LIMIT 1", (task_id,)).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    try:
+        return json.loads(row["body"])
+    except ValueError:
+        return None
+
+
+def next_step_for_task(task: dict, actor: str | None, problem: dict | None = None) -> dict | None:
     """给出该任务下一条合法的迁移动作，参数直接可复制，不用宿主去猜 revision 与 operation_key。"""
     assignee = task.get("assignee_id")
     if actor and assignee and assignee != actor:
         # 派发者不代做别人的任务，否则独立执行与独立审核都会失效。
         return None
+    if problem and problem.get("definition_status") == "needs_clarification":
+        # 问题定义没完成时任何状态迁移都会被拒，先给澄清动作，别给注定失败的下一步。
+        questions = problem.get("clarification_questions") or ["什么结果可以证明目标已完成？"]
+        return {"tool": "butian_problem_update",
+                "arguments": {"task_id": task["task_id"],
+                              "expected_revision": problem.get("revision", 0),
+                              "changes": {"acceptance_criteria": ["<可验证的验收标准>"]},
+                              "reason": "<为什么这样补>"},
+                "why": "目标还没定义清（" + "；".join(questions[:2]) + "）：先补问题定义，再推进状态；"
+                       "这里的 expected_revision 是问题定义 revision，不是任务 revision。"}
     step = _STEP_BY_STATUS.get(task.get("status"))
     if not step:
         return None
@@ -101,7 +131,7 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
     """一次返回模式、成员、可见任务和下一步动作，免去宿主自己拼 session_id 与 revision。"""
     members = [dict(row) for row in service.store.db.execute(
         "SELECT member_id, name, role, provider_id FROM members ORDER BY member_id")]
-    visible = []
+    visible, problems = [], {}
     for task in service.store.list_tasks():
         if actor and not service.store.task_access(task["task_id"], actor):
             continue
@@ -110,10 +140,17 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
             payload = json.loads(task.get("payload") or "{}")
         except ValueError:
             payload = {}
-        visible.append({"task_id": task["task_id"], "title": task["title"], "status": task["status"],
-                        "revision": task["revision"], "assignee_id": task["assignee_id"],
-                        "session_id": task["session_id"], "mode": payload.get("mode"),
-                        "execution_mode": payload.get("execution_mode")})
+        problem = latest_problem(service, task["task_id"])
+        entry = {"task_id": task["task_id"], "title": task["title"], "status": task["status"],
+                 "revision": task["revision"], "assignee_id": task["assignee_id"],
+                 "session_id": task["session_id"], "mode": payload.get("mode"),
+                 "execution_mode": payload.get("execution_mode")}
+        if problem:
+            entry["definition_status"] = problem.get("definition_status")
+            if problem.get("definition_status") == "needs_clarification":
+                entry["clarification_questions"] = problem.get("clarification_questions") or []
+        problems[task["task_id"]] = problem
+        visible.append(entry)
     active = [task for task in visible if task["status"] in ACTIVE_STATUSES]
     recent = (active + [task for task in visible if task["status"] not in ACTIVE_STATUSES])[-limit:]
     recent.reverse()
@@ -130,7 +167,7 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
     for task in active:
         if advancing >= 2:
             break
-        step = next_step_for_task(task, actor)
+        step = next_step_for_task(task, actor, problems.get(task["task_id"]))
         if step:
             next_actions.append(step)
             advancing += 1
@@ -143,8 +180,16 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
                              "why": "有任务等待审核；审核必须由有权限的其他成员独立完成，不能自己审自己的任务。"})
     own_review = [task for task in active if task["status"] == "review" and task.get("assignee_id") == actor]
     if own_review and not review_tasks:
-        next_actions.append({"note": "你名下的任务已在 review，需由其他成员审核；不要自己审自己。",
-                             "task_id": own_review[0]["task_id"]})
+        target = own_review[0]
+        if mode == "solo":
+            # 单人模式下任务只归一个人：合法审核者只有自己，不能假装存在独立审核。
+            next_actions.append({"tool": "butian_task_review",
+                                 "arguments": {"task_id": target["task_id"], "revision": target["revision"],
+                                               "verdict": "approve|rework"},
+                                 "why": "单人模式下没有其他成员可审：审核只能由你完成，这不构成独立审核，请在结论里如实标注；要独立审核请切团队模式并派给其他成员。"})
+        else:
+            next_actions.append({"note": "你名下的任务已在 review，需由本会话派发者或其他人审核；不要自己审自己。",
+                                 "task_id": target["task_id"]})
     if mode == "team" and not others:
         next_actions.append({"outside_mcp": "butian member add <member_id> <name> --role <role>",
                              "why": "当前只有你一个成员，团队模式会退化；本 MCP 成员面无添加成员工具，需用 CLI 或网页添加。"})

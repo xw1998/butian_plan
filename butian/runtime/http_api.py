@@ -46,6 +46,21 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ValueError:
             return False
 
+    def _bind_local_actor(self, actor, token=None):
+        # 本机免令牌模式下，服务层的成员边界仍要求一个可信的本地代表；
+        # 不绑定就会让 goals/host-submit 这类走 call_tool 的接口在“没口令”时失败。
+        if not actor or not self._local_mode():
+            return
+        if token:
+            # 显式给了口令就按口令校验：本机免口令不等于“错口令也算对”。
+            self.service.local_actor = None
+            return
+        try:
+            self.service.enable_local_actor(actor)
+        except ValueError:
+            # BUTIAN_MCP_TOKEN_REQUIRED=1 等配置明确要求口令时不越权，交给服务层报错。
+            pass
+
     def _authenticate_actor(self, actor, token):
         if self._local_mode():
             return bool(self.service.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (actor,)).fetchone())
@@ -76,6 +91,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(401, {"error": "member_authentication_failed"})
             return False
         self._authenticated_member_id = actor
+        self._bind_local_actor(actor, token)
         if (body or {}).get("actor_member_id") and (body or {}).get("actor_member_id") != actor:
             self._send(403, {"error": "actor_identity_mismatch"})
             return False
@@ -399,12 +415,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                 from ..mcp_server import call_tool
                 tool = {"/api/goals/host-submit": "butian_goal_submit", "/api/goals/problem/get": "butian_problem_get", "/api/goals/problem/update": "butian_problem_update", "/api/goals/problem/resume": "butian_problem_resume"}[path]
                 actor, token = self._member_credentials(body)
-                self._send(200, call_tool(self.service, tool, {**body, "actor_member_id": actor, "token": token})); return
+                self._send(200, call_tool(self.service, tool, {**body, "actor_member_id": actor, "token": token or ""})); return
             if path in {"/api/executions/export", "/api/executions/submit"}:
                 from ..mcp_server import call_tool
                 actor, token = self._member_credentials(body)
                 tool = "butian_execution_export" if path.endswith("/export") else "butian_execution_submit"
-                self._send(200, call_tool(self.service, tool, {**body, "actor_member_id": actor, "token": token})); return
+                self._send(200, call_tool(self.service, tool, {**body, "actor_member_id": actor, "token": token or ""})); return
             if path == "/api/goals/run-solo":
                 self._send(200, self.service.run_solo_task(body["task_id"], actor_member_id=self._member_credentials(body)[0])); return
             if path == "/api/goals/run-team":

@@ -20,6 +20,13 @@ _ALLOWED: dict[TaskStatus, set[TaskStatus]] = {
 class InvalidTransition(ValueError):
     pass
 
+def allowed_targets(current) -> list[str]:
+    """当前状态可以合法迁移到的状态名；供错误提示给出可执行下一步。"""
+    if isinstance(current, str):
+        current = TaskStatus(current)
+    return sorted(target.value for target in _ALLOWED.get(current, set()))
+
+
 def transition(current: TaskStatus, target: TaskStatus) -> TaskStatus:
     if target not in _ALLOWED[current]:
         raise InvalidTransition(f"invalid task transition: {current} -> {target}")

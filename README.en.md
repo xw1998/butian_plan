@@ -197,6 +197,8 @@ Team mode suits work that benefits from specialization. Each sub-agent acts unde
 
 Choose the workflow to match the task. Persistent tasks and memory help preserve continuity as the work progresses.
 
+The web console's **Submit goal** panel is one form: the **Solo / Team** switch sits at the top and toggles in place, so anything already typed (goal, acceptance criteria) survives the switch. In team mode each member is picked with a checkbox and carries its own subtask field, so work is paired member-to-subtask and the old "subtask line count must equal member count" failure cannot happen. Delivery mode (current AI app / manual, or a configured provider) is shared by both modes: a team goal can be dispatched without any provider bound, and it simply waits for external execution.
+
 ## Keep context from disappearing
 
 Butian stores task state, corrections, open questions, evidence, handoffs, and next steps in structured state packages and an append-only event log.
@@ -396,11 +398,21 @@ Three calls replace re-sending credentials, session ids and subtasks on every re
 2. `butian_mode` reads or switches solo/team **without a session_id**. The change applies to upcoming goals; running tasks are preserved.
 3. `butian_context` returns the current member, mode, visible tasks with revisions, and the next legal action.
 
+Submitting the same goal text again for the same operator does not fail, but the response carries `duplicate_of` and `duplicate_note` (the existing `task_id` and status) — two parallel tasks that cannot see each other is the real hazard; change one word of the goal when you genuinely want a parallel run.
+
+The loopback console also accepts `/api/goals/host-submit` and the other tool-backed endpoints without a token (the server binds the local operator for that request), **but an explicitly supplied token is still verified**: a wrong token fails, because "no token locally" is not the same as "any token is fine".
+
 `butian_goal_submit` may omit `mode` (uses the current one). In team mode, omitting `subtasks` produces a deterministic role-based split (`plan_source=deterministic_role_split`, explicitly not model-generated); omitting `member_ids` drafts every other member and reports `worker_selection=all_other_members`. **Passing `member_ids` in solo mode now fails loudly with `member_ids_require_team_mode` and a switch-mode action instead of silently dropping them.**
 
 `butian_context` returns `next_actions` keyed by task status instead of always selling a new goal: `todo->ready`, `ready->claim`, `claimed->running`, `running->review` each come with a ready-to-copy `task_id`, `expected_revision`, `target` and `operation_key`. When an actionable task exists no new-goal hint is offered. A dispatcher is never told to do another member's work (it gets `butian_task_tree` for progress only), and review suggestions only cover tasks not owned by the caller.
 
-The first tool page is fixed to status / connect / context / mode / goal_submit / task_list / catalog / schema; further tools follow `nextCursor`. `butian_tools_catalog` accepts `query` (case-insensitive substring over name and description) and returns `catalog_query_no_match` with usable entry points when nothing matches. `butian_task_claim` defaults `member_id` to the connected member, `butian_task_transition` derives `operation_key` from `task:revision:target` when omitted, and `actor_member_id`/`token` are no longer required fields on these tools.
+The first tool page is fixed to status / connect / context / mode / goal_submit / task_list / catalog / schema; further tools follow `nextCursor`. `butian_tools_catalog` accepts `query` (case-insensitive substring over name and description) and returns `catalog_query_no_match` with usable entry points when nothing matches. `butian_task_claim` defaults `member_id` to the connected member and `butian_task_transition` derives `operation_key` from `task:revision:target` when omitted; `member_id`, `actor_member_id` and `token` stay required in the schemas, but `butian_connect` makes them injectable so a caller states its identity once.
+
+Identity is stated once: `butian_connect` injects `member_id`/`actor_member_id`/`token` into every later call (they stay required in the schemas because they are genuinely required without a connection, and calling before connecting returns a ready-to-copy `butian_connect` next action). Only `butian_hypothesis_action_grant`, `butian_tool_security_review`, `butian_tool_repair_confirm`, `butian_dispatcher_set` and `butian_host_authorization_*` are never injected, because there `member_id` names someone else or an independent role — defaulting it to yourself would turn authorization and independent review into self-approval. Optional arguments sent as `null` count as absent instead of failing type validation.
+
+`butian_goal_submit` accepts problem-model fields at the top level (for example `acceptance_criteria`) as an equivalent of nesting them under `problem`; conflicting values across the two places return `problem_field_conflict`, and **misspelled or unknown arguments return `unknown_argument` with the accepted names** instead of being silently ignored (previously a top-level `acceptance_criteria` was dropped and the goal stalled in `needs_clarification`).
+
+Errors always say what is missing and which call comes next: missing objects (`knowledge_source_not_found`, `source_snapshot_not_found`, `memory_not_found`, `tool_version_not_found`, ...) point at a tool that lists or creates them; `butian_knowledge_source_add` registers only a hash, so reading its content requires `butian_knowledge_source_verify` first (a hash match also stores the readable snapshot) or `butian_knowledge_source_capture`; `butian_task_tree` returns `payload` already parsed instead of a double-encoded string.
 
 Convenience does not relax boundaries: cross-member access still returns `member_memory_access_denied`, shared deployments can restore per-call tokens with `BUTIAN_MCP_TOKEN_REQUIRED=1`, and a started Provider is neither a completed execution nor an independent review.
 

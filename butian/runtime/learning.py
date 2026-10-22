@@ -387,7 +387,13 @@ class LearningStore:
         expected = str(row["content_hash"]).lower().removeprefix("sha256:")
         matched = actual == expected
         self.db.execute("UPDATE knowledge_sources SET status=?,verified_hash=?,verified_at=? WHERE source_id=?", ("verified" if matched else "hash_mismatch", actual, self._clock(), source_id))
-        return {"source_id": source_id, "status": "verified" if matched else "hash_mismatch", "expected_hash": expected, "actual_hash": actual}
+        # 校验通过时把这份字节留作可读快照：否则 add 只登记了哈希，read 永远 source_snapshot_not_found，
+        # 本机/人工来源（没有可抓 URL）就彻底读不回原文。
+        snapshot_saved = False
+        if matched and len(raw) <= 10_000_000:
+            self.db.execute("INSERT OR IGNORE INTO knowledge_source_snapshots VALUES (?,?,?)", (source_id, raw, actual))
+            snapshot_saved = True
+        return {"source_id": source_id, "status": "verified" if matched else "hash_mismatch", "expected_hash": expected, "actual_hash": actual, "snapshot_saved": snapshot_saved}
 
     @synchronized_learning
     def add_claim(self, source_id: str, claim: str, *, owner_member_id: str | None = None, conditions=None, limitations=None, confidence: float = 0.0, predictions=None, falsifiers=None) -> str:

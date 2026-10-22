@@ -21,7 +21,7 @@ TOOLS = [
     {"name": "butian_session_list", "description": "List sessions with mode and dispatcher snapshot plus backend dispatcher config", "inputSchema": {"type": "object", "properties": {}}},
     {"name": "butian_dispatcher_set", "description": "Set backend default dispatcher member (only affects new sessions)", "inputSchema": {"type": "object", "required": ["member_id"], "properties": {"member_id": {"type": "string"}}}},
     {"name": "butian_task_tree", "description": "Return the task tree (roots with nested children)", "inputSchema": {"type": "object", "properties": {"session_id": {"type": "string"}}}},
-    {"name": "butian_task_review", "description": "Review a task in review status: approve (done, gated by handoff evidence) or rework (back to ready, capped by rework limit)", "inputSchema": {"type": "object", "required": ["task_id", "revision", "verdict"], "properties": {"task_id": {"type": "string"}, "revision": {"type": "integer"}, "verdict": {"type": "string", "enum": ["approve", "rework"]}, "reviewer_member_id": {"type": "string"}, "notes": {"type": "string"}, "rework_limit": {"type": "integer"}}}},
+    {"name": "butian_task_review", "description": "Review a task in review status: approve (done, gated by handoff evidence) or rework (back to ready, capped by rework limit). revision accepts expected_revision; verdict accepts decision.", "inputSchema": {"type": "object", "required": ["task_id"], "properties": {"task_id": {"type": "string"}, "revision": {"type": "integer", "description": "current task revision; expected_revision is accepted as an alias"}, "expected_revision": {"type": "integer", "description": "alias of revision"}, "verdict": {"type": "string", "enum": ["approve", "rework"], "description": "decision is accepted as an alias"}, "decision": {"type": "string", "enum": ["approve", "rework"], "description": "alias of verdict"}, "reviewer_member_id": {"type": "string"}, "notes": {"type": "string"}, "rework_limit": {"type": "integer"}}}},
     {"name": "butian_task_create", "description": "Create a task", "inputSchema": {"type": "object", "required": ["session_id", "title"], "properties": {"session_id": {"type": "string"}, "title": {"type": "string"}, "assignee_id": {"type": "string"}}}},
     {"name": "butian_task_transition", "description": "Transition a task with revision guard; todo->ready->claimed->running->review->done", "inputSchema": {"type": "object", "required": ["task_id", "expected_revision", "target"], "properties": {"task_id": {"type": "string"}, "expected_revision": {"type": "integer"}, "target": {"type": "string", "enum": ["ready", "claimed", "running", "review", "done", "blocked", "failed", "cancelled", "waiting_user"]}, "operation_key": {"type": "string", "description": "idempotency key; derived from task/revision/target when omitted"}}}},
     {"name": "butian_task_claim", "description": "Claim a ready task with a lease; member_id defaults to the connected member", "inputSchema": {"type": "object", "required": ["task_id"], "properties": {"task_id": {"type": "string"}, "member_id": {"type": "string", "description": "defaults to the connected member"}, "lease_seconds": {"type": "integer"}, "token": {"type": "string"}}}},
@@ -123,9 +123,9 @@ TOOLS.extend([
 # Host AI applications execute work themselves; these tools do not need a model Provider.
 for _name, _description, _fields, _required in [
     ("butian_context_compose", "Compose member context for work performed by the host AI", {"instruction": {"type": "string"}, "task_id": {"type": "string"}, "environment": {"type": "object"}, "budgets": {"type": "object"}, "include_tools": {"type": "boolean"}}, ["instruction"]),
-    ("butian_context_recover", "Recover committed task history or persisted output with its content hash", {"task_id": {"type": "string"}, "event_id": {"type": "string"}, "payload_field": {"type": "string", "enum": ["provider_output", "results", "dream_source_snapshot", "candidate_content"]}}, ["task_id"]),
+    ("butian_context_recover", "Recover committed task history or persisted output with its content hash", {"task_id": {"type": "string"}, "event_id": {"type": "string"}, "payload_field": {"type": "string", "description": "provider_output | results | dream_source_snapshot | candidate_content"}}, ["task_id"]),
     ("butian_evidence_record", "Register an existing local evidence file owned by the authenticated member", {"path": {"type": "string"}}, ["path"]),
-    ("butian_task_handoff", "Submit host-produced task handoff at the current revision; evidence remains required for approval", {"method_uses": {"type": "array", "items": {"type": "object", "required": ["memory_id", "outcome", "evidence_id"], "properties": {"memory_id": {"type": "string"}, "outcome": {"type": "string", "enum": ["success", "failure", "unknown"]}, "evidence_id": {"type": "string"}}}}, "task_id": {"type": "string"}, "task_revision": {"type": "integer"}, "status": {"type": "string"}, "summary": {"type": "string"}, "evidence_ids": {"type": "array", "items": {"type": "string"}}, "next_action": {"type": "string"}, "confidence": {"type": "number"}}, ["task_id", "task_revision", "status", "summary", "evidence_ids", "next_action", "confidence"]),
+    ("butian_task_handoff", "Submit host-produced task handoff at the current revision; evidence remains required for approval. Minimal payload: {\"task_id\":\"task_...\",\"task_revision\":<current revision>,\"status\":\"done|partial\",\"summary\":\"实际做了什么\",\"evidence_ids\":[\"ev_...\"],\"next_action\":\"审核内容与证据\",\"confidence\":0.7(optional, default 0.5)}", {"method_uses": {"type": "array", "items": {"type": "object", "required": ["memory_id", "outcome", "evidence_id"], "properties": {"memory_id": {"type": "string"}, "outcome": {"type": "string", "enum": ["success", "failure", "unknown"]}, "evidence_id": {"type": "string"}}}}, "task_id": {"type": "string"}, "task_revision": {"type": "integer"}, "status": {"type": "string"}, "summary": {"type": "string"}, "evidence_ids": {"type": "array", "items": {"type": "string"}}, "next_action": {"type": "string"}, "confidence": {"type": "number"}}, ["task_id", "task_revision", "status", "summary", "evidence_ids", "next_action"]),
 ]:
     _fields.update({field: {"type": "string"} for field in ("member_id", "actor_member_id", "token")})
     TOOLS.append({"name": _name, "description": _description, "inputSchema": {"type": "object", "properties": _fields, "required": ["member_id", "actor_member_id", "token", *_required]}})
@@ -174,11 +174,33 @@ def run(home=None):
     finally:
         service.close()
 
+_PROBLEM_FIELD_DOC = ('constraints / known_facts / unknowns / acceptance_criteria / next_actions / '
+                       'undesired_outcomes / inputs / outputs / resources / assumptions / disputes / '
+                       'confirmation_required / partial_progress_criteria (list[str]), deadline (str), '
+                       'problem_type (known|similar|new|unknown). acceptance_criteria 为空即视为未定义，任务无法推进。')
 for _name, _required, _properties in [
-    ('butian_goal_submit', ['goal'], {'goal': {'type': 'string'}, 'problem': {'type': 'object'}, 'mode': {'type': 'string', 'enum': ['solo', 'team']}, 'dispatcher_member_id': {'type': 'string'}, 'member_ids': {'type': 'array', 'items': {'type': 'string'}},  'subtasks': {'type': 'array', 'items': {'type': 'string'}}, 'requested_model': {'type': 'string'}, 'capabilities': {'type': 'object'}, 'environment': {'type': 'object'}}),
-    ('butian_problem_resume', ['task_id'], {'task_id': {'type': 'string'}, 'subtasks': {'type': 'array', 'items': {'type': 'string'}}}),
+    ('butian_goal_submit', ['goal'], {
+        'goal': {'type': 'string', 'description': 'one-sentence goal; the durable problem model is stored with it'},
+        'acceptance_criteria': {'type': 'array', 'items': {'type': 'string'},
+                                'description': 'shortcut for problem.acceptance_criteria: 空列表会让目标停在 needs_clarification，无法推进'},
+        'problem': {'type': 'object',
+                    'description': 'durable problem model: ' + _PROBLEM_FIELD_DOC,
+                    'properties': {'acceptance_criteria': {'type': 'array', 'items': {'type': 'string'}}}},
+        'mode': {'type': 'string', 'description': 'solo | team; defaults to the current butian_mode; team mode splits work by member role'},
+        'dispatcher_member_id': {'type': 'string', 'description': 'must equal the connected member when supplied'},
+        'member_ids': {'type': 'array', 'items': {'type': 'string'}, 'description': 'team mode only; solo mode rejects it with member_ids_require_team_mode'},
+        'subtasks': {'type': 'array', 'items': {'type': 'string'}, 'description': 'team mode only; omit for a deterministic role-based split'},
+        'requested_model': {'type': 'string'}, 'capabilities': {'type': 'object'}, 'environment': {'type': 'object'}}),
+    ('butian_problem_resume', ['task_id'], {'task_id': {'type': 'string'}, 'subtasks': {'type': 'array', 'items': {'type': 'string'}, 'description': 'team dispatcher only: explicit split, otherwise role-based'}}),
     ('butian_problem_get', ['task_id'], {'task_id': {'type': 'string'}}),
-    ('butian_problem_update', ['task_id', 'expected_revision', 'changes', 'reason'], {'task_id': {'type': 'string'}, 'expected_revision': {'type': 'integer'}, 'changes': {'type': 'object'}, 'reason': {'type': 'string'}}),
+    ('butian_problem_update', ['task_id', 'expected_revision', 'changes', 'reason'], {
+        'task_id': {'type': 'string'},
+        'expected_revision': {'type': 'integer',
+                              'description': 'problem definition revision from problem.revision — NOT the task revision'},
+        'changes': {'type': 'object',
+                    'description': 'only the problem fields to change: ' + _PROBLEM_FIELD_DOC,
+                    'properties': {'acceptance_criteria': {'type': 'array', 'items': {'type': 'string'}}}},
+        'reason': {'type': 'string', 'description': 'why this correction is made; recorded in the revision chain'}}),
 ]:
     _properties.update(actor_member_id={'type': 'string'}, token={'type': 'string'})
     TOOLS.append({'name': _name, 'description': 'Host goal and durable problem model: ' + _name, 'inputSchema': {'type': 'object', 'required': _required + ['actor_member_id', 'token'], 'properties': _properties}})
@@ -263,6 +285,60 @@ for _relaxed_name, _relaxed_required in (
     if _relaxed is not None:
         _relaxed["inputSchema"]["required"] = list(_relaxed_required)
 
+# 身份与口令仍写在 schema 的 required 里（对外契约：这些工具确实需要认证），
+# 但 call_tool 会在校验前从 butian_connect 建立的连接状态注入，所以调用方连一次之后就无需重复交代。
+# member_id 在这些工具里不是“当前执行人”，而是别人或被授权对象，注入必须跳过：
+# 默认成连接身份会把“授权/独立复核”静默变成自己对自己，所以宁可不默认。
+_EXPLICIT_MEMBER_TOOLS = {
+    "butian_hypothesis_action_grant",   # member_id = 被授权的假设所有者，不是发言人
+    "butian_dispatcher_set",            # 派发者配置（管理面）
+    "butian_host_authorization_grant", "butian_host_authorization_list", "butian_host_authorization_revoke",
+    "butian_tool_security_review",      # 独立安全复核者的身份声明
+    "butian_tool_repair_confirm",       # 独立确认修复结果
+}
+# 其余带 member_id 的工具，缺省取已连接成员（跨成员访问仍由权限拦回）。
+_DEFAULT_MEMBER_TOOLS = {tool["name"] for tool in TOOLS
+                         if "member_id" in (tool["inputSchema"].get("properties") or {})} - _EXPLICIT_MEMBER_TOOLS
+for _tool in TOOLS:
+    if _tool["name"] not in _DEFAULT_MEMBER_TOOLS:
+        continue
+    _tool["inputSchema"].setdefault("properties", {})["member_id"] = {
+        "type": "string", "description": "defaults to the connected member"}
+
+# 召回不再强制 decision_id：缺省按本次调用生成，调用方不会因为不知道填什么而卡住。
+_recall = next(tool for tool in TOOLS if tool["name"] == "butian_memory_recall")
+_recall["inputSchema"]["properties"]["decision_id"] = {
+    "type": "string", "description": "optional; generated when omitted (groups recall outcomes of one decision)"}
+_recall["inputSchema"]["required"] = [f for f in _recall["inputSchema"]["required"] if f != "decision_id"]
+
+# 交付字段给出取值与语义，避免宿主逐个试错。
+_recall_outcome = next(tool for tool in TOOLS if tool["name"] == "butian_memory_recall_outcome")
+_recall_outcome["inputSchema"]["properties"]["missed"] = {
+    "type": "boolean",
+    "description": "true = 本次召回应有经验但没召回（漏召回）；不是漏掉哪些 memory 的列表"}
+
+_ksv = next(tool for tool in TOOLS if tool["name"] == "butian_knowledge_source_verify")
+_ksv["description"] = ("Verify retrieve content against the registered SHA-256. On a match the verified bytes are "
+                       "stored as the readable snapshot, so butian_knowledge_source_read works afterwards; "
+                       "butian_knowledge_source_add alone registers only a hash and has nothing to read.")
+
+_handoff = next(tool for tool in TOOLS if tool["name"] == "butian_task_handoff")
+_handoff_props = _handoff["inputSchema"]["properties"]
+# 不设 enum：服务端 status 是自由文本（既有调用方在用 completed 等写法），
+# 收紧成枚举会让合法调用在 schema 层被拒，错误也从语义错误退化成 invalid_tool_arguments。
+_handoff_props["status"] = {"type": "string",
+                            "description": "通常填 done（验收条件全部满足）或 partial（仍有未完成项，交给审核判断）"}
+_handoff_props["task_revision"] = {"type": "integer", "description": "current task revision from butian_context"}
+_handoff_props["evidence_ids"] = {"type": "array", "items": {"type": "string"},
+                                  "description": "evidence_id values from butian_evidence_record; required by approval"}
+_handoff_props["next_action"] = {"type": "string", "description": "what the reviewer should do next"}
+_handoff_props["confidence"] = {"type": "number", "minimum": 0, "maximum": 1}
+_handoff_props["summary"] = {"type": "string", "description": "what was actually done; no unexecuted claims"}
+
+_review = next(tool for tool in TOOLS if tool["name"] == "butian_task_review")
+_review["description"] = ("Review a task in review status: approve (done, gated by handoff evidence) or rework "
+                          "(back to ready, capped by rework limit). revision accepts expected_revision; verdict accepts decision.")
+
 def _require_member_arg(service, args, member_id=None):
     target = member_id or args.get("member_id")
     if not target:
@@ -273,12 +349,20 @@ def _require_member_arg(service, args, member_id=None):
 
 def call_tool(service, name, args, state=None):
     from .runtime.mcp_guidance import ToolError, describe_tool, validate_arguments, recovery_details
+    if isinstance(args, dict):
+        # JSON null 等于“没提供”：模板常把可选字段留成 null，不能因此报类型错。
+        args = {key: value for key, value in args.items() if value is not None}
     if state is not None and isinstance(args, dict):
         # 身份只在本连接内继承，避免每次调用重复交代；不会放宽成员边界。
         if not args.get("actor_member_id") and state.get("actor"):
             args["actor_member_id"] = state["actor"]
         if "token" not in args:
             args["token"] = state.get("token") or ""
+        if name in _DEFAULT_MEMBER_TOOLS and not args.get("member_id") and state.get("actor"):
+            args["member_id"] = state["actor"]
+    if name in {"butian_member_preflight", "butian_member_import", "butian_migration_runs"}:
+        # 历史身份迁移被整体排除：这是明确的功能结论，不是“工具不存在”。
+        raise ValueError("historical_identity_migration_out_of_scope")
     if name == "butian_tool_schema":
         validate_arguments(name, args, TOOLS)
         return describe_tool(args["name"], TOOLS)
@@ -301,6 +385,16 @@ def call_tool(service, name, args, state=None):
     validate_arguments(name, args, TOOLS)
     try:
         return _call_tool(service, name, args, state)
+    except OSError as exc:
+        # 本地文件类失败（路径不存在、无权限）也要给结构化错误，不能把 errno 原文漏给宿主。
+        code = 'evidence_file_not_found' if isinstance(exc, FileNotFoundError) else 'local_file_access_failed'
+        raise ToolError(code, {
+            'code': code, 'tool': name,
+            'missing_conditions': ['readable_local_file'],
+            'next_actions': [
+                {'tool': 'butian_tool_schema', 'arguments': {'name': name}},
+                {'action': 'check_path', 'note': '先确认文件真的存在且可读（相对路径按服务进程工作目录解析），再登记；不要为绕过错误新建空文件。'},
+            ]}) from exc
     except ValueError as exc:
         if isinstance(exc, ToolError):
             raise
@@ -349,6 +443,32 @@ def _call_tool(service, name, args, state=None):
         _require_member_arg(service, args, member_id=actor)
         models = ProblemModels(service.store)
         if name == 'butian_goal_submit':
+            from .runtime.problem import FIELDS as _PROBLEM_FIELDS
+            # 问题模型字段允许写在顶层（AI 最自然的写法）：以前顶层 acceptance_criteria 被静默丢弃，
+            # 于是“我提交了验收标准”变成 needs_clarification，看着像系统坏了。
+            _schema = next(tool for tool in TOOLS if tool["name"] == "butian_goal_submit")["inputSchema"]
+            # 身份/口令是通用信封字段（有的工具没写进 properties），不能算未知参数。
+            _accepted = set((_schema.get("properties") or {})) | set(_PROBLEM_FIELDS)
+            _accepted |= {'member_id', 'actor_member_id', 'token'}
+            _unexpected = sorted(set(args) - _accepted)
+            if _unexpected:
+                raise ToolError('unknown_argument', {
+                    'code': 'unknown_argument', 'tool': name, 'unexpected': _unexpected,
+                    'accepted': sorted(_accepted),
+                    'reason': '这些参数不会被使用；静默忽略会让你以为设置生效了。',
+                    'next_actions': [{'tool': 'butian_tool_schema', 'arguments': {'name': name}}]})
+            _lifted = {field: args.pop(field) for field in _PROBLEM_FIELDS if field in args}
+            if _lifted:
+                _problem = dict(args.get('problem') or {})
+                _conflict = sorted(field for field in _lifted
+                                   if field in _problem and _problem[field] != _lifted[field])
+                if _conflict:
+                    raise ToolError('problem_field_conflict', {
+                        'code': 'problem_field_conflict', 'tool': name, 'fields': _conflict,
+                        'reason': '同一字段既写在 problem 里又写在顶层且取值不同；只能留一处。',
+                        'next_actions': [{'tool': 'butian_tool_schema', 'arguments': {'name': name}}]})
+                _problem.update({field: value for field, value in _lifted.items() if field not in _problem})
+                args['problem'] = _problem
             from .runtime.usability import current_mode, role_split_plan
             mode = args.get('mode') or current_mode(service)
             args['mode'] = mode
@@ -356,12 +476,13 @@ def _call_tool(service, name, args, state=None):
                 raise ValueError('invalid_session_mode')
             if args.get('dispatcher_member_id') not in {None, actor}:
                 raise ValueError('dispatcher_identity_mismatch')
+            duplicate = service.active_goal_duplicate(actor, args['goal'].strip())
             if mode == 'team':
                 subtasks, plan_source = args.get('subtasks'), 'host'
                 if not subtasks:
                     subtasks = role_split_plan(service, args['goal'], service._team_workers(actor, args.get('member_ids')))
                     plan_source = 'deterministic_role_split'
-                result = service.submit_host_team_goal(args['goal'], actor_member_id=actor, member_ids=args.get('member_ids'), subtasks=subtasks, problem=args.get('problem'))
+                result = service.annotate_duplicate(service.submit_host_team_goal(args['goal'], actor_member_id=actor, member_ids=args.get('member_ids'), subtasks=subtasks, problem=args.get('problem')), duplicate)
                 result['plan_source'] = plan_source
                 result['worker_selection'] = 'explicit' if args.get('member_ids') else 'all_other_members'
                 if not args.get('member_ids'):
@@ -388,7 +509,23 @@ def _call_tool(service, name, args, state=None):
                     task = service.store.create_task(session['session_id'], model['goal'], assignee_id=actor, payload={'goal': model['goal'], 'mode': 'solo', 'execution_mode': 'host'})
                     problem = models.save(task, model, actor_id=actor, reason='host_goal_submit')
                     service.store.db.execute('RELEASE host_goal')
-                    return {'task_id': task, 'session': session, 'problem': problem, 'status': 'needs_clarification' if problem['definition_status'] == 'needs_clarification' else 'awaiting_host'}
+                    result = service.annotate_duplicate({'task_id': task, 'session': session, 'problem': problem,
+                                                        'status': 'needs_clarification' if problem['definition_status'] == 'needs_clarification' else 'awaiting_host'}, duplicate)
+                    if problem['definition_status'] == 'needs_clarification':
+                        # 目标已登记但还不能开工：直接把澄清动作交出去，避免宿主重复提交同名目标。
+                        result['clarification'] = {
+                            'definition_status': 'needs_clarification',
+                            'clarification_questions': problem.get('clarification_questions', []),
+                            'note': '任务已创建但问题定义未完成，暂时不能推进状态；请先补问题定义，不要重复提交同一目标。',
+                            'next_actions': [
+                                {'tool': 'butian_problem_update',
+                                 'arguments': {'task_id': task, 'expected_revision': problem.get('revision', 0),
+                                               'changes': {'acceptance_criteria': ['<可验证的验收标准>']},
+                                               'reason': '<为什么这样补>'},
+                                 'why': 'expected_revision 是问题定义 revision（本次返回里的 problem.revision），不是任务 revision。'},
+                                {'tool': 'butian_problem_get', 'arguments': {'task_id': task}},
+                            ]}
+                    return result
                 except Exception:
                     service.store.db.execute('ROLLBACK TO host_goal')
                     service.store.db.execute('RELEASE host_goal')
@@ -530,6 +667,10 @@ def _call_tool(service, name, args, state=None):
     if name == "butian_evidence_record":
         return {"evidence_id": service.record_evidence(args["path"], owner_member_id=args["member_id"], actor_member_id=args["actor_member_id"], token=args.get("token") or None)}
     if name == "butian_task_handoff":
+        # confidence 是自评元数据，缺省不该拦下一次真实交付：给中性值并回显，别让调用方猜。
+        confidence_defaulted = args.get("confidence") is None
+        if confidence_defaulted:
+            args["confidence"] = 0.5
         with service.store._write_lock:
             task = service.store.db.execute("SELECT assignee_id,status FROM tasks WHERE task_id=?", (args["task_id"],)).fetchone()
             if not task or task["assignee_id"] != args["member_id"] or task["status"] not in {"running", "review"}:
@@ -540,7 +681,31 @@ def _call_tool(service, name, args, state=None):
             handoff = {key: args[key] for key in ("task_id", "task_revision", "member_id", "status", "summary", "evidence_ids", "next_action", "confidence")}
             if "method_uses" in args:
                 handoff["method_uses"] = args["method_uses"]
-            return {"ok": service.submit_handoff(handoff)}
+            submitted = service.submit_handoff(handoff)
+            current = service.store.db.execute("SELECT status,revision FROM tasks WHERE task_id=?", (args["task_id"],)).fetchone()
+            result = {"ok": submitted, "task_id": args["task_id"], "status": current["status"],
+                      "revision": current["revision"], "handoff_revision": args["task_revision"],
+                      "confidence": args["confidence"]}
+            if confidence_defaulted:
+                result["confidence_defaulted"] = True
+                result["confidence_note"] = "未提供 confidence，已按 0.5（未评估）登记；要表达自评请显式传 0~1。"
+            # 交付按 revision 绑定，而迁状态会改 revision：这里必须说清审核前还差哪一步。
+            if current["status"] == "running":
+                result["review_ready"] = False
+                result["note"] = ("交付已登记在当前 revision，但任务仍在 running：审核要求 review 状态且交付与当前 revision 对齐。"
+                                  "先迁到 review（revision 会 +1），再在新 revision 上提交一次交付，然后审核。")
+                result["next_actions"] = [
+                    {"tool": "butian_task_transition",
+                     "arguments": {"task_id": args["task_id"], "expected_revision": current["revision"], "target": "review"},
+                     "why": "进入 review 后才能审核；这一步会让 revision 变成 " + str(current["revision"] + 1) + "。"},
+                ]
+            elif current["status"] == "review":
+                result["review_ready"] = True
+                result["next_actions"] = [{"tool": "butian_task_review",
+                                           "arguments": {"task_id": args["task_id"], "revision": current["revision"],
+                                                         "verdict": "approve|rework"},
+                                           "why": "交付与当前 revision 对齐，可以进入审核；审核者须是本会话派发者或任务归属者，无关第三方不行。"}]
+            return result
     if name == "butian_provider_start": return service.start_provider_task(args["member_id"], args["prompt"], task_id=args.get("task_id"), provider_id=args.get("provider_id"), model=args.get("model"))
     if name == "butian_provider_consume": return service.consume_provider_task(args["provider_session_id"], args.get("prompt"), actor_member_id=args.get("actor_member_id"))
     if name == "butian_task_team_run":
@@ -563,8 +728,26 @@ def _call_tool(service, name, args, state=None):
             session = service.store.session(session_id)
             if not session or session.get("dispatcher_member_id") != actor:
                 raise ValueError("member_task_access_denied")
-        return {"tree": service.task_tree(session_id)}
-    if name == "butian_task_review": return service.review_task(args["task_id"], args["revision"], args["verdict"], reviewer_member_id=args.get("reviewer_member_id") or args["actor_member_id"], actor_member_id=args["actor_member_id"], notes=args.get("notes", ""), rework_limit=args.get("rework_limit", 3))
+        def normalize(node):
+            payload = node.get("payload")
+            if isinstance(payload, str):
+                try:
+                    node["payload"] = json.loads(payload) if payload.strip() else {}
+                except ValueError:
+                    pass
+            for child in node.get("children") or []:
+                normalize(child)
+            return node
+
+        return {"tree": [normalize(node) for node in service.task_tree(session_id)]}
+    if name == "butian_task_review":
+        _revision = args.get("revision", args.get("expected_revision"))
+        _verdict = args.get("verdict") or args.get("decision")
+        if _revision is None:
+            raise ValueError("review_revision_required")
+        if not _verdict:
+            raise ValueError("review_verdict_required")
+        return service.review_task(args["task_id"], _revision, _verdict, reviewer_member_id=args.get("reviewer_member_id") or args["actor_member_id"], actor_member_id=args["actor_member_id"], notes=args.get("notes", ""), rework_limit=args.get("rework_limit", 3))
     if name == "butian_task_create":
         session = service.store.session(args["session_id"])
         if session.get("dispatcher_member_id") != args.get("actor_member_id"):
@@ -646,7 +829,9 @@ def _call_tool(service, name, args, state=None):
         finally: memory.close()
     if name == "butian_memory_recall":
         service.require_member_access(args["member_id"], actor_member_id=args.get("actor_member_id"), token=args.get("token"))
-        return service.recall_for_decision(args["member_id"], args["query"], decision_id=args["decision_id"], environment=args.get("environment"), limit=args.get("limit", 20))
+        import uuid as _uuid
+        decision_id = args.get("decision_id") or f"decision_{_uuid.uuid4().hex[:12]}"
+        return service.recall_for_decision(args["member_id"], args["query"], decision_id=decision_id, environment=args.get("environment"), limit=args.get("limit", 20))
     if name == "butian_memory_recall_outcome":
         service.require_member_access(args["member_id"], actor_member_id=args.get("actor_member_id"), token=args.get("token"))
         return {"ok": service.record_recall_outcome(args["member_id"], args["recall_id"], used_memory_ids=args["used_memory_ids"], missed=args["missed"], useful_memory_ids=args.get("useful_memory_ids"), harmful_memory_ids=args.get("harmful_memory_ids"), evidence_ref=args.get("evidence_ref"))}

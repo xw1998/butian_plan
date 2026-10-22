@@ -13,6 +13,11 @@ from butian.runtime import http_api
 from butian.runtime.service import ButianService
 from butian.runtime.experiments import ExperimentStore
 
+def require_remote_auth(monkeypatch):
+    """本机免令牌是产品要求：loopback 绑定的服务不校验口令。
+    这些用例断言的是“远程路径必须带 token”，所以先关掉本机免令牌。"""
+    monkeypatch.setattr(http_api.ApiHandler, "_local_mode", lambda self: False)
+
 
 def test_mcp_tool_schemas_include_verification_and_execution_limits():
     schemas = {item["name"]: item["inputSchema"] for item in mcp_server.TOOLS}
@@ -43,6 +48,7 @@ def test_mcp_tool_execute_forwards_verification_and_resource_limits(monkeypatch)
 
 def test_http_tool_verify_authenticates_and_forwards_binding_fields(tmp_path, monkeypatch):
     service = ButianService(tmp_path)
+    require_remote_auth(monkeypatch)
     service.add_member("m1", "Member")
     service.store.set_member_token("m1", "secret")
     captured = {}
@@ -160,6 +166,7 @@ def test_mcp_escalation_schemas_only_require_action_fields():
 
 def test_http_issue_escalations_require_auth_and_forward_dispatcher(tmp_path, monkeypatch):
     service = ButianService(tmp_path)
+    require_remote_auth(monkeypatch)
     service.add_member("dispatcher", "Dispatcher")
     service.store.set_member_token("dispatcher", "secret")
     monkeypatch.setattr(service, "list_tool_issue_escalations", lambda member_id, status=None: [{"work_item_id": "wi-1", "status": status or "open"}])
@@ -257,6 +264,7 @@ def test_http_provider_cancel_requires_session_access(tmp_path):
 
 def test_http_provider_start_binds_authenticated_actor(tmp_path, monkeypatch):
     service = ButianService(tmp_path)
+    require_remote_auth(monkeypatch)
     service.add_member("m1", "Member 1")
     service.add_member("m2", "Member 2")
     service.store.set_member_token("m1", "secret1")
@@ -352,7 +360,8 @@ def test_host_authorization_capabilities_must_cover_manifest(tmp_path):
         service.close()
 
 
-def test_http_session_creation_requires_member_auth(tmp_path):
+def test_http_session_creation_requires_member_auth(tmp_path, monkeypatch):
+    require_remote_auth(monkeypatch)
     service = ButianService(tmp_path)
     service.add_member("m1", "Member")
     service.store.set_member_token("m1", "secret")
