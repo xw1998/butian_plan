@@ -92,6 +92,7 @@ def snapshot(service, actor):
             'useful_evidence': '按成员、记忆和证据摘要去重的有用反馈，非独立任务次数。',
             'recall_hits': '召回日志条数，同一记忆可多次被召回。',
             'dream_runs': '仅统计本成员库中 completed 的自省；skipped 是门控检查未执行，另记 dream_skipped，dream_attempts 为全部记录。',
+            'dream_skipped': '只含手动触发的门控跳过；自动自省扫到“没材料/时间没到”时不入账，避免指标与记录被无动作的扫查刷满。',
             'dream_auto': '其中由后台自动自省产生的 completed 数；自动自省默认关闭（BUTIAN_AUTO_DREAM=1 才开启），因此默认为 0。',
             'members': '当前注册成员身份数，不等于在线人数。',
             'coverage': '未初始化的记忆库没有记录；不可读取的库不计入总量，总量可能不完整。',

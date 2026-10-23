@@ -53,6 +53,28 @@ class Checks:
         return self.ok(actual == expected, label, f"期望 {expected!r}，实际 {actual!r}")
 
 
+def wait_text(page, selector: str, any_of, timeout: int = 15000) -> str:
+    """等元素出现任一候选文本，再把当前文本返回给断言。
+
+    这里刻意不用固定 wait_for_timeout：提交后要等服务端落库 + 页面 sync() 再渲染，
+    在高负载机器上 1.5 秒并不够，固定等待会把“慢”误报成“没提示”。
+    超时也不抛异常，而是把当前文本交回去，让断言自己说清实际看到了什么。
+    """
+    candidates = [any_of] if isinstance(any_of, str) else list(any_of)
+    try:
+        page.wait_for_function(
+            """([sel, texts]) => {
+                const el = document.querySelector(sel);
+                const content = el ? (el.textContent || '') : '';
+                return texts.some(t => content.includes(t));
+            }""",
+            arg=[selector, candidates],
+            timeout=timeout,
+        )
+    except Exception:  # noqa: BLE001 - 超时由断言报告，避免打断后续检查
+        pass
+    return (page.text_content(selector) or "").strip()
+
 def start_server(home: Path):
     service = ButianService(home)
     for member_id, name, role in (("host", "派活者", "host"), ("m1", "张三", "worker"), ("m2", "李四", "worker")):
@@ -105,8 +127,7 @@ def run(base: str, checks: Checks, service) -> None:
             page.fill('[data-member-task="m1"]', "整理输入数据")
             page.fill('[data-member-task="m2"]', "复核边界条件")
             page.click('[data-form="goal"] button[type="submit"]')
-            page.wait_for_timeout(1500)
-            notice = (page.text_content("#notice") or "").strip()
+            notice = wait_text(page, "#notice", ["已派发", "已创建"])
             checks.ok("已派发" in notice or "已创建" in notice, "团队目标提交后给出提示", notice)
 
             page.click('[data-goal-mode="solo"]')
@@ -114,13 +135,11 @@ def run(base: str, checks: Checks, service) -> None:
             checks.ok(page.is_visible('[data-solo-fields]'), "切回单人模式显示单人区")
             checks.equal(page.input_value('[data-form="goal"] [name="goal"]'), "走一遍易用性脚本", "切回单人模式仍保留目标")
             page.click('[data-form="goal"] button[type="submit"]')
-            page.wait_for_timeout(1500)
-            duplicate_notice = (page.text_content("#notice") or "").strip()
+            duplicate_notice = wait_text(page, "#notice", "单人目标已创建")
             checks.ok("已创建" in duplicate_notice, "单人目标提交成功", duplicate_notice)
 
             page.click('[data-form="goal"] button[type="submit"]')
-            page.wait_for_timeout(1500)
-            repeat_notice = (page.text_content("#notice") or "").strip()
+            repeat_notice = wait_text(page, "#notice", ["目标任务", "改写"])
             checks.ok("目标任务" in repeat_notice or "改写" in repeat_notice, "重复目标给出提示但不拦截", repeat_notice)
 
             # 自省归属：给 m1 造材料并做梦，页面上只有 m1 有记录，m2 仍为空。
@@ -135,14 +154,12 @@ def run(base: str, checks: Checks, service) -> None:
             page.wait_for_selector("#evolutionMember")
             page.select_option("#evolutionMember", "m1")
             page.click("#loadEvolution")
-            page.wait_for_timeout(800)
-            m1_text = page.text_content("#content") or ""
+            m1_text = wait_text(page, "#content", "（手动）")
             checks.ok("（手动）" in m1_text, "进化页标出自省来源（手动）", m1_text[:120])
             checks.ok("自动自省默认关闭" in m1_text, "进化页说明自动自省默认关闭")
             page.select_option("#evolutionMember", "m2")
             page.click("#loadEvolution")
-            page.wait_for_timeout(800)
-            m2_text = page.text_content("#content") or ""
+            m2_text = wait_text(page, "#content", "暂无自省记录")
             checks.ok("暂无自省记录" in m2_text and "（手动）" not in m2_text, "其他成员仍无自省记录", m2_text[:120])
 
             checks.ok(not errors, "页面无 JS 报错", "; ".join(errors[:3]))

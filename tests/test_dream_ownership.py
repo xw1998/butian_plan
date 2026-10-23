@@ -72,13 +72,37 @@ def test_auto_dream_opt_in_is_marked_and_stays_per_member(tmp_path, monkeypatch)
         runs_a = service.list_dream_runs("a", limit=5)
         runs_b = service.list_dream_runs("b", limit=5)
         assert any(run["status"] == "completed" and run["source"] == "auto" for run in runs_a)
-        assert runs_b and all(run["status"] == "skipped" for run in runs_b)
+        # 自动扫查里“无事可做”的结果不落库：否则每人每小时一条 skipped 会把
+        # 真正的 completed 从“最近 20 条”里挤出去，也让 skipped 指标凭空线性增长。
+        assert runs_b == []
+        totals_b = {row["member_id"]: row for row in snapshot(service, "b")["member_stats"]}["b"]["totals"]
+        assert totals_b.get("dream_skipped", 0) == 0
+        assert totals_b.get("dream_attempts", 0) == 0
+        skipped_auto = [item for item in result["members"] if item["member_id"] == "b"][0]["dream"]
+        assert skipped_auto["status"] == "skipped" and skipped_auto["recorded"] is False
+        assert skipped_auto["reason"] == "insufficient_fragments"
         totals_a = snapshot(service, "a")["totals"]
         assert totals_a["dream_runs"] == 1
         assert totals_a["dream_auto"] == 1
     finally:
         service.close()
 
+
+def test_manual_skipped_checks_are_still_recorded(tmp_path, monkeypatch):
+    monkeypatch.setenv("BUTIAN_MAINTENANCE_ENABLED", "0")
+    service = ButianService(tmp_path)
+    try:
+        service.add_member("a", "A")
+        # 用户手动点了做梦但没有材料：必须留下记录并给出原因，不能静默。
+        result = service.dream_run("a", min_fragments=3, min_interval=0)
+        assert result["status"] == "skipped"
+        assert result["reason"] == "insufficient_fragments"
+        assert result["recorded"] is True
+        assert result["run_id"]
+        runs = service.list_dream_runs("a")
+        assert len(runs) == 1 and runs[0]["status"] == "skipped" and runs[0]["source"] == "manual"
+    finally:
+        service.close()
 
 def test_dream_source_must_be_known(tmp_path, monkeypatch):
     monkeypatch.setenv("BUTIAN_MAINTENANCE_ENABLED", "0")

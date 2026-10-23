@@ -84,8 +84,14 @@ class DreamRunner:
         elif not materials: reason = 'insufficient_valid_material'
         elif len(new_ids) < min_fragments: reason = 'insufficient_new_fragments'
         if reason:
+            # 自动自省是每个间隔对全员扫一遍，“没新材料 / 时间没到”这类无事可做的结果不落库：
+            # 一名成员每小时一条、十人一年约 8.8 万条，会把真正的 completed 从看板和
+            # “最近 20 条”里挤出去，也让 skipped 指标凭空线性增长。
+            # 手动自省照常记录：用户点了按钮，就需要看到为什么没做。
+            if source == 'auto':
+                return dict(run_id=None, status='skipped', reason=reason, source=source, gate=gate, recorded=False)
             db.execute('INSERT INTO dream_runs(run_id,started_at,status,gate_snapshot,candidate_count,reason,source) VALUES (?,?,?,?,?,?,?)', (run_id, now, 'skipped', json.dumps(gate), 0, reason, source))
-            return dict(run_id=run_id, status='skipped', reason=reason, source=source, gate=gate)
+            return dict(run_id=run_id, status='skipped', reason=reason, source=source, gate=gate, recorded=True)
         db.execute('INSERT INTO dream_lock VALUES (1,?,?)', (run_id, now))
         rows = [row for row in materials if row['memory_id'] in new_ids][:budget]
         candidate_id = f"dream_{uuid.uuid4().hex}"
@@ -96,7 +102,7 @@ class DreamRunner:
         for row in rows:
             db.execute('INSERT INTO dream_materials VALUES (?,?,?) ON CONFLICT(memory_id) DO UPDATE SET content_hash=excluded.content_hash,run_id=excluded.run_id', (row['memory_id'], fingerprints[row['memory_id']], run_id))
         db.execute('DELETE FROM dream_lock WHERE lock_id=1 AND owner=?', (run_id,))
-        return dict(run_id=run_id, status='completed', candidate_id=candidate_id, source=source, gate=gate)
+        return dict(run_id=run_id, status='completed', candidate_id=candidate_id, source=source, gate=gate, recorded=True)
 
     def distill_memories(self, memory_ids, *, summary: str, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True):
         db = self.memory.db
