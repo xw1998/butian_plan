@@ -88,6 +88,7 @@ class ButianService:
         self._maintenance_stop = threading.Event()
         self._maintenance_interval = max(1.0, float(os.environ.get("BUTIAN_MAINTENANCE_INTERVAL", "3600")))
         self._maintenance_enabled = os.environ.get("BUTIAN_MAINTENANCE_ENABLED", "1").lower() not in {"0", "false", "no", "off"}
+        self._auto_dream = os.environ.get("BUTIAN_AUTO_DREAM", "0").lower() in {"1", "true", "yes", "on"}
         self._maintenance_thread = None
         if self._maintenance_enabled:
             self._maintenance_thread = threading.Thread(target=self._maintenance_loop, name="butian-maintenance", daemon=True)
@@ -130,7 +131,12 @@ class ButianService:
                     pass
 
     def maintenance_tick(self):
-        """Run bounded, evidence-preserving maintenance for every member."""
+        """Run bounded, evidence-preserving maintenance for every member.
+
+        Dreaming is member activity, not maintenance: it only runs here when the
+        operator explicitly opts in with BUTIAN_AUTO_DREAM=1. Otherwise a scheduled
+        tick leaves every member's dream counters untouched.
+        """
         self.tools.retry_host_revocations()
         self.recover_peer_verifications()
         self.recover_review_learning()
@@ -141,7 +147,10 @@ class ButianService:
             member_id = row["member_id"]
             try:
                 memory_result = self._maintain_member_memories(member_id)
-                dream_result = self.dream_run(member_id, min_fragments=3, min_interval=self._maintenance_interval, budget=10, lock_timeout=max(7200.0, self._maintenance_interval * 2))
+                if self._auto_dream:
+                    dream_result = self.dream_run(member_id, min_fragments=3, min_interval=self._maintenance_interval, budget=10, lock_timeout=max(7200.0, self._maintenance_interval * 2), source="auto")
+                else:
+                    dream_result = {"status": "not_requested", "reason": "auto_dream_disabled"}
                 result = {"member_id": member_id, **dream_result, "memories": memory_result, "dream": dream_result}
                 results.append(result)
                 self.store.append_event(member_id, "maintenance_tick", {"result": result}, "maintenance_" + uuid.uuid4().hex)
@@ -166,7 +175,7 @@ class ButianService:
         except Exception as exc:
             external_learning = None
             learning_error = type(exc).__name__ + ":" + str(exc)
-        return {"status": "completed", "members": results, "dream_reasoning_tasks": dream_tasks, "member_memory_outbox": outbox_results, "issue_escalations": escalation_result, "external_learning": "authorized_url_queue", "external_learning_result": external_learning, "external_learning_error": learning_error}
+        return {"status": "completed", "auto_dream": self._auto_dream, "members": results, "dream_reasoning_tasks": dream_tasks, "member_memory_outbox": outbox_results, "issue_escalations": escalation_result, "external_learning": "authorized_url_queue", "external_learning_result": external_learning, "external_learning_error": learning_error}
 
     def dispatch_dream_tasks(self, *, limit: int = 1):
         """Persist bounded host reasoning tasks; never invent hypotheses or authorization."""
@@ -2162,10 +2171,10 @@ class ButianService:
         """梦境表由 DreamRunner 懒创建；读取前先确保存在，避免空成员查询报错。"""
         DreamRunner(memory, team_store=self.store, actor_member_id=None)
 
-    def dream_run(self, member_id, *, min_fragments=3, min_interval=3600, budget=10, lock_timeout=7200):
+    def dream_run(self, member_id, *, min_fragments=3, min_interval=3600, budget=10, lock_timeout=7200, source="manual"):
         memory = self.memory(member_id)
         try:
-            return DreamRunner(memory, team_store=self.store, actor_member_id=member_id).run(min_fragments=min_fragments, min_interval=min_interval, budget=budget, lock_timeout=lock_timeout)
+            return DreamRunner(memory, team_store=self.store, actor_member_id=member_id).run(min_fragments=min_fragments, min_interval=min_interval, budget=budget, lock_timeout=lock_timeout, source=source)
         finally:
             memory.close()
 
@@ -2224,7 +2233,9 @@ class ButianService:
         memory = self.memory(member_id)
         self._ensure_dream_tables(memory)
         try:
-            return [{"run_id": row["run_id"], "started_at": row["started_at"], "status": row["status"], "reason": row["reason"], "candidate_count": row["candidate_count"], "gate": json.loads(row["gate_snapshot"])} for row in memory.db.execute("SELECT * FROM dream_runs ORDER BY started_at DESC LIMIT ?", (limit,))]
+            columns = {row[1] for row in memory.db.execute("PRAGMA table_info(dream_runs)")}
+            source_expr = "source" if "source" in columns else "'unknown' AS source"
+            return [{"run_id": row["run_id"], "started_at": row["started_at"], "status": row["status"], "reason": row["reason"], "candidate_count": row["candidate_count"], "source": row["source"], "gate": json.loads(row["gate_snapshot"])} for row in memory.db.execute(f"SELECT run_id,started_at,status,reason,candidate_count,{source_expr},gate_snapshot FROM dream_runs ORDER BY started_at DESC LIMIT ?", (limit,))]
         finally:
             memory.close()
 

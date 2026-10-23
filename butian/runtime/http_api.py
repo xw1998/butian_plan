@@ -168,7 +168,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             latest_maintenance = None
             if latest:
                 latest_maintenance = {"event_type": latest["event_type"], "payload": json.loads(latest["payload"]), "created_at": latest["created_at"]}
-            self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "latest": latest_maintenance, "external_learning": "authorized_url_queue", "rewarm_policy": "evidence_required"}}); return
+            self._send(200, {"ok": True, "service": "butian", "startup_recovery": self.service.startup_recovery, "maintenance": {"enabled": self.service._maintenance_enabled, "interval": self.service._maintenance_interval, "auto_dream": self.service._auto_dream, "latest": latest_maintenance, "external_learning": "authorized_url_queue", "rewarm_policy": "evidence_required"}}); return
         if urlparse(self.path).path == "/api/tools/host-authorizations":
             q = parse_qs(urlparse(self.path).query)
             member_id = (q.get("member_id") or [self._visible_member_id()])[0]

@@ -3,7 +3,7 @@ import os
 from butian.runtime.service import ButianService
 
 
-def test_maintenance_tick_audits_skipped_dream_gate(tmp_path):
+def test_maintenance_tick_audits_without_dreaming_for_members(tmp_path):
     old = os.environ.get("BUTIAN_MAINTENANCE_ENABLED")
     os.environ["BUTIAN_MAINTENANCE_ENABLED"] = "0"
     service = ButianService(tmp_path)
@@ -11,11 +11,15 @@ def test_maintenance_tick_audits_skipped_dream_gate(tmp_path):
         service.add_member("m", "Member")
         result = service.maintenance_tick()
         assert result["status"] == "completed"
+        assert result["auto_dream"] is False
         assert result["external_learning"] == "authorized_url_queue"
         assert result["external_learning_result"]["claims_created"] == 0
         assert result["external_learning_result"]["memories_created"] == 0
-        assert result["members"][0]["status"] == "skipped"
-        assert result["members"][0]["reason"] == "insufficient_fragments"
+        member = next(item for item in result["members"] if item["member_id"] == "m")
+        assert member["status"] == "not_requested"
+        assert member["reason"] == "auto_dream_disabled"
+        assert all(item["dream"]["status"] == "not_requested" for item in result["members"])
+        assert service.list_dream_runs("m") == []
         event = service.store.db.execute("SELECT event_type FROM events WHERE event_type='maintenance_tick'").fetchone()
         assert event["event_type"] == "maintenance_tick"
     finally:

@@ -65,7 +65,7 @@ def start_server(home: Path):
     return server, service, f"http://127.0.0.1:{server.server_address[1]}"
 
 
-def run(base: str, checks: Checks) -> None:
+def run(base: str, checks: Checks, service) -> None:
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as playwright:
@@ -123,6 +123,28 @@ def run(base: str, checks: Checks) -> None:
             repeat_notice = (page.text_content("#notice") or "").strip()
             checks.ok("目标任务" in repeat_notice or "改写" in repeat_notice, "重复目标给出提示但不拦截", repeat_notice)
 
+            # 自省归属：给 m1 造材料并做梦，页面上只有 m1 有记录，m2 仍为空。
+            memory = service.memory("m1")
+            try:
+                for index in range(3):
+                    memory.put(f"m1-seed-{index}", "experience", f"m1 observation {index}", status="candidate")
+            finally:
+                memory.close()
+            checks.equal(service.dream_run("m1", min_fragments=1, min_interval=0)["status"], "completed", "通过运行时触发一次 m1 自省")
+            page.click('[data-view="evolution"]')
+            page.wait_for_selector("#evolutionMember")
+            page.select_option("#evolutionMember", "m1")
+            page.click("#loadEvolution")
+            page.wait_for_timeout(800)
+            m1_text = page.text_content("#content") or ""
+            checks.ok("（手动）" in m1_text, "进化页标出自省来源（手动）", m1_text[:120])
+            checks.ok("自动自省默认关闭" in m1_text, "进化页说明自动自省默认关闭")
+            page.select_option("#evolutionMember", "m2")
+            page.click("#loadEvolution")
+            page.wait_for_timeout(800)
+            m2_text = page.text_content("#content") or ""
+            checks.ok("暂无自省记录" in m2_text and "（手动）" not in m2_text, "其他成员仍无自省记录", m2_text[:120])
+
             checks.ok(not errors, "页面无 JS 报错", "; ".join(errors[:3]))
         finally:
             browser.close()
@@ -146,7 +168,7 @@ def main() -> int:
         server, service, base = start_server(folder / "runtime")
         print("服务地址 " + base + "，数据目录 " + str(folder))
         try:
-            run(base, checks)
+            run(base, checks, service)
         except Exception as exc:  # noqa: BLE001 - 浏览器侧异常一律算失败并打印原因
             checks.failures.append(f"浏览器执行异常：{type(exc).__name__}: {exc}")
             print("  FAIL 浏览器执行异常：" + type(exc).__name__ + ": " + str(exc))

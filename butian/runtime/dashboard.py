@@ -61,6 +61,8 @@ def snapshot(service, actor):
                 local['dream_runs'] = run_states.get('completed', 0)
                 local['dream_skipped'] = run_states.get('skipped', 0)
                 local['dream_other'] = local['dream_attempts'] - local['dream_runs'] - local['dream_skipped']
+                run_columns = {r[1] for r in db.execute('PRAGMA table_info(dream_runs)')}
+                local['dream_auto'] = db.execute("SELECT COUNT(*) FROM dream_runs WHERE status='completed' AND source='auto'").fetchone()[0] if 'source' in run_columns else 0
             if 'memory_validation_batches' in tables:
                 local['validation_samples'], local['validation_passes'], local['validation_failures'] = db.execute('SELECT COALESCE(SUM(sample_count),0),COALESCE(SUM(pass_count),0),COALESCE(SUM(fail_count),0) FROM memory_validation_batches').fetchone()
             row.update(coverage='readable', totals=dict(local), memory_kinds=dict(local_kinds), memory_states=dict(local_states))
@@ -90,6 +92,7 @@ def snapshot(service, actor):
             'useful_evidence': '按成员、记忆和证据摘要去重的有用反馈，非独立任务次数。',
             'recall_hits': '召回日志条数，同一记忆可多次被召回。',
             'dream_runs': '仅统计本成员库中 completed 的自省；skipped 是门控检查未执行，另记 dream_skipped，dream_attempts 为全部记录。',
+            'dream_auto': '其中由后台自动自省产生的 completed 数；自动自省默认关闭（BUTIAN_AUTO_DREAM=1 才开启），因此默认为 0。',
             'members': '当前注册成员身份数，不等于在线人数。',
             'coverage': '未初始化的记忆库没有记录；不可读取的库不计入总量，总量可能不完整。',
         },

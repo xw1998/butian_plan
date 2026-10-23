@@ -382,6 +382,8 @@ Experiment tools remain unavailable to member identities through the current MCP
 
 See `skills/butian-workflow/SKILL.md` for schema discovery, host/manual execution, evidence, delivery, permissions and recovery. Install through the host skill mechanism; no member credentials or fixed connector IDs are included. Dream completion counts include only per-member `completed` rows; scheduled checks recorded as `skipped` are separate. Recent evolution history is not a lifetime total.
 
+Dreams belong to the member who triggered them: one member running a dream only changes that member's counters and records. The scheduled maintenance loop (`BUTIAN_MAINTENANCE_ENABLED`, on by default) performs memory maintenance, queue dispatch and due checks, and by default does **not** run dreams for any member, so one member's dream no longer raises everyone else's count. Set `BUTIAN_AUTO_DREAM=1` to restore automatic dreaming; such runs carry `source="auto"`, manual runs carry `source="manual"`, and legacy rows show an unrecorded source. Dashboards report `dream_auto` separately.
+
 ## v0.1.8 update
 
 - Dream counts now include only `completed` runs. Gated `skipped` checks are reported separately in both member and team totals; recent history is explicitly not a lifetime total.

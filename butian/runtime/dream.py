@@ -10,7 +10,7 @@ class DreamRunner:
         self.team_store = team_store
         self.actor_member_id = actor_member_id
         schema = ('''
-        CREATE TABLE IF NOT EXISTS dream_runs (run_id TEXT PRIMARY KEY, started_at REAL NOT NULL, status TEXT NOT NULL, gate_snapshot TEXT NOT NULL, candidate_count INTEGER NOT NULL DEFAULT 0, reason TEXT);
+        CREATE TABLE IF NOT EXISTS dream_runs (run_id TEXT PRIMARY KEY, started_at REAL NOT NULL, status TEXT NOT NULL, gate_snapshot TEXT NOT NULL, candidate_count INTEGER NOT NULL DEFAULT 0, reason TEXT, source TEXT NOT NULL DEFAULT 'unknown');
         CREATE TABLE IF NOT EXISTS hypotheses (hypothesis_id TEXT PRIMARY KEY, candidate_id TEXT, statement TEXT NOT NULL, prior_reliability REAL NOT NULL, argument TEXT NOT NULL, status TEXT NOT NULL, evidence_refs TEXT NOT NULL DEFAULT '[]', created_at REAL NOT NULL, updated_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS verification_actions (action_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, description TEXT NOT NULL, cost REAL NOT NULL, risk REAL NOT NULL, expected_information_gain REAL NOT NULL, authorized INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL, created_at REAL NOT NULL, updated_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS verification_queue (queue_id TEXT PRIMARY KEY, hypothesis_id TEXT NOT NULL, action_id TEXT NOT NULL, priority REAL NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL);
@@ -26,6 +26,10 @@ class DreamRunner:
             if statement.strip():
                 self.memory.db.execute(statement)
 
+        run_columns = {row[1] for row in self.memory.db.execute("PRAGMA table_info(dream_runs)")}
+        if "source" not in run_columns:
+            self.memory.db.execute("ALTER TABLE dream_runs ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'")
+
         candidate_columns = {row[1] for row in self.memory.db.execute("PRAGMA table_info(dream_candidates)")}
         if "source_snapshot" not in candidate_columns:
             self.memory.db.execute("ALTER TABLE dream_candidates ADD COLUMN source_snapshot TEXT NOT NULL DEFAULT '[]'")
@@ -39,23 +43,25 @@ class DreamRunner:
             if column not in abstraction_columns:
                 self.memory.db.execute(f"ALTER TABLE memory_abstractions ADD COLUMN {column} {definition}")
 
-    def run(self, *, min_fragments=3, min_interval=3600, budget=10, lock_timeout=7200, now=None):
+    def run(self, *, min_fragments=3, min_interval=3600, budget=10, lock_timeout=7200, now=None, source="manual"):
         now = time.time() if now is None else now
         import math
+        if source not in {"manual", "auto"}:
+            raise ValueError("invalid_dream_source")
         if (any(isinstance(v, bool) or not isinstance(v, int) or v < 1 for v in (budget, min_fragments))
                 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 for v in (min_interval, lock_timeout, now))):
             raise ValueError("invalid_dream_run_limits")
         db = self.memory.db
         db.execute('BEGIN IMMEDIATE')
         try:
-            result = self._run_locked(min_fragments, min_interval, budget, lock_timeout, now)
+            result = self._run_locked(min_fragments, min_interval, budget, lock_timeout, now, source)
             db.execute('COMMIT')
             return result
         except Exception:
             db.execute('ROLLBACK')
             raise
 
-    def _run_locked(self, min_fragments, min_interval, budget, lock_timeout, now):
+    def _run_locked(self, min_fragments, min_interval, budget, lock_timeout, now, source='manual'):
         db = self.memory.db
         run_id = f"dreamrun_{uuid.uuid4().hex}"
         stale = db.execute("SELECT acquired_at FROM dream_lock WHERE lock_id=1").fetchone()
@@ -78,19 +84,19 @@ class DreamRunner:
         elif not materials: reason = 'insufficient_valid_material'
         elif len(new_ids) < min_fragments: reason = 'insufficient_new_fragments'
         if reason:
-            db.execute('INSERT INTO dream_runs VALUES (?,?,?,?,?,?)', (run_id, now, 'skipped', json.dumps(gate), 0, reason))
-            return dict(run_id=run_id, status='skipped', reason=reason, gate=gate)
+            db.execute('INSERT INTO dream_runs(run_id,started_at,status,gate_snapshot,candidate_count,reason,source) VALUES (?,?,?,?,?,?,?)', (run_id, now, 'skipped', json.dumps(gate), 0, reason, source))
+            return dict(run_id=run_id, status='skipped', reason=reason, source=source, gate=gate)
         db.execute('INSERT INTO dream_lock VALUES (1,?,?)', (run_id, now))
         rows = [row for row in materials if row['memory_id'] in new_ids][:budget]
         candidate_id = f"dream_{uuid.uuid4().hex}"
         content = '\n'.join(row['content'] for row in rows)
-        db.execute('INSERT INTO dream_runs VALUES (?,?,?,?,?,?)', (run_id, now, 'completed', json.dumps(gate), 1, None))
+        db.execute('INSERT INTO dream_runs(run_id,started_at,status,gate_snapshot,candidate_count,reason,source) VALUES (?,?,?,?,?,?,?)', (run_id, now, 'completed', json.dumps(gate), 1, None, source))
         snapshots = [dict(memory_id=row['memory_id'], content_sha256=fingerprints[row['memory_id']], status=row['status'], updated_at=row['updated_at']) for row in rows]
         db.execute('INSERT INTO dream_candidates(candidate_id,run_id,memory_ids,content,status,created_at,source_snapshot) VALUES (?,?,?,?,?,?,?)', (candidate_id, run_id, json.dumps([row['memory_id'] for row in rows]), content, 'candidate', now, json.dumps(snapshots)))
         for row in rows:
             db.execute('INSERT INTO dream_materials VALUES (?,?,?) ON CONFLICT(memory_id) DO UPDATE SET content_hash=excluded.content_hash,run_id=excluded.run_id', (row['memory_id'], fingerprints[row['memory_id']], run_id))
         db.execute('DELETE FROM dream_lock WHERE lock_id=1 AND owner=?', (run_id,))
-        return dict(run_id=run_id, status='completed', candidate_id=candidate_id, gate=gate)
+        return dict(run_id=run_id, status='completed', candidate_id=candidate_id, source=source, gate=gate)
 
     def distill_memories(self, memory_ids, *, summary: str, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True):
         db = self.memory.db
