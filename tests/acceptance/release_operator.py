@@ -66,6 +66,10 @@ def main():
     commands.append(('tool_business', [sys.executable, 'tests/acceptance/tool_business.py']))
     commands.extend(('official_mcp_' + name, ['node', 'tests/acceptance/official-mcp/' + name + '.mjs'])
                     for name in ('acceptance', 'team', 'source', 'extraction', 'queue', 'dream', 'dream-dispatch', 'workflows'))
+    if os.environ.get('BUTIAN_WEB_E2E') == '1':
+        # 网页表单的易用性只能在真浏览器里验收，但它需要 playwright + chromium；
+        # 默认不跑，发版环境装了浏览器时用 BUTIAN_WEB_E2E=1 把它纳入同一份报告。
+        commands.append(('web_ui', [sys.executable, 'tests/acceptance/web_ui.py']))
     backend = None
     try:
         for name, command in commands:

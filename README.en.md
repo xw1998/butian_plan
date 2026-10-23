@@ -299,7 +299,19 @@ python -m butian.cli evolution history m1
 # Standard-library test entry points; pytest is not required for these commands.
 python tests/test_evolution.py
 python tests/test_provider_runtime.py
+
+# Full regression (both variables matter: maintenance worker and real execution backend).
+BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
+    python -m pytest tests --ignore=tests/acceptance -q
+
+# Real-browser acceptance for the web “submit goal” form: solo/team switching,
+# one subtask per member, and the duplicate-goal hint. Requires playwright and chromium;
+# exit code 0 = passed, 1 = assertion failed, 2 = dependency missing.
+python tests/acceptance/web_ui.py
 ```
+
+The regression gate is “zero skips”: when the machine cannot create symlinks, the
+redirect-point tests fall back to junctions (`tests/fs_redirect.py`) instead of skipping.
 
 The research experiment module is separate from the user-facing product workflow.
 
@@ -399,6 +411,8 @@ Three calls replace re-sending credentials, session ids and subtasks on every re
 3. `butian_context` returns the current member, mode, visible tasks with revisions, and the next legal action.
 
 Submitting the same goal text again for the same operator does not fail, but the response carries `duplicate_of` and `duplicate_note` (the existing `task_id` and status) — two parallel tasks that cannot see each other is the real hazard; change one word of the goal when you genuinely want a parallel run.
+
+When the executor never confirmed the outcome (`status` is `unknown`, `provider_lost`, or `failed`), the response carries `trustworthy: false`, a `diagnosis` (`reason` plus why the result cannot count as done), and `next_actions` (call `butian_context` first for the legal next step, then `butian_provider_start` with a fresh session). Such a result must not be written into review, and the task status must not be hand-edited to bypass confirmation.
 
 The loopback console also accepts `/api/goals/host-submit` and the other tool-backed endpoints without a token (the server binds the local operator for that request), **but an explicitly supplied token is still verified**: a wrong token fails, because "no token locally" is not the same as "any token is fine".
 

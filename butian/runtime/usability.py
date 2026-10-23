@@ -214,6 +214,31 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
             "token_required": token_required(), "next_actions": next_actions}
 
 
+def describe_provider_failure(result: dict, *, task_id: str | None = None, member_id: str | None = None) -> dict:
+    """给“执行没跑完但没有结论”的结果补上原因与下一步，别只丢一个 unknown。
+
+    这类结果最伤 AI：状态既不是完成也不是失败，照抄回去等于把不确定当成结论。
+    这里只说清三件事：这个状态不采信、为什么、现在能合法做什么。
+    """
+    status = result.get("status")
+    reason = result.get("reason") or "provider_status_unknown"
+    result["trustworthy"] = False
+    result["diagnosis"] = {
+        "reason": reason,
+        "meaning": "执行结果没有被确认：既不能当完成写进审核，也不该手工改状态来绕过确认。",
+        "evidence": ["provider_session_status=" + str(status)],
+    }
+    next_actions = [{"tool": "butian_context", "arguments": {},
+                     "why": "先看这条任务现在的状态和上下文给出的合法下一步，再决定重试还是收尾。"}]
+    if task_id:
+        start = {"tool": "butian_provider_start", "arguments": {"task_id": task_id},
+                 "why": "原会话已经不在运行，只能重新发起一次执行；不要复用旧的 provider_session_id。"}
+        if member_id:
+            start["arguments"]["member_id"] = member_id
+        next_actions.append(start)
+    result["next_actions"] = next_actions
+    return result
+
 def role_split_plan(service, goal: str, workers: list[str]) -> list[str]:
     """按成员职责生成确定性分工；不调用模型，不编造实验结论。"""
     plans = []

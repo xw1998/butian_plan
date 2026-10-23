@@ -120,6 +120,23 @@ def test_schema_does_not_demand_credentials_it_derives(runtime):
     assert "required" not in _tool("butian_collaboration_preflight")["inputSchema"]
 
 
+def test_unconfirmed_execution_is_marked_untrustworthy_with_retry_step():
+    """执行没有结论时不能只回一个 unknown：要说清不采信、为什么、下一步怎么重发。"""
+    from butian.runtime.usability import describe_provider_failure
+
+    result = describe_provider_failure({'status': 'unknown', 'reason': 'provider_executor_unconfirmed'},
+                                       task_id='task_1', member_id='analyst')
+    assert result['trustworthy'] is False
+    assert result['diagnosis']['reason'] == 'provider_executor_unconfirmed'
+    assert '不采信' in result['diagnosis']['meaning'] or '当完成' in result['diagnosis']['meaning']
+    tools = [action['tool'] for action in result['next_actions']]
+    assert tools == ['butian_context', 'butian_provider_start']
+    assert result['next_actions'][1]['arguments'] == {'task_id': 'task_1', 'member_id': 'analyst'}
+    # 没有任务号的会话（例如规划期）只给上下文，不给一个填不出参数的调用。
+    orphan = describe_provider_failure({'status': 'unknown'}, task_id=None)
+    assert [action['tool'] for action in orphan['next_actions']] == ['butian_context']
+    assert orphan['diagnosis']['reason'] == 'provider_status_unknown'
+
 def test_first_page_puts_task_loop_before_execution_preflight():
     names = [tool["name"] for tool in list_tools_page()["tools"]]
     assert "butian_task_list" in names

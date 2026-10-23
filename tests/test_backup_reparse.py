@@ -1,12 +1,10 @@
-import os
-import subprocess
-
 import pytest
 
 from butian.runtime.service import ButianService
 
 
-def test_backup_rejects_directory_redirect_in_source(tmp_path):
+def test_backup_rejects_directory_redirect_in_source(tmp_path, redirect_link):
+    """目录重定向点必须被拒；建链走 fs_redirect，不依赖 cmd.exe/mklink。"""
     home = tmp_path / 'runtime'
     service = ButianService(home)
     external = tmp_path / 'external'
@@ -14,12 +12,8 @@ def test_backup_rejects_directory_redirect_in_source(tmp_path):
     (external / 'sentinel.txt').write_text('must not be copied', encoding='utf-8')
     link = home / 'escape'
     try:
-        if os.name == 'nt':
-            result = subprocess.run(['cmd.exe', '/c', 'mklink', '/J', str(link), str(external)], capture_output=True, text=True)
-            assert result.returncode == 0, result.stderr
-            assert link.lstat().st_file_attributes & 0x400
-        else:
-            link.symlink_to(external, target_is_directory=True)
+        redirect_link(link, external)
+        assert link.lstat().st_file_attributes & 0x400
         with pytest.raises(ValueError, match='symlink'):
             service.create_backup(tmp_path / 'backup')
         assert not (tmp_path / 'backup').exists()

@@ -73,7 +73,8 @@ class LocalCommandProvider:
             yield ProviderEvent(f'{provider_session_id}:cancelled', 'status', status='cancelled', reason='provider_execution_not_started')
             return
         except (OSError, ValueError, RuntimeError) as exc:
-            yield ProviderEvent(f'{provider_session_id}:unconfirmed', 'status', status='unknown', reason='provider_executor_unconfirmed', metadata={'error_type': type(exc).__name__})
+            yield ProviderEvent(f'{provider_session_id}:unconfirmed', 'status', status='unknown', reason='provider_executor_unconfirmed', metadata={'error_type': type(exc).__name__,
+                                  'error_message': str(exc)})
             return
         if observation.tree_exit_confirmed:
             with self._lock:

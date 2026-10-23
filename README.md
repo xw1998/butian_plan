@@ -310,7 +310,17 @@ python -m butian.cli evolution history m1
 # 标准库定向测试（无需 pytest）
 python tests/test_evolution.py
 python tests/test_provider_runtime.py
+
+# 全量回归（必须带上这两个环境变量：维护线程与真实执行后端的开关）
+BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
+    python -m pytest tests --ignore=tests/acceptance -q
+
+# 网页“提交目标”的真实浏览器验收（单人/团队切换、逐成员子任务、重复目标提示）
+# 需要 playwright 与 chromium；退出码 0 全过、1 有断言失败、2 环境缺依赖
+python tests/acceptance/web_ui.py
 ```
+
+全量回归的闸门是“零 skip”：本机没有符号链接权限时，重定向点用目录联接代替（`tests/fs_redirect.py`），不会因环境跳过用例。
 
 > 论文实验模块（`butian/runtime/experiments.py`、`/api/experiments*`、`python -m butian.cli experiment`）属于内部研究工具，不属于面向用户的产品功能。
 
@@ -420,6 +430,8 @@ python -m butian.assets.export /absolute/new/runtime
 身份与口令仍写在工具的 schema 必填里（这些工具确实需要认证），但 `butian_connect` 之后由连接自动注入，**连一次就不必每次重传** `member_id`/`actor_member_id`/`token`；没连接时缺身份会直接得到“先 `butian_connect`”的下一步，而不是让人猜。只有 `butian_hypothesis_action_grant`、`butian_tool_security_review`、`butian_tool_repair_confirm`、`butian_dispatcher_set`、`butian_host_authorization_*` 这些 **member_id 指向别人或独立角色**的工具不会被注入——默认成自己会把“授权、独立复核”变成自我授权。可选参数传 `null` 视为未提供，不会因模板留空被判类型错。
 
 同一执行者重复提交同名目标不会失败，但会在返回里带 `duplicate_of` 与 `duplicate_note`（指出已有任务的 `task_id` 与状态）——静默产生两份互相看不见的工作才是真问题；刻意并行时改一句目标描述即可。
+
+执行结果没有被执行器确认时（`status` 为 `unknown` / `provider_lost` / `failed`），返回里带 `trustworthy: false`、`diagnosis`（`reason` 与“为什么不能当完成”）和 `next_actions`（先 `butian_context` 看上下文与合法下一步，再 `butian_provider_start` 用新会话重发）。这类状态既不能写进审核，也不该手工改状态绕过确认。
 
 本机回环工作台在 `/api/goals/host-submit` 这类走工具层的接口上同样不需要口令（服务端为当前请求绑定本机代表），**但显式传了口令就按口令校验**：错口令仍然失败，本机免口令不等于“错口令也算对”。
 

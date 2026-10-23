@@ -680,6 +680,9 @@ class ButianService:
                     latest = self.store.db.execute("SELECT status,lease_id FROM tasks WHERE task_id=?", (task["task_id"],)).fetchone()
                     if latest["status"] in {"review", "unknown", "provider_lost", "cancelled", "failed"} and latest["lease_id"]:
                         self.store.release_lease(task["task_id"], latest["lease_id"])
+        if result.get("status") in {"unknown", "provider_lost", "failed"}:
+            from .usability import describe_provider_failure
+            describe_provider_failure(result, task_id=session.get("task_id"), member_id=session.get("member_id"))
         return result
 
     def cancel_provider_task(self, provider_session_id: str, *, actor_member_id: str | None = None) -> dict[str, Any]:

@@ -61,7 +61,8 @@ def test_clarification_revision_resumes_real_execution(tmp_path):
         ProblemModels(service.store).update(task_id, 1, {'acceptance_criteria': ['报告包含测量值'], 'confirmation_required': []}, actor_id='owner', reason='用户明确验收')
         service.resume_problem_task(task_id, actor_member_id='owner')
         result = service.run_solo_task(task_id, actor_member_id='owner')
-        assert result['status'] == 'completed'
+        # 带上整份结果：偶发的 unknown 必须能一眼看到 reason，不靠猜。
+        assert result['status'] == 'completed', result
         payload = json.loads(service.store.db.execute('SELECT payload FROM tasks WHERE task_id=?', (task_id,)).fetchone()[0])
         assert '报告包含测量值' in payload['provider_output']
         assert payload['problem_model']['revision'] == 2

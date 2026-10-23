@@ -48,6 +48,12 @@ def inject_operator_business_backend(request, monkeypatch, operator_backend):
     monkeypatch.setattr(ButianService, '__init__', initialized)
 
 @pytest.fixture
+def redirect_link():
+    """建立重定向点：符号链接优先，无权限时退化为目录联接（不 skip）。"""
+    from fs_redirect import make_redirect
+    return make_redirect
+
+@pytest.fixture
 def operator_local_provider(operator_backend, tmp_path):
     """Real provider tests require the confirmed operator entrypoint."""
     if operator_backend is None:

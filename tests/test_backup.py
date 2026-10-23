@@ -157,21 +157,24 @@ def test_restore_manifest_is_the_only_copy_allowlist(tmp_path):
         service.close()
 
 
-def test_backup_rejects_symlinks_in_source(tmp_path):
+def test_backup_rejects_redirect_in_source(tmp_path, redirect_link):
+    """指向外部的重定向点必须被拒；没有符号链接权限时用目录联接（不 skip）。
+
+    发版闸门要求全量测试零 skip，而 Windows 建立符号链接需要开发者模式或管理员
+    权限；目录联接同样是重定向点，走的是 _is_redirect 的同一条判定分支。
+    """
     home = tmp_path / "runtime"
     service = ButianService(home)
-    external = tmp_path / "external.txt"
-    external.write_text("external")
-    link = home / "escape.txt"
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "sentinel.txt").write_text("must not be copied", encoding="utf-8")
+    link = home / "escape"
     try:
-        try:
-            link.symlink_to(external)
-        except OSError as exc:
-            if getattr(exc, "winerror", None) == 1314:
-                pytest.skip("symlink privilege unavailable")
-            raise
+        redirect_link(link, external)
         with pytest.raises(ValueError, match="symlink"):
             service.create_backup(tmp_path / "backup")
+        assert not (tmp_path / "backup").exists()
+        assert (external / "sentinel.txt").read_text(encoding="utf-8") == "must not be copied"
     finally:
         service.close()
 
@@ -197,7 +200,9 @@ def test_backup_detects_missing_manifest_file_and_database_corruption(tmp_path):
         service.create_backup(backup)
         manifest = json.loads((backup / "manifest.json").read_text(encoding="utf-8"))
         first = backup / manifest["files"][0]["path"]
-        first.unlink()
+        # 用移出代替删除：校验的语义是“清单里的文件不在盘上”，且本机策略禁止
+        # os.remove 的永久删除，删除动作会把用例挡在环境里而不是代码里。
+        first.replace(tmp_path / "moved-away.bin")
         with pytest.raises(ValueError):
             service.verify_backup(backup)
     finally:
