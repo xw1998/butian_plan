@@ -53,7 +53,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if token:
             # 显式给了口令就按口令校验：本机免口令不等于“错口令也算对”。
-            self.service.local_actor = None
+            # 只撤销该成员的本地信任，不要把别的成员并发请求的信任一起清掉。
+            self.service.disable_local_actor(actor)
             return
         try:
             self.service.enable_local_actor(actor)

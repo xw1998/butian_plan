@@ -24,8 +24,9 @@ class ButianService:
         self.home = Path(home or os.environ.get("BUTIAN_HOME", Path.home() / ".butian"))
         self.home.mkdir(parents=True, exist_ok=True)
         self._claim_practice_lock = threading.RLock()
-        # 仅 MCP 本机信任模式下由 butian_connect 设置；None 表示仍逐步校验口令。
-        self.local_actor: str | None = None
+        # 本机信任模式下的成员集合：MCP 的 butian_connect 与 HTTP 本机请求都会登记。
+        # 用集合而非单值，避免两名成员并发请求时互相把对方的本地信任清掉。
+        self._local_actors: set[str] = set()
         self.store = Store(self.home / "team.db")
         # 启动先收口崩溃前的 prepared 操作，再回收过期租约；结果保留供状态页和审计使用。
         self.startup_recovery = {
@@ -955,12 +956,31 @@ class ButianService:
         return []
 
     def enable_local_actor(self, member_id: str) -> None:
-        """本机信任模式下绑定唯一可代表成员；共享部署可设 BUTIAN_MCP_TOKEN_REQUIRED=1 关闭。"""
+        """本机信任模式下登记一个可代表成员；共享部署可设 BUTIAN_MCP_TOKEN_REQUIRED=1 关闭。"""
         if os.environ.get("BUTIAN_MCP_TOKEN_REQUIRED", "0") == "1":
             raise ValueError("token_required_by_configuration")
         if not self.store.db.execute("SELECT 1 FROM members WHERE member_id=?", (member_id,)).fetchone():
             raise ValueError("member_not_found")
-        self.local_actor = member_id
+        self._local_actors.add(member_id)
+
+    def disable_local_actor(self, member_id: str | None = None) -> None:
+        """撤销本地信任：给 member_id 只撤销该成员，不给则全清（口令强制模式用）。"""
+        if member_id is None:
+            self._local_actors.clear()
+        else:
+            self._local_actors.discard(member_id)
+
+    @property
+    def local_actor(self) -> str | None:
+        """兼容单值视图：恰好只有一个本地信任成员时返回它，否则 None（0 个或并发多名）。"""
+        actors = tuple(self._local_actors)  # 先取快照：本机多线程下集合可能被并发修改。
+        return actors[0] if len(actors) == 1 else None
+
+    @local_actor.setter
+    def local_actor(self, member_id: str | None) -> None:
+        self._local_actors.clear()
+        if member_id:
+            self._local_actors.add(member_id)
 
     def require_member_access(self, member_id: str, *, actor_member_id: str | None, token: str | None = None) -> None:
         """Enforce an explicit actor boundary for external member-scoped calls."""
@@ -968,7 +988,9 @@ class ButianService:
             raise ValueError("actor_member_id_required")
         if actor_member_id != member_id:
             raise ValueError("member_memory_access_denied")
-        if self.local_actor and actor_member_id == member_id == self.local_actor:
+        # 本地信任是逐成员登记的：多人并发请求时，A 的登记不能被 B 的请求清掉。
+        # 运行期把 BUTIAN_MCP_TOKEN_REQUIRED 打开时，已登记的信任也必须立刻失效。
+        if actor_member_id in self._local_actors and os.environ.get("BUTIAN_MCP_TOKEN_REQUIRED", "0") != "1":
             return
         if not self.store.authenticate_member(actor_member_id, token):
             raise ValueError("member_authentication_failed")

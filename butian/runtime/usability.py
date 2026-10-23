@@ -61,7 +61,8 @@ def connect(service, args: dict, state: dict) -> dict:
     if token_required():
         if not service.store.authenticate_member(member, token):
             raise ValueError("member_authentication_failed")
-        service.local_actor = None
+        # 要求口令的模式下不保留任何本地信任。
+        service.disable_local_actor()
     else:
         service.enable_local_actor(member)
     previous, state["actor"], state["token"] = state.get("actor"), member, token
