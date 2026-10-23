@@ -9,6 +9,11 @@ description = "Platform-independent AI team orchestration and memory runtime"
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+# 全量回归用 xdist 并行：本机 8 核从 14 分钟压到 4 分半；不装也能跑，只是慢（串行约 11～25 分钟）
+dev = ["pytest>=8", "pytest-xdist>=3"]
+acceptance = ["playwright"]
+
 [project.scripts]
 butian = "butian.cli:main"
 

@@ -37,7 +37,13 @@ class MemoryStore:
         self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA busy_timeout=5000")
-        self.db.executescript(SCHEMA)
+        # 每次开库都重放 18 条 CREATE 的真实成本是 8ms 上下；服务启动会开出几十个成员库，
+        # 串起来就是几百毫秒的固定开销。表齐了就不再执行脚本（缺任意一张仍走全量脚本，
+        # 因为脚本本身是 CREATE IF NOT EXISTS，重放是安全的）。
+        existing_tables = {row[0] for row in self.db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if not {"memories", "memory_fts", "memory_degradation", "usage_feedback_evidence"} <= existing_tables:
+            self.db.executescript(SCHEMA)
         degradation_columns = {row[1] for row in self.db.execute("PRAGMA table_info(memory_degradation)")}
         if degradation_columns and "base_status" not in degradation_columns:
             self.db.execute("ALTER TABLE memory_degradation ADD COLUMN base_status TEXT NOT NULL DEFAULT 'warm'")

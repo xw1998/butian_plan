@@ -345,8 +345,13 @@ python tests/test_evolution.py
 python tests/test_provider_runtime.py
 
 # Full regression (both variables matter: maintenance worker and real execution backend).
-# About 1100 tests, 25–30 minutes locally; most of the time goes to real subprocess
-# execution, SQLite transactions and restart/recovery cases.
+# About 1100 tests. 4–5 minutes on 8 cores in parallel; 11–25 minutes single-process
+# (slower under load). Most of the time is each test building a fresh runtime:
+# databases, ten seeded members, internal assets.
+BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
+    python -m pytest tests --ignore=tests/acceptance -q -n 8 --dist loadfile
+
+# Single process: only when hunting a failure that shows up only in parallel. Slow, simplest state.
 BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
     python -m pytest tests --ignore=tests/acceptance -q
 
@@ -355,6 +360,11 @@ BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
 # exit code 0 = passed, 1 = assertion failed, 2 = dependency missing. About 1 minute, 21 checks.
 python tests/acceptance/web_ui.py
 ```
+
+Parallel regression uses `pytest-xdist` (`pip install -e ".[dev]"`). It runs with `--dist loadfile`,
+not the default per-test distribution: a test file stays on one worker, so module-level fixtures and
+temporary directories are never split, and the test count matches the serial run exactly (1102 today).
+Both commands must pass with zero skips and zero failures; parallelism only changes where a test runs.
 
 The regression gate is “zero skips”: when the machine cannot create symlinks, the
 redirect-point tests fall back to junctions (`tests/fs_redirect.py`) instead of skipping.

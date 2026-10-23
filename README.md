@@ -356,7 +356,12 @@ python tests/test_evolution.py
 python tests/test_provider_runtime.py
 
 # 全量回归（必须带上这两个环境变量：维护线程与真实执行后端的开关）
-# 约 1100 条用例，本机 25～30 分钟；时间主要花在真实子进程执行、SQLite 事务与重启恢复类用例上
+# 约 1100 条用例。8 核并行 4～5 分钟；单进程串行 11～25 分钟（负载高时更慢）
+# 时间主要花在每条用例都要新建一套运行时（建库、播种十位成员、导入内部资产）上
+BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
+    python -m pytest tests --ignore=tests/acceptance -q -n 8 --dist loadfile
+
+# 单进程串行：只有排查“并行才失败”的用例时才需要，慢但状态最简单
 BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
     python -m pytest tests --ignore=tests/acceptance -q
 
@@ -364,6 +369,8 @@ BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
 # 需要 playwright 与 chromium；退出码 0 全过、1 有断言失败、2 环境缺依赖；约 1 分钟 21 项
 python tests/acceptance/web_ui.py
 ```
+
+并行回归用 `pytest-xdist`（`pip install -e ".[dev]"`）。这里用 `--dist loadfile` 而不是默认的按用例分发：同一个测试文件留在同一个 worker 里，文件内部的模块级夹具与临时目录不会被拆开，用例数与串行完全一致（当前 1102 条）。两条命令都必须是零 skip、零失败才算通过；并行只改变执行位置，不放宽任何断言。
 
 全量回归的闸门是“零 skip”：本机没有符号链接权限时，重定向点用目录联接代替（`tests/fs_redirect.py`），不会因环境跳过用例。
 

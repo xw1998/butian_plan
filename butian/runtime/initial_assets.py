@@ -17,15 +17,21 @@ def bootstrap_initial_assets(service):
             raise
     # Member databases are separate SQLite stores. Publish guides only after
     # their tool registrations commit; a restart safely resumes missing cards.
+    # 按成员分组：以前每条资产都 service.memory(member_id) 开一次库再关，
+    # 51 条资产就是 51 次 connect + schema 检查；同一成员只开一次即可。
+    by_member = {}
     for member_id, memory_id, content, environment in pending:
+        by_member.setdefault(member_id, []).append((memory_id, content, environment))
+    for member_id, items in by_member.items():
         memory = service.memory(member_id)
         try:
-            if memory.get(memory_id):
-                continue
-            memory.put(memory_id, 'knowledge', content, confidence=0.0, status='candidate',
-                       environment=environment,
-                       change_reason='Initial knowledge, not validated practical experience')
-            result['memories_created'] += 1
+            for memory_id, content, environment in items:
+                if memory.get(memory_id):
+                    continue
+                memory.put(memory_id, 'knowledge', content, confidence=0.0, status='candidate',
+                           environment=environment,
+                           change_reason='Initial knowledge, not validated practical experience')
+                result['memories_created'] += 1
         finally:
             memory.close()
     return result
