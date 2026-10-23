@@ -49,6 +49,18 @@ description: 正确使用补天 Butian MCP 完成任务执行、经验召回、�
 - 用导出包中的 task_revision/problem_revision 和唯一 submission_id 调用 `butian_execution_submit`；如实填写 work_done/work_not_done，确认返回 review。
 - 按真实审核策略提交给获授权审核者。没有独立审核就明确未独立审核，不靠切换姓名制造独立性，不把 review 写成 done。
 
+### 团队模式没有 Provider：宿主以成员身份执行
+
+团队子任务的执行模式是 host、或负责人没绑 Provider、或 Provider 为 `manual` 时，没有子进程会跑。此时 `butian_task_team_run` 返回的子任务状态是 `awaiting_external_execution`，`next_actions` 已给出完整闭环，`host_execution_reason` 说明属于哪种情况：
+
+1. `butian_connect(member_id=<assignee>)` 切到该成员——产出与记忆记在它名下，这是以它的身份执行，不是替它代笔；
+2. `butian_execution_export` 取绑定 revision 的上下文（符合条件的任务自动推进到 running）；
+3. 宿主实际完成工作，`butian_evidence_record` 登记真实证据；
+4. `butian_execution_submit` 带 `expected_revision`、`problem_revision` 与唯一 `submission_id` 交回，进入 review；
+5. 切回原身份 `butian_task_team_run` 汇总；派发者审核子任务后团队目标才进最终审核。
+
+不要用 `butian_task_handoff` 处理 `todo` 状态的团队子任务（`handoff_task_not_owned_or_active`），也不要让派发者代做（`task_transition`/`task_claim` 代做路径禁止）。团队父任务在子任务全部 `done` 前导出必被 `team_children_not_reviewed` 拒——上下文只给子任务导出动作就是为此。
+
 ### 已有普通任务 / 手动交付
 
 - `butian_task_create` 仅登记 todo，不等于执行成功。
@@ -61,7 +73,8 @@ description: 正确使用补天 Butian MCP 完成任务执行、经验召回、�
 - 优先读取 MCP 工具错误正文 `details.current`、`missing_conditions`、`required`、`next_actions`；动作片段可能缺认证、操作键，先查询 schema 补齐。
 - `external_execution_required` 是执行模式不匹配，不仅是状态未 running。已有任务不要自行改 payload/provider；确认采用宿主还是配置 Provider 路径，必要时请求任务拥有者决策。
 - `admin_authorization_required`：当前成员 MCP 实验入口不可用；如实记录阻塞，交获授权操作者处理，不换身份试权限，不声称实验已登记。
-- `handoff_task_not_owned_or_active`：核对身份、assignee、running/review 状态及 revision；跨成员无权限就停止，不冒用身份。
+- `handoff_task_not_owned_or_active`：核对身份、assignee、running/review 状态及 revision；跨成员无权限就停止，不冒用身份。团队子任务处于 todo 时应走上面的外部执行闭环，不是 handoff。
+- `awaiting_external_execution` 不是完成、也不是卡死：按返回的 `next_actions` 走 connect → export → 执行 → evidence → submit，不要手工改状态或重复提交目标。
 - `evidence_not_found`：引用已登记 evidence_id，不传文件路径作 evidence_ref。
 - revision 冲突先读最新状态，不盲重试带副作用的旧请求；幂等键只能用于同一操作内容。
 

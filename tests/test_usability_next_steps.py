@@ -83,9 +83,11 @@ def test_context_offers_advancing_step_before_new_goal(runtime):
                      {"goal": "单人任务", "problem": {"acceptance_criteria": ["给出结论"]}}, state)
     ctx = call_tool(service, "butian_context", {}, state)
     first = ctx["next_actions"][0]
-    assert first["tool"] == "butian_task_transition"
-    assert first["arguments"] == {"task_id": goal["task_id"], "expected_revision": 1,
-                                  "target": "ready", "operation_key": f"{goal['task_id']}:1:ready"}
+    # host 没配 Provider：合法下一步是“导出上下文 → 本机做完 → 交回证据”，
+    # 不是先迁 ready 再认领（那条路要求 Provider 真能派活，这里派不出去）。
+    assert first["tool"] == "butian_execution_export"
+    assert first["arguments"] == {"task_id": goal["task_id"], "actor_member_id": "host"}
+    assert first["then"]["tool"] == "butian_execution_submit"
     # 有可推进任务时不再兜售新建目标
     assert all(a.get("tool") != "butian_goal_submit" for a in ctx["next_actions"])
 
@@ -101,13 +103,16 @@ def test_dispatcher_is_not_told_to_do_someone_elses_task(runtime):
     ctx = call_tool(service, "butian_context", {}, state)
     advancing = [a for a in ctx["next_actions"] if a.get("tool") == "butian_task_transition"]
     assert all(a["arguments"]["task_id"] != child for a in advancing)
-    # 派发者自己的父任务仍可推进，所以这里只要求"不代做别人那条"，
-    # 不要求立刻出现等待提示（父任务推完后才会出现）。
+    # 派发者身份不代做别人的任务；没有 Provider 时给的是“以成员身份导出执行”，
+    # 产出仍记在该成员名下，独立执行与独立审核都还在。
+    external = [a for a in ctx["next_actions"] if a.get("tool") == "butian_execution_export"]
+    assert external and external[0]["as_member"] == "analyst"
+    assert external[0]["arguments"] == {"task_id": child, "actor_member_id": "analyst"}
     assert any(t["task_id"] == child for t in ctx["tasks"])
 
     call_tool(service, "butian_connect", {"member_id": "analyst"}, state)
     own = call_tool(service, "butian_context", {}, state)
-    assert own["next_actions"][0]["tool"] == "butian_task_transition"
+    assert own["next_actions"][0]["tool"] == "butian_execution_export"
     assert own["next_actions"][0]["arguments"]["task_id"] == child
 
 
@@ -141,3 +146,56 @@ def test_first_page_puts_task_loop_before_execution_preflight():
     names = [tool["name"] for tool in list_tools_page()["tools"]]
     assert "butian_task_list" in names
     assert "butian_collaboration_preflight" not in names
+
+def test_team_mode_without_provider_is_not_a_dead_end(runtime):
+    """没有 Provider 的团队模式：子任务要能由宿主以成员身份执行完，不能空转。
+
+    这条守的是“打不开的钥匙”：父任务导出会被 team_children_not_reviewed 拒，
+    所以父任务不能给导出动作；子任务给的导出动作必须带负责人本人的身份，
+    而且照着做完之后团队真的能走到待审核。
+    """
+    service, state = runtime
+    call_tool(service, "butian_connect", {"member_id": "host"}, state)
+    call_tool(service, "butian_mode", {"action": "set", "mode": "team"}, state)
+    plan = call_tool(service, "butian_goal_submit",
+                     {"goal": "把导出流程写成脚本", "member_ids": ["analyst"],
+                      "subtasks": ["写脚本"],
+                      "problem": {"acceptance_criteria": ["脚本能跑"]}}, state)
+    root = plan["task_id"]
+    child = plan["children"][0]["task_id"]
+
+    ran = call_tool(service, "butian_task_team_run", {"task_id": root}, state)
+    assert ran["children"][0]["status"] == "awaiting_external_execution"
+    actions = ran["children"][0]["next_actions"]
+    assert actions[0]["tool"] == "butian_execution_export"
+    assert actions[0]["as_member"] == "analyst"
+    assert actions[0]["then"]["tool"] == "butian_execution_submit"
+
+    ctx = call_tool(service, "butian_context", {}, state)
+    exported_roots = [action for action in ctx["next_actions"]
+                      if action.get("tool") == "butian_execution_export"
+                      and action["arguments"]["task_id"] == root]
+    assert not exported_roots, "父任务此刻导出必被拒，不能把它当成下一步"
+    assert any(action.get("tool") == "butian_execution_export"
+               and action["arguments"]["task_id"] == child for action in ctx["next_actions"])
+
+    # 指引要求的顺序：先切到该成员身份，再导出执行（成员各有独立记忆与身份）。
+    assert actions[0]["before"] == {"tool": "butian_connect", "arguments": {"member_id": "analyst"}}
+    call_tool(service, "butian_connect", {"member_id": "analyst"}, state)
+    package = call_tool(service, "butian_execution_export",
+                        {"task_id": child, "actor_member_id": "analyst"}, state)
+    proof = service.home / "proofs" / "team-child-1.txt"
+    proof.parent.mkdir(parents=True, exist_ok=True)
+    proof.write_text("脚本已写成并跑通", encoding="utf-8")
+    evidence_id = service.record_evidence(proof, owner_member_id="analyst", actor_member_id="analyst")
+    delivered = call_tool(service, "butian_execution_submit",
+                          {"task_id": child, "expected_revision": package["task_revision"],
+                           "problem_revision": package["problem_revision"],
+                           "submission_id": "sub-team-child-1", "output": "脚本已写成并跑通",
+                           "evidence_ids": [evidence_id], "actor_member_id": "analyst"}, state)
+    assert delivered["status"] == "review"
+
+    # 交付完切回派发者身份：汇总与审核都不能由被审人自己来。
+    call_tool(service, "butian_connect", {"member_id": "host"}, state)
+    after = call_tool(service, "butian_task_team_run", {"task_id": root}, state)
+    assert after["status"] == "awaiting_child_reviews"

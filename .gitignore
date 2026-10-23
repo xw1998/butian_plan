@@ -43,3 +43,10 @@ _tmp_*.py
 !/docs/论文/补天多轮经验机制-English.docx
 !/docs/论文/补天多轮经验机制.pdf
 !/docs/论文/补天多轮经验机制-English.pdf
+# Research scripts and their fixtures are shipped so tests/test_research_*.py can run
+# from a fresh clone; everything else under docs/ stays private.
+!/docs/论文/prepare_runs.py
+!/docs/论文/statistics_report.py
+!/docs/论文/任务包.v1.json
+!/docs/论文/fixtures/
+!/docs/论文/fixtures/nist-eda352-20261014.html

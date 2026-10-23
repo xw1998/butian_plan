@@ -8,6 +8,38 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 
 **补天计划就是为这些能力准备的增强层。** 将它接入你正在使用的 AI 应用，宿主 AI 便可以通过 MCP 调用补天的任务、记忆、上下文、证据和协作工具，把一次次对话连接成持续的工作过程。你继续使用熟悉的 AI，由补天保存工作进度和实践积累，无需额外部署 Ollama 或本地模型。
 
+## 最短上手路径（先看这一节）
+
+后面各节是机制说明，第一次接入不必通读。
+
+**三步上手（约 3 分钟）**
+
+1. 装一次：`python -m pip install -e .`（Python 3.11+，只用标准库，不需要 Ollama 或任何模型 API Key）
+2. 连一次：在 MCP 里调 `butian_connect`（本机回环免口令；成员多于一个时必须显式给 `member_id`），紧接着调 `butian_context` 拿到当前成员、模式、可见任务与下一步动作。
+3. 交一次活：`butian_goal_submit` 写目标与验收条件 → 照抄 `butian_context` 返回的 `next_actions` 一步步执行 → `butian_evidence_record` 登记真实证据 → `butian_task_handoff`（或 `butian_execution_submit`）交付。
+
+要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数超过 40 个，但不必先背表——`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数；找不到工具时用 `butian_tools_catalog`（`query` 子串过滤）加 `butian_tool_schema` 查单个参数。
+
+最容易踩的只有一件事：**`butian_goal_submit` 只是登记目标，不等于执行完成**。任务要真做过、留下可核验的证据，才能交付与审核。
+
+### 轻任务不要用补天
+
+一次问答、一段文案、一次代码补全这类单轮工作，直接用宿主 AI 更快。补天一次完整闭环有固定开销：建目标、取上下文、登记证据、交付、审核；它的收益来自**跨会话延续、经验复用、证据审核与多人分工**，不是单轮生成速度。
+
+判断标准很简单：这件事需要下次接着做、需要留下能复核的证据、或者需要多人分工互审，才值得接入补天。
+
+### 没有 Provider 也能走完团队模式
+
+团队模式不配 Provider 时子任务不会自动跑，但并非死路：`butian_task_team_run` 返回的子任务状态是 `awaiting_external_execution`，并在 `next_actions` 里给出完整闭环，同时 `host_execution_reason` 说明属于哪种情况（任务按 `execution_mode=host` 创建、成员没绑 Provider、或 Provider 为 `manual`）。
+
+1. `butian_connect(member_id="<负责人>")` 切到该成员身份——产出与记忆记在它名下，不是替它代笔；
+2. `butian_execution_export` 取绑定 revision 的执行上下文，符合条件的任务自动推进到 running；
+3. 由当前宿主 AI 实际完成工作，`butian_evidence_record` 登记证据；
+4. `butian_execution_submit` 带 `expected_revision`、`problem_revision` 与唯一 `submission_id` 交回，进入 review；
+5. 切回原身份调 `butian_task_team_run` 汇总；派发者审核子任务后，团队目标才进入最终审核。
+
+团队父任务在子任务全部 `done` 之前导出必被拒（`team_children_not_reviewed`），所以上下文只会把导出动作给子任务，不会给父任务一个注定被打回的调用。
+
 ## 接入补天，你的 AI 能增强什么？
 
 - **更能记住你：减少重复交代。** 将你的要求、纠正、项目背景和已确认结论保存为可检索的长期记忆，在后续任务中按需带回上下文。持续合作时，已经说清楚的事情有据可查。
@@ -307,20 +339,29 @@ python -m butian.cli evolution history m1
 ### 运行测试
 
 ```bash
-# 标准库定向测试（无需 pytest）
+# 定向（改一处只跑相关文件，通常 1～3 分钟）
+BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
+    python -m pytest tests/test_usability_next_steps.py tests/test_team.py -q
+
+# 标准库用例（无需 pytest）
 python tests/test_evolution.py
 python tests/test_provider_runtime.py
 
 # 全量回归（必须带上这两个环境变量：维护线程与真实执行后端的开关）
+# 约 1100 条用例，本机 25～30 分钟；时间主要花在真实子进程执行、SQLite 事务与重启恢复类用例上
 BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
     python -m pytest tests --ignore=tests/acceptance -q
 
 # 网页“提交目标”的真实浏览器验收（单人/团队切换、逐成员子任务、重复目标提示）
-# 需要 playwright 与 chromium；退出码 0 全过、1 有断言失败、2 环境缺依赖
+# 需要 playwright 与 chromium；退出码 0 全过、1 有断言失败、2 环境缺依赖；约 1 分钟 21 项
 python tests/acceptance/web_ui.py
 ```
 
 全量回归的闸门是“零 skip”：本机没有符号链接权限时，重定向点用目录联接代替（`tests/fs_redirect.py`），不会因环境跳过用例。
+
+论文研究脚本（`docs/论文/prepare_runs.py`、`docs/论文/statistics_report.py`、`docs/论文/任务包.v1.json`）与它们依赖的 `docs/论文/fixtures/` 快照随仓库分发，`tests/test_research_preparation.py`、`tests/test_research_statistics.py` 在干净克隆里即可运行，不需要额外索取材料。
+
+全量回归期间避免同时跑整仓 `grep` 之类的重 IO 任务：本地 `local-command` Provider 用例在高负载下偶发子进程启动超时，表现为个别团队用例短暂出现 `unknown`/`blocked`，单独复跑即恢复（不是状态机缺陷）。
 
 > 论文实验模块（`butian/runtime/experiments.py`、`/api/experiments*`、`python -m butian.cli experiment`）属于内部研究工具，不属于面向用户的产品功能。
 

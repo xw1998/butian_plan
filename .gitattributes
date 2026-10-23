@@ -3,3 +3,6 @@ butian/assets/*.sqlite3 binary
 
 *.pdf binary
 *.docx binary
+
+# Research fixture snapshots are hash-asserted by tests; never rewrite their bytes.
+docs/论文/fixtures/** -text

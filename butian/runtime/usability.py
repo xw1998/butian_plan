@@ -84,6 +84,57 @@ _STEP_BY_STATUS = {
 }
 
 
+def external_execution_reason(service, task: dict, payload: dict | None = None) -> str | None:
+    """这个任务是否只能由宿主代做（没有 Provider 参与）；返回原因，None 表示走 Provider。
+
+    为什么需要这层判断：团队模式不配 Provider 时，子任务会停在“等执行”，
+    而宿主既不能代做（不代别人做任务）也没有别的合法动作，界面看起来就是空转。
+    实际上协议是通的——以子任务负责人本人的身份导出上下文、在本机做完、再交回证据。
+    这里只是把那条路明确指出来，不改状态机与权限边界。
+    """
+    payload = payload or {}
+    if payload.get("mode") == "team" and not task.get("parent_id"):
+        # 团队父任务要等子任务都审核通过、且汇总已准备好才能导出，
+        # 否则给出的动作会被服务端直接拒（team_children_not_reviewed）。此刻该动的是子任务。
+        children = service.store.db.execute(
+            "SELECT status FROM tasks WHERE parent_id=? AND COALESCE(json_extract(payload,'$.superseded_by_problem_revision'),0)=0",
+            (task["task_id"],)).fetchall()
+        if not children or any(child["status"] != "done" for child in children) or not payload.get("results"):
+            return None
+    if payload.get("execution_mode") == "host":
+        return "该任务按 host 执行模式创建：没有 Provider 参与，由当前宿主 AI 直接做。"
+    assignee = task.get("assignee_id")
+    if not assignee:
+        return None
+    row = service.store.db.execute("SELECT provider_id FROM members WHERE member_id=?", (assignee,)).fetchone()
+    if row is None:
+        return None
+    if not row["provider_id"]:
+        return f"成员 {assignee} 没配 Provider：由当前宿主 AI 以它的身份执行，产出仍记在它名下。"
+    if row["provider_id"] == "manual":
+        return f"成员 {assignee} 是人工交付身份（provider=manual）：由当前宿主 AI 以它的身份执行并交回证据。"
+    return None
+
+def external_execution_step(task_id: str, assignee: str, reason: str) -> dict:
+    """把“导出上下文 → 本机做完 → 交回证据”写成一条可复制的动作。"""
+    return {"tool": "butian_execution_export",
+            "as_member": assignee,
+            "before": {"tool": "butian_connect", "arguments": {"member_id": assignee}},
+            "arguments": {"task_id": task_id, "actor_member_id": assignee},
+            "then": {"tool": "butian_execution_submit",
+                     "as_member": assignee,
+                     "arguments": {"task_id": task_id,
+                                   "expected_revision": "<export 返回的 task_revision>",
+                                   "problem_revision": "<export 返回的 problem_revision>",
+                                   "submission_id": f"sub-{task_id}-1",
+                                   "output": "<实际交付内容>",
+                                   "evidence_ids": ["<butian_evidence_record 返回的 ev_...>"],
+                                   "actor_member_id": assignee}},
+            "why": reason + f"步骤：先 butian_connect(member_id={assignee}) 切到该成员身份（每位成员有自己的记忆，"
+                   "不是替它代笔）→ butian_execution_export 取绑定 revision 的上下文（同时把任务推进 running）"
+                   "→ 在本机把活干完 → butian_evidence_record 登记证据 → butian_execution_submit 交回；"
+                   f"actor_member_id 一直是 {assignee} 本人。做完可切回原身份做审核。"}
+
 def latest_problem(service, task_id: str) -> dict | None:
     """取任务最新一版问题定义；没有定义时返回 None（不是错误）。"""
     try:
@@ -99,9 +150,14 @@ def latest_problem(service, task_id: str) -> dict | None:
         return None
 
 
-def next_step_for_task(task: dict, actor: str | None, problem: dict | None = None) -> dict | None:
+def next_step_for_task(task: dict, actor: str | None, problem: dict | None = None, *, external_reason: str | None = None) -> dict | None:
     """给出该任务下一条合法的迁移动作，参数直接可复制，不用宿主去猜 revision 与 operation_key。"""
     assignee = task.get("assignee_id")
+    if external_reason and assignee and task.get("status") in {"todo", "ready", "claimed", "running"} \
+            and not (problem and problem.get("definition_status") == "needs_clarification"):
+        # 没有 Provider 时不适用“派发者不代做”：这里不是以派发者身份替人干活，
+        # 而是明确让宿主切到该成员身份执行，产出与记忆仍归该成员。
+        return external_execution_step(task["task_id"], assignee, external_reason)
     if actor and assignee and assignee != actor:
         # 派发者不代做别人的任务，否则独立执行与独立审核都会失效。
         return None
@@ -132,7 +188,7 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
     """一次返回模式、成员、可见任务和下一步动作，免去宿主自己拼 session_id 与 revision。"""
     members = [dict(row) for row in service.store.db.execute(
         "SELECT member_id, name, role, provider_id FROM members ORDER BY member_id")]
-    visible, problems = [], {}
+    visible, problems, externals = [], {}, {}
     for task in service.store.list_tasks():
         if actor and not service.store.task_access(task["task_id"], actor):
             continue
@@ -150,6 +206,11 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
             entry["definition_status"] = problem.get("definition_status")
             if problem.get("definition_status") == "needs_clarification":
                 entry["clarification_questions"] = problem.get("clarification_questions") or []
+        reason = external_execution_reason(service, task, payload)
+        if reason:
+            entry["needs_host_execution"] = True
+            entry["host_execution_reason"] = reason
+            externals[task["task_id"]] = reason
         problems[task["task_id"]] = problem
         visible.append(entry)
     active = [task for task in visible if task["status"] in ACTIVE_STATUSES]
@@ -164,11 +225,15 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
         next_actions.append({"tool": "butian_connect", "arguments": {},
                              "why": "先确定当前成员身份，后续调用不必重复传。"})
     # 已有任务时优先推进它，而不是再建一个目标：只给最靠前两条推进动作，避免刷屏。
+    # 需要宿主代做的任务排前面：它们不看身份、现在就能动，而团队父任务在子任务完成前确实不能动。
+    runnable_external = {"todo", "ready", "claimed", "running"}
+    ordered = sorted(active, key=lambda item: 0 if externals.get(item["task_id"]) and item["status"] in runnable_external else 1)
     advancing = 0
-    for task in active:
+    for task in ordered:
         if advancing >= 2:
             break
-        step = next_step_for_task(task, actor, problems.get(task["task_id"]))
+        step = next_step_for_task(task, actor, problems.get(task["task_id"]),
+                                  external_reason=externals.get(task["task_id"]))
         if step:
             next_actions.append(step)
             advancing += 1
@@ -191,12 +256,18 @@ def build_context(service, *, actor: str | None, limit: int = 20) -> dict:
         else:
             next_actions.append({"note": "你名下的任务已在 review，需由本会话派发者或其他人审核；不要自己审自己。",
                                  "task_id": target["task_id"]})
+    if externals and not any(action.get("tool") == "butian_execution_export" for action in next_actions):
+        # 即便上面两条配额被别的动作占满，也要把“不配 Provider 也能推进”这条路说清。
+        task_id, reason = next(iter(externals.items()))
+        target = next(item for item in active if item["task_id"] == task_id)
+        next_actions.append(external_execution_step(task_id, target["assignee_id"], reason))
     if mode == "team" and not others:
         next_actions.append({"outside_mcp": "butian member add <member_id> <name> --role <role>",
                              "why": "当前只有你一个成员，团队模式会退化；本 MCP 成员面无添加成员工具，需用 CLI 或网页添加。"})
     waiting_others = [task for task in active
                       if task.get("assignee_id") and task["assignee_id"] != actor
-                      and task["status"] in {"todo", "ready", "claimed", "running"}]
+                      and task["status"] in {"todo", "ready", "claimed", "running"}
+                      and not externals.get(task["task_id"])]
     if not advancing and waiting_others:
         target = waiting_others[0]
         next_actions.append({"tool": "butian_task_tree", "arguments": {"task_id": target["task_id"]},

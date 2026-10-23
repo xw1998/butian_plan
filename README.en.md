@@ -8,6 +8,38 @@ AI can answer questions. Working with it over time asks for more: remembering yo
 
 **Butian adds that working layer to the AI application you already use.** Through MCP, your host AI can access tools for tasks, memory, context recovery, evidence, and collaboration. Butian preserves progress and experience between interactions while your familiar AI handles reasoning and communication. No additional Ollama installation or local model is required.
 
+## Shortest path to first use (read this first)
+
+The sections after this one explain mechanisms; you do not need to read them before a first run.
+
+**Three steps, about three minutes**
+
+1. Install once: `python -m pip install -e .` (Python 3.11+, standard library only, no Ollama and no model API key).
+2. Connect once: call `butian_connect` over MCP (loopback has no token; with more than one member you must pass `member_id` explicitly), then `butian_context` for the current member, mode, visible tasks and next legal action.
+3. Deliver once: `butian_goal_submit` records the goal and acceptance criteria → copy the `next_actions` returned by `butian_context` → `butian_evidence_record` registers real evidence → `butian_task_handoff` (or `butian_execution_submit`) delivers.
+
+Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are more than 40 tools, but you do not need the list up front: `butian_context` returns ready-to-copy arguments for the current state, and `butian_tools_catalog` (`query` substring filter) plus `butian_tool_schema` answer “which tool, which parameters”.
+
+The one thing that trips people up: **`butian_goal_submit` only registers a goal, it does not mean the work is done.** A task counts only after it was actually performed and left verifiable evidence.
+
+### Do not use Butian for light tasks
+
+Single-turn work — one question, one paragraph, one code completion — is faster with the host AI alone. A full Butian cycle has fixed overhead: goal, context, evidence, handoff, review. Its payoff is continuity across sessions, reusable experience, evidence-based review and team separation of duties, not raw generation speed.
+
+The test is simple: use it when the work must continue later, must leave reviewable evidence, or needs several members to divide and cross-check.
+
+### Team mode works without a Provider
+
+Without a Provider, team subtasks do not run by themselves — but that is not a dead end. `butian_task_team_run` returns those subtasks as `awaiting_external_execution` with the whole loop spelled out in `next_actions`, and `host_execution_reason` says which case applies (task created with `execution_mode=host`, member has no Provider, or Provider is `manual`).
+
+1. `butian_connect(member_id="<assignee>")` to act as that member — output and memory stay under its name, it is not ghostwriting;
+2. `butian_execution_export` returns the execution context bound to the task revision and moves eligible tasks to running;
+3. the host AI performs the work, then `butian_evidence_record` registers the evidence;
+4. `butian_execution_submit` with `expected_revision`, `problem_revision` and a unique `submission_id` returns the task to review;
+5. switch back and call `butian_task_team_run` to aggregate; the team goal reaches final review only after the dispatcher reviews the children.
+
+A team parent cannot be exported before all children are `done` (`team_children_not_reviewed`), so the context only offers export for subtasks — never a call that is guaranteed to be rejected.
+
 ## What can Butian improve?
 
 - **Remember more of what matters to you.** Store requirements, corrections, project background, and confirmed findings as searchable long-term memory. Bring relevant information back into later tasks and spend less time repeating yourself.
@@ -296,22 +328,37 @@ python -m butian.cli evolution history m1
 ### Focused tests
 
 ```bash
+# Focused run while changing code: usually 1–3 minutes.
+BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
+    python -m pytest tests/test_usability_next_steps.py tests/test_team.py -q
+
 # Standard-library test entry points; pytest is not required for these commands.
 python tests/test_evolution.py
 python tests/test_provider_runtime.py
 
 # Full regression (both variables matter: maintenance worker and real execution backend).
+# About 1100 tests, 25–30 minutes locally; most of the time goes to real subprocess
+# execution, SQLite transactions and restart/recovery cases.
 BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
     python -m pytest tests --ignore=tests/acceptance -q
 
 # Real-browser acceptance for the web “submit goal” form: solo/team switching,
 # one subtask per member, and the duplicate-goal hint. Requires playwright and chromium;
-# exit code 0 = passed, 1 = assertion failed, 2 = dependency missing.
+# exit code 0 = passed, 1 = assertion failed, 2 = dependency missing. About 1 minute, 21 checks.
 python tests/acceptance/web_ui.py
 ```
 
 The regression gate is “zero skips”: when the machine cannot create symlinks, the
 redirect-point tests fall back to junctions (`tests/fs_redirect.py`) instead of skipping.
+
+The paper research scripts (`docs/论文/prepare_runs.py`, `docs/论文/statistics_report.py`,
+`docs/论文/任务包.v1.json`) and the `docs/论文/fixtures/` snapshot they depend on ship with the
+repository, so `tests/test_research_preparation.py` and `tests/test_research_statistics.py`
+run in a fresh clone without asking anyone for extra material.
+
+Avoid heavy IO such as a repository-wide `grep` during a full run: local `local-command`
+Provider tests occasionally time out spawning their subprocess under load and briefly show
+`unknown`/`blocked` for one team case; rerunning that case recovers, it is not a state-machine bug.
 
 The research experiment module is separate from the user-facing product workflow.
 

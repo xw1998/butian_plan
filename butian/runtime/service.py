@@ -1330,7 +1330,11 @@ class ButianService:
                     continue
                 child_payload = json.loads(child["payload"] or "{}")
                 if child_payload.get("execution_mode") == "host":
-                    results.append({"task_id": child["task_id"], "status": "awaiting_external_execution"})
+                    entry = {"task_id": child["task_id"], "status": "awaiting_external_execution"}
+                    actions = self.host_execution_actions(child["task_id"])
+                    if actions:
+                        entry["next_actions"] = actions
+                    results.append(entry)
                     continue
                 lease = self.store.claim_task(child["task_id"], member_id, internal=True)
                 self.store.transition_task(child["task_id"], lease["revision"], "running", f"team-resume:{child['task_id']}:{lease['revision']}")
@@ -1365,7 +1369,11 @@ class ButianService:
                 results.append(entry)
                 continue
             if json.loads(child["payload"] or "{}").get("execution_mode") == "host":
-                results.append({"task_id": child["task_id"], "status": "awaiting_external_execution"})
+                entry = {"task_id": child["task_id"], "status": "awaiting_external_execution"}
+                actions = self.host_execution_actions(child["task_id"])
+                if actions:
+                    entry["next_actions"] = actions
+                results.append(entry)
                 continue
             provider_row = self.store.db.execute("SELECT provider_session_id,status FROM provider_sessions WHERE task_id=? ORDER BY created_at DESC LIMIT 1", (child["task_id"],)).fetchone()
             if not provider_row:
@@ -1488,7 +1496,11 @@ class ButianService:
                         self.store.db.rollback()
                         raise
                 if external:
-                    return {"task_id": task_id, "status": "awaiting_external_execution", "children": results, "aggregate": outputs}
+                    summary = {"task_id": task_id, "status": "awaiting_external_execution", "children": results, "aggregate": outputs}
+                    actions = self.host_execution_actions(task_id)
+                    if actions:
+                        summary["next_actions"] = actions
+                    return summary
                 execution = self.start_provider_task(root_owner, instruction, task_id=task_id)
                 if execution.get("status") == "running":
                     self.consume_provider_task(execution["provider_session_id"])
@@ -1688,6 +1700,24 @@ class ButianService:
         self.drain_member_memory_outbox()
         row = next(item for item in self.store.list_member_memory_outbox() if item["outbox_id"] == outbox_id)
         return {"status": row["status"], "memory_id": memory_id, "candidate": True, "event_id": event_id}
+
+    def host_execution_actions(self, task_id: str) -> list[dict[str, Any]]:
+        """没有 Provider 时，把“宿主代这位成员做”的下一步明确写出来。
+
+        团队模式不配 Provider 时子任务会停在等执行：派发者不能代做，负责人也没有进程在跑，
+        于是一直空转。协议本身是通的（导出上下文 → 本机执行 → 交回证据），这里只负责指路。
+        """
+        from .usability import external_execution_reason, external_execution_step
+        row = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if not row:
+            return []
+        task = dict(row)
+        if not task.get("assignee_id") or task.get("status") in {"review", "done", "cancelled"}:
+            return []
+        reason = external_execution_reason(self, task, self._task_payload(task))
+        if not reason:
+            return []
+        return [external_execution_step(task_id, task["assignee_id"], reason)]
 
     @staticmethod
     def _task_payload(task: dict[str, Any]) -> dict[str, Any]:
