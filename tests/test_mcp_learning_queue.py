@@ -26,5 +26,7 @@ def test_queue_schema_exposes_required_authentication():
     for tool in TOOLS:
         if tool['name'] in {'butian_knowledge_source_enqueue', 'butian_knowledge_source_queue'}:
             schema = tool['inputSchema']
-            assert {'actor_member_id', 'token'} <= set(schema['required'])
+            # 身份由 butian_connect 继承；口令本机回环免填，只作为可选字段存在。
+            assert 'actor_member_id' in schema['required']
+            assert 'token' not in schema['required']
             assert {'actor_member_id', 'token'} <= set(schema['properties'])

@@ -161,7 +161,8 @@ def test_mcp_escalation_schemas_only_require_action_fields():
     assert "now" not in schemas["butian_tool_issue_escalations"]["properties"]
     assert "now" not in schemas["butian_tool_issue_escalation_claim"]["properties"]
     assert "now" not in schemas["butian_tool_issue_escalation_resolve"]["properties"]
-    assert {"member_id", "actor_member_id", "token"} <= set(schemas["butian_tool_issue_escalations"]["required"])
+    assert {"member_id", "actor_member_id"} <= set(schemas["butian_tool_issue_escalations"]["required"])
+    assert "token" not in schemas["butian_tool_issue_escalations"]["required"]
 
 
 def test_http_issue_escalations_require_auth_and_forward_dispatcher(tmp_path, monkeypatch):

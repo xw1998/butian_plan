@@ -1190,19 +1190,89 @@ class ButianService:
                 self.store.db.execute("RELEASE host_team_goal")
                 raise
 
-    def active_goal_duplicate(self, assignee: str, goal: str) -> dict[str, Any] | None:
-        """同一执行者已有未结束的同名目标时给出提示：重复提交会产生两份互相看不见的工作。
+    def active_goal_duplicate(self, assignee: str, goal: str, mode: str | None = None) -> dict[str, Any] | None:
+        """同一执行者在同一模式下已有未结束的同名目标时，判定为同一件事的重复提交。
 
-        只提示、不拦截——刻意并行或重建目标时仍然允许提交，避免把合法操作判死。
+        必须按模式分开看：团队目标的根任务挂在派活者名下，若单人提交同名目标也被它吸走，
+        用户“我一个人先做”的意图会被塞进团队任务里，等于静默改写了请求。
+        刻意并行时仍然允许提交，这里的返回值只用于幂等复用，不用于拒绝。
         """
         if not assignee or not goal:
             return None
-        row = self.store.db.execute(
-            "SELECT task_id, status FROM tasks WHERE assignee_id=? AND TRIM(title)=? "
-            "AND status NOT IN ('done','cancelled','failed') ORDER BY rowid DESC LIMIT 1",
+        rows = self.store.db.execute(
+            "SELECT task_id, status, payload FROM tasks WHERE assignee_id=? AND TRIM(title)=? "
+            "AND status NOT IN ('done','cancelled','failed') ORDER BY rowid DESC",
             (assignee, goal),
-        ).fetchone()
-        return {'task_id': row['task_id'], 'status': row['status']} if row else None
+        ).fetchall()
+        for row in rows:
+            if mode:
+                try:
+                    payload = json.loads(row['payload'] or '{}')
+                except (TypeError, ValueError):
+                    payload = {}
+                existing_mode = payload.get('mode') if isinstance(payload, dict) else None
+                # 老数据可能没有 mode 字段：宁可复用（保持幂等）也不要凭空判成两件事。
+                if existing_mode and existing_mode != mode:
+                    continue
+            return {'task_id': row['task_id'], 'status': row['status']}
+        return None
+
+    def goal_next_actions(self, task_id: str, actor: str | None) -> list[dict[str, Any]]:
+        """目标刚提交时把“下一步真正能调什么”直接写出来：
+
+        否则宿主只拿到一个 status（awaiting_host），而推进用的 task_transition /
+        context_compose / evidence_record / task_handoff 都要自己去猜参数。
+        """
+        from .usability import latest_problem, next_step_for_task
+        row = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (task_id,)).fetchone()
+        if not row:
+            return []
+        task = dict(row)
+        actions = []
+        step = next_step_for_task(task, actor, latest_problem(self, task_id))
+        if step:
+            actions.append(step)
+        for child in self.store.db.execute("SELECT task_id FROM tasks WHERE parent_id=? ORDER BY rowid", (task_id,)):
+            actions.extend(self.host_execution_actions(child["task_id"]))
+        return actions
+
+    def open_goal_result(self, actor: str, duplicate: dict[str, Any], goal: str) -> dict[str, Any]:
+        """同一目标重复提交时返回已有任务，而不是再造一份互相看不见的工作。
+
+        以前只在返回里加一句 duplicate_note，任务照建：同一目标会出现两条 todo。
+        """
+        from .usability import latest_problem, next_step_for_task
+        row = self.store.db.execute("SELECT * FROM tasks WHERE task_id=?", (duplicate["task_id"],)).fetchone()
+        if not row:
+            return {"task_id": duplicate["task_id"], "status": duplicate.get("status"),
+                    "created": False, "reused_existing": True, "goal": goal}
+        task = dict(row)
+        step = next_step_for_task(task, actor, latest_problem(self, task["task_id"]))
+        children = [{"task_id": child["task_id"], "member_id": child["assignee_id"],
+                     "instruction": child["title"], "status": child["status"]}
+                    for child in self.store.db.execute(
+                        "SELECT * FROM tasks WHERE parent_id=? ORDER BY rowid", (task["task_id"],))]
+        result = {
+            "task_id": task["task_id"],
+            "session_id": task["session_id"],
+            "status": task["status"],
+            "created": False,
+            "reused_existing": True,
+            "goal": task["title"],
+            "duplicate_of": {"task_id": task["task_id"], "status": task["status"]},
+            "note": "同一执行者已有未结束的同名目标，这次返回的是它，没有新建任务；"
+                    "要并行推进就把目标改成能区分的描述。",
+        }
+        if children:
+            result["children"] = children
+        actions = [step] if step else []
+        actions.extend(self.goal_next_actions(task["task_id"], actor))
+        deduped = []
+        for action in actions:
+            if action not in deduped:
+                deduped.append(action)
+        result["next_actions"] = deduped
+        return result
 
     def annotate_duplicate(self, result: dict[str, Any], duplicate: dict[str, Any] | None) -> dict[str, Any]:
         if duplicate:
@@ -1227,7 +1297,10 @@ class ButianService:
         assignee = resolved_dispatcher if mode == "team" else (member_id or resolved_dispatcher)
         if not assignee:
             raise ValueError("member_required")
-        duplicate = self.active_goal_duplicate(assignee, goal.strip())
+        duplicate = self.active_goal_duplicate(assignee, goal.strip(), mode)
+        if duplicate:
+            # 同一目标重复提交返回已有任务：以前只提示不拦，同一句话会留下两份 todo。
+            return self.open_goal_result(resolved_dispatcher or assignee, duplicate, goal.strip())
         if problem_model['definition_status'] == 'needs_clarification':
             clarification_payload = {'goal': goal.strip(), 'mode': mode, 'environment': environment or {}}
             if mode == 'team':

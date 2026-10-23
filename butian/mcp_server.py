@@ -131,13 +131,26 @@ for _name, _description, _fields, _required in [
     TOOLS.append({"name": _name, "description": _description, "inputSchema": {"type": "object", "properties": _fields, "required": ["member_id", "actor_member_id", "token", *_required]}})
 
 def run(home=None):
+    from .runtime.stdio_encoding import InputEncodingError, read_request_line, repair_surrogates, write_frame
     service = ButianService(home)
     state = {"actor": None, "token": None}
     try:
-        for line in sys.stdin:
+        while True:
+            try:
+                line = read_request_line()
+            except InputEncodingError as exc:
+                # 字节层解不出来时给一帧明确错误（含下一步动作），不让整个进程死掉。
+                write_frame({"jsonrpc": "2.0", "id": None,
+                             "error": {"code": -32700, "message": str(exc), "data": exc.details()}})
+                continue
+            if line is None:
+                break
+            if not line.strip():
+                continue
             req = None
             try:
-                req = json.loads(line)
+                # 宿主按别的编码解过我们的中文后回传时会带孤立代理字符；可逆还原，不存进库里。
+                req = repair_surrogates(json.loads(line))
                 if not isinstance(req, dict) or req.get("jsonrpc") != "2.0" or not isinstance(req.get("method"), str):
                     raise ValueError("invalid_jsonrpc_request")
                 method = req["method"]
@@ -149,7 +162,7 @@ def run(home=None):
                 elif method.startswith("notifications/"):
                     continue
                 elif method == "tools/list":
-                    result = list_tools_page(params.get("cursor"))
+                    result = list_tools_page(params.get("cursor"), params.get("limit"))
                 elif method == "tools/call":
                     from .runtime.mcp_guidance import ToolError
                     try:
@@ -161,16 +174,16 @@ def run(home=None):
                         result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": True}
                 else:
                     if "id" in req:
-                        print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": "method_not_found"}}), flush=True)
+                        write_frame({"jsonrpc": "2.0", "id": req["id"], "error": {"code": -32601, "message": "method_not_found"}})
                     continue
                 if "id" in req:
-                    print(json.dumps({"jsonrpc": "2.0", "id": req["id"], "result": result}, ensure_ascii=False), flush=True)
+                    write_frame({"jsonrpc": "2.0", "id": req["id"], "result": result})
             except Exception as exc:
                 if isinstance(req, dict) and "id" not in req:
                     continue
                 code = -32700 if isinstance(exc, json.JSONDecodeError) else (-32600 if not isinstance(req, dict) else -32000)
                 request_id = req.get("id") if isinstance(req, dict) else None
-                print(json.dumps({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": str(exc), "data": getattr(exc, "details", {"code": str(exc)})}}, ensure_ascii=False), flush=True)
+                write_frame({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": str(exc), "data": getattr(exc, "details", {"code": str(exc)})}})
     finally:
         service.close()
 
@@ -339,6 +352,19 @@ _review = next(tool for tool in TOOLS if tool["name"] == "butian_task_review")
 _review["description"] = ("Review a task in review status: approve (done, gated by handoff evidence) or rework "
                           "(back to ready, capped by rework limit). revision accepts expected_revision; verdict accepts decision.")
 
+# 口令（token）不是必填：本机回环免口令，远程成员访问才需要。
+# 以前几乎所有工具把它写进 required，宿主只能传空串凑参数；
+# “schema 说必填、实际不用”会让 AI 以为参数填错了，也容易在报错时把原因归错。
+for _token_tool in TOOLS:
+    _token_schema = _token_tool.setdefault("inputSchema", {"type": "object"})
+    _token_required = _token_schema.get("required")
+    if _token_required:
+        _token_schema["required"] = [field for field in _token_required if field != "token"]
+    _token_schema.setdefault("properties", {})["token"] = {
+        "type": "string",
+        "description": "optional: local loopback needs no token; inherited from butian_connect when omitted",
+    }
+
 def _require_member_arg(service, args, member_id=None):
     target = member_id or args.get("member_id")
     if not target:
@@ -458,16 +484,24 @@ def _call_tool(service, name, args, state=None):
                     'reason': '这些参数不会被使用；静默忽略会让你以为设置生效了。',
                     'next_actions': [{'tool': 'butian_tool_schema', 'arguments': {'name': name}}]})
             _lifted = {field: args.pop(field) for field in _PROBLEM_FIELDS if field in args}
+            _merged_fields = []
             if _lifted:
                 _problem = dict(args.get('problem') or {})
-                _conflict = sorted(field for field in _lifted
-                                   if field in _problem and _problem[field] != _lifted[field])
-                if _conflict:
-                    raise ToolError('problem_field_conflict', {
-                        'code': 'problem_field_conflict', 'tool': name, 'fields': _conflict,
-                        'reason': '同一字段既写在 problem 里又写在顶层且取值不同；只能留一处。',
-                        'next_actions': [{'tool': 'butian_tool_schema', 'arguments': {'name': name}}]})
-                _problem.update({field: value for field, value in _lifted.items() if field not in _problem})
+                for _field, _value in _lifted.items():
+                    if _field not in _problem:
+                        _problem[_field] = _value
+                        continue
+                    _existing = _problem[_field]
+                    if _existing == _value:
+                        continue
+                    # 同一字段两处写法不同不是错误：列表字段取并集（信息不丢），
+                    # 标量字段以顶层快捷写法为准并回显。以前这里直接报冲突，
+                    # 调用方明明写对了却收到 problem_field_conflict。
+                    if isinstance(_existing, list) and isinstance(_value, list):
+                        _problem[_field] = _existing + [item for item in _value if item not in _existing]
+                    else:
+                        _problem[_field] = _value
+                    _merged_fields.append(_field)
                 args['problem'] = _problem
             from .runtime.usability import current_mode, role_split_plan
             mode = args.get('mode') or current_mode(service)
@@ -476,13 +510,21 @@ def _call_tool(service, name, args, state=None):
                 raise ValueError('invalid_session_mode')
             if args.get('dispatcher_member_id') not in {None, actor}:
                 raise ValueError('dispatcher_identity_mismatch')
-            duplicate = service.active_goal_duplicate(actor, args['goal'].strip())
+            duplicate = service.active_goal_duplicate(actor, args['goal'].strip(), mode)
+            if duplicate:
+                # 幂等：同一目标重复提交返回已有任务，不新建第二份 todo。
+                return service.open_goal_result(actor, duplicate, args['goal'].strip())
             if mode == 'team':
                 subtasks, plan_source = args.get('subtasks'), 'host'
                 if not subtasks:
                     subtasks = role_split_plan(service, args['goal'], service._team_workers(actor, args.get('member_ids')))
                     plan_source = 'deterministic_role_split'
                 result = service.annotate_duplicate(service.submit_host_team_goal(args['goal'], actor_member_id=actor, member_ids=args.get('member_ids'), subtasks=subtasks, problem=args.get('problem')), duplicate)
+                # 团队目标刚提交时就要把下一步说清（根任务推进 + 每个无 Provider 子任务的宿主执行），
+                # 否则宿主停在 awaiting_host 不知道调什么。
+                result['next_actions'] = service.goal_next_actions(result['task_id'], actor)
+                if _merged_fields:
+                    result['problem_fields_merged'] = sorted(set(_merged_fields))
                 result['plan_source'] = plan_source
                 result['worker_selection'] = 'explicit' if args.get('member_ids') else 'all_other_members'
                 if not args.get('member_ids'):
@@ -510,7 +552,11 @@ def _call_tool(service, name, args, state=None):
                     problem = models.save(task, model, actor_id=actor, reason='host_goal_submit')
                     service.store.db.execute('RELEASE host_goal')
                     result = service.annotate_duplicate({'task_id': task, 'session': session, 'problem': problem,
-                                                        'status': 'needs_clarification' if problem['definition_status'] == 'needs_clarification' else 'awaiting_host'}, duplicate)
+                                                        'status': 'needs_clarification' if problem['definition_status'] == 'needs_clarification' else 'awaiting_host',
+                                                        'created': True}, duplicate)
+                    if _merged_fields:
+                        result['problem_fields_merged'] = sorted(set(_merged_fields))
+                    result['next_actions'] = service.goal_next_actions(task, actor)
                     if problem['definition_status'] == 'needs_clarification':
                         # 目标已登记但还不能开工：直接把澄清动作交出去，避免宿主重复提交同名目标。
                         result['clarification'] = {
@@ -885,22 +931,36 @@ TOOLS.extend([
 TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-only member permission, Provider configuration and task/reviewer readiness checks; never claims execution success", "inputSchema": {"type": "object", "properties": {key: {"type": "string"} for key in ("actor_member_id", "token", "member_id", "task_id")}}})
 
 
-def list_tools_page(cursor=None):
-    """Standard MCP pagination: bounded schemas without hiding callable tools."""
+TOOLS_PAGE_SIZE = 8
+
+def list_tools_page(cursor=None, limit=None):
+    """MCP tools/list：默认一次返回全部工具。
+
+    以前首页只放 8 个“入口”工具、其余靠 nextCursor 翻页；但宿主（以及很多 MCP
+    客户端）只读第一页，于是 task_claim / task_transition / task_review /
+    execution_submit / context_compose / evidence_record / task_handoff 这些
+    推进与收口的工具根本看不到：任务能建、却无法推进。现在默认全量返回，
+    分页能力保留给显式传 limit 的客户端。
+    """
+    first = ("butian_status", "butian_connect", "butian_context", "butian_mode",
+             "butian_goal_submit", "butian_task_list", "butian_tools_catalog",
+             "butian_tool_schema")
+    ordered = sorted(TOOLS, key=lambda tool: first.index(tool['name']) if tool['name'] in first else len(first))
+    if cursor is None and limit is None:
+        return {"tools": ordered}
+    size = TOOLS_PAGE_SIZE if limit is None else limit
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        raise ValueError("invalid_tools_limit")
     offset = 0
     if cursor is not None:
         if not isinstance(cursor, str) or not cursor.startswith("tools:") or not cursor[6:].isdigit():
             raise ValueError("invalid_tools_cursor")
         offset = int(cursor[6:])
-        if offset >= len(TOOLS) or offset % 8:
+        if offset >= len(TOOLS) or offset % size:
             raise ValueError("invalid_tools_cursor")
-    first = ("butian_status", "butian_connect", "butian_context", "butian_mode",
-             "butian_goal_submit", "butian_task_list", "butian_tools_catalog",
-             "butian_tool_schema")
-    ordered = sorted(TOOLS, key=lambda tool: first.index(tool['name']) if tool['name'] in first else len(first))
-    result = {"tools": ordered[offset:offset + 8]}
-    if offset + 8 < len(TOOLS):
-        result["nextCursor"] = "tools:" + str(offset + 8)
+    result = {"tools": ordered[offset:offset + size]}
+    if offset + size < len(TOOLS):
+        result["nextCursor"] = "tools:" + str(offset + size)
     return result
 
 TOOLS.append({"name": "butian_collaboration_start", "description": "Preflight then create, claim and start a Provider task for the authenticated member; blocked requests create no task; independent review remains required", "inputSchema": {"type": "object", "required": ["goal"], "properties": {"actor_member_id": {"type": "string", "description": "inherited from butian_connect when omitted"}, "token": {"type": "string", "description": "inherited from butian_connect; not required on local trust"}, "member_id": {"type": "string"}, "goal": {"type": "string"}, "problem": {"type": "object"}}}})

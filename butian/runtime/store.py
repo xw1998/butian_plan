@@ -37,6 +37,111 @@ CREATE TABLE IF NOT EXISTS provider_outputs (provider_session_id TEXT NOT NULL, 
 CREATE INDEX IF NOT EXISTS idx_provider_sessions_task ON provider_sessions(task_id, status);
 """
 
+class _LockedCursor:
+    """把语句结果一次性取全，避免“执行”和“取行”之间被别的线程插进来。
+
+    单连接被多线程共用时，实测会出现执行完拿到别人的行、查不到刚写入的记录，
+    甚至 `sqlite3.InterfaceError: bad parameter or other API misuse`。
+    """
+
+    __slots__ = ("_rows", "_index", "lastrowid", "rowcount", "description")
+
+    def __init__(self, rows, lastrowid, rowcount, description):
+        self._rows = rows
+        self._index = 0
+        self.lastrowid = lastrowid
+        self.rowcount = rowcount
+        self.description = description
+
+    def fetchone(self):
+        if self._index >= len(self._rows):
+            return None
+        row = self._rows[self._index]
+        self._index += 1
+        return row
+
+    def fetchmany(self, size=None):
+        size = 1 if size is None else size
+        chunk = self._rows[self._index:self._index + size]
+        self._index += len(chunk)
+        return chunk
+
+    def fetchall(self):
+        chunk = self._rows[self._index:]
+        self._index = len(self._rows)
+        return chunk
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        row = self.fetchone()
+        if row is None:
+            raise StopIteration
+        return row
+
+    def close(self):
+        self._rows = []
+        self._index = 0
+
+
+class _LockedConnection:
+    """串行化同一条 SQLite 连接上的“执行 + 取行”。
+
+    Store 只有一条连接，HTTP 服务是 ThreadingHTTPServer，后台还有维护线程与执行线程，
+    多线程共用一条连接会让结果错位（错行、漏行、InterfaceError）。这里只把单条语句的
+    执行与取行放进同一把锁；事务边界仍由 `_write_lock` 与 `with store.db:` 负责。
+    """
+
+    def __init__(self, connection, lock):
+        self._connection = connection
+        self._lock = lock
+
+    def execute(self, sql, parameters=()):
+        with self._lock:
+            cursor = self._connection.execute(sql, parameters)
+            try:
+                # 写语句（description 为 None）没有结果集，跳过 fetchall 以免白付代价。
+                rows = [] if cursor.description is None else cursor.fetchall()
+                return _LockedCursor(rows, cursor.lastrowid, cursor.rowcount, cursor.description)
+            finally:
+                cursor.close()
+
+    def executescript(self, script):
+        with self._lock:
+            cursor = self._connection.executescript(script)
+            cursor.close()
+        return None
+
+    def commit(self):
+        with self._lock:
+            self._connection.commit()
+
+    def rollback(self):
+        with self._lock:
+            self._connection.rollback()
+
+    def close(self):
+        with self._lock:
+            self._connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # 必须按 sqlite3.Connection.__exit__ 的语义收尾：无异常提交、有异常回滚。
+        # 写成空 `with self._connection:` 会在异常路径上也提交，等于把失败的事务落库。
+        with self._lock:
+            if exc_type is None:
+                self._connection.commit()
+            else:
+                self._connection.rollback()
+        return False
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
 def serialized_write(fn):
     def wrapped(self, *args, **kwargs):
         with self._write_lock:
@@ -50,9 +155,11 @@ class Store:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
-        self.db.row_factory = sqlite3.Row
+        self._connection = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
+        self._connection.row_factory = sqlite3.Row
         self._write_lock = threading.RLock()
+        self._db_lock = threading.RLock()
+        self.db = _LockedConnection(self._connection, self._db_lock)
         self.db.executescript(SCHEMA)
         self._migrate_columns()
         from .planning_execution import initialize

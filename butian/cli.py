@@ -7,7 +7,9 @@ from .runtime.store import Store
 from .runtime.service import ButianService
 
 def emit(data, status="ok") -> None:
-    print(json.dumps({"status": status, "data": data}, ensure_ascii=False))
+    # 写字节层并固定 UTF-8：Windows 管道默认是本地代码页，中文输出会变成乱码。
+    from .runtime.stdio_encoding import write_frame
+    write_frame({"status": status, "data": data})
 
 def home() -> Path:
     return Path(os.environ.get("BUTIAN_HOME", Path.home() / ".butian"))

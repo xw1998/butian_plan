@@ -70,15 +70,16 @@ def test_goal_submit_rejects_unknown_argument_instead_of_ignoring_it(runtime):
     assert "acceptance_criteria" in err.value.details["accepted"]
     assert service.store.list_tasks() == []
 
-def test_goal_submit_rejects_conflicting_problem_field(runtime):
+def test_goal_submit_merges_duplicated_problem_field_instead_of_failing(runtime):
+    """同一字段顶层与 problem 里都写不是错误：列表取并集，信息不丢，也不再把合法调用判死。"""
     service, state = runtime
     call_tool(service, "butian_connect", {"member_id": "host"}, state)
-    with pytest.raises(ToolError) as err:
-        call_tool(service, "butian_goal_submit",
-                  {"goal": "核验标定流程", "acceptance_criteria": ["顶层写法"],
-                   "problem": {"acceptance_criteria": ["嵌套写法"]}}, state)
-    assert err.value.details["code"] == "problem_field_conflict"
-    assert err.value.details["fields"] == ["acceptance_criteria"]
+    result = call_tool(service, "butian_goal_submit",
+                       {"goal": "核验标定流程", "acceptance_criteria": ["顶层写法"],
+                        "problem": {"acceptance_criteria": ["嵌套写法"]}}, state)
+    assert result["problem"]["acceptance_criteria"] == ["嵌套写法", "顶层写法"]
+    assert result["problem_fields_merged"] == ["acceptance_criteria"]
+    assert result["problem"]["definition_status"] == "defined"
 
 def test_null_optional_argument_is_treated_as_absent(runtime):
     service, state = runtime

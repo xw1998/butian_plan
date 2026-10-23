@@ -142,10 +142,11 @@ def test_unconfirmed_execution_is_marked_untrustworthy_with_retry_step():
     assert [action['tool'] for action in orphan['next_actions']] == ['butian_context']
     assert orphan['diagnosis']['reason'] == 'provider_status_unknown'
 
-def test_first_page_puts_task_loop_before_execution_preflight():
+def test_default_tool_list_puts_task_loop_first_but_keeps_everything():
     names = [tool["name"] for tool in list_tools_page()["tools"]]
-    assert "butian_task_list" in names
-    assert "butian_collaboration_preflight" not in names
+    assert "butian_task_list" in names[:8]
+    # 执行预检不再被藏到第二页：只读第一页的宿主要能看到全部能力。
+    assert "butian_collaboration_preflight" in names
 
 def test_team_mode_without_provider_is_not_a_dead_end(runtime):
     """没有 Provider 的团队模式：子任务要能由宿主以成员身份执行完，不能空转。

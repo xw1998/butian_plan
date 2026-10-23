@@ -18,7 +18,7 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 2. 连一次：在 MCP 里调 `butian_connect`（本机回环免口令；成员多于一个时必须显式给 `member_id`），紧接着调 `butian_context` 拿到当前成员、模式、可见任务与下一步动作。
 3. 交一次活：`butian_goal_submit` 写目标与验收条件 → 照抄 `butian_context` 返回的 `next_actions` 一步步执行 → `butian_evidence_record` 登记真实证据 → `butian_task_handoff`（或 `butian_execution_submit`）交付。
 
-要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数超过 40 个，但不必先背表——`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数；找不到工具时用 `butian_tools_catalog`（`query` 子串过滤）加 `butian_tool_schema` 查单个参数。
+要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数 124 个，但不必先背表——`tools/list` 默认一次返回全部工具（含 `task_claim`、`task_transition`、`task_review`、`execution_submit`、`context_compose`、`evidence_record`、`task_handoff` 这些推进与收口的入口），`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数；找不到工具时用 `butian_tools_catalog`（`query` 子串过滤）加 `butian_tool_schema` 查单个参数。
 
 最容易踩的只有一件事：**`butian_goal_submit` 只是登记目标，不等于执行完成**。任务要真做过、留下可核验的证据，才能交付与审核。
 
@@ -27,6 +27,14 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 一次问答、一段文案、一次代码补全这类单轮工作，直接用宿主 AI 更快。补天一次完整闭环有固定开销：建目标、取上下文、登记证据、交付、审核；它的收益来自**跨会话延续、经验复用、证据审核与多人分工**，不是单轮生成速度。
 
 判断标准很简单：这件事需要下次接着做、需要留下能复核的证据、或者需要多人分工互审，才值得接入补天。
+
+### MCP 传输：中文、口令与重复提交
+
+- **中文全链路 UTF-8**：MCP 与 CLI 都走字节层 UTF-8，不再继承 Windows 本地代码页。宿主没设 `PYTHONUTF8` 时中文也不会变成乱码，更不会在提交时报 `surrogates not allowed`；请求里若带孤立代理字符会先做可逆还原，存库与回显都是正常中文。
+- **`token` 是可选字段**：本机回环免口令，远程成员访问时才需要，缺省从 `butian_connect` 继承。schema 不再把它列进 `required`，不必再传空串凑参数。
+- **同一字段两处写法不再报错**：`acceptance_criteria` 既写在顶层又写在 `problem` 里时，列表取并集、标量以顶层为准，并在返回的 `problem_fields_merged` 里回显，不再抛 `problem_field_conflict`。
+- **同名目标幂等**：同一执行者在同一模式下重复提交未结束的同一目标时，返回已有任务（`created: false`、`reused_existing: true`）并附 `next_actions`，不会再多出一条互相看不见的 `todo`。去重按模式分开算：团队目标的根任务挂在派活者名下，单人提交同名目标仍然单独建单，不会被吸进团队任务。
+- **提交即给出入口**：`butian_goal_submit` 返回的 `next_actions` 直接给出推进动作（以及团队模式里每个无 Provider 子任务的宿主执行动作），不必自己猜 revision 与 operation_key。
 
 ### 没有 Provider 也能走完团队模式
 
@@ -474,7 +482,7 @@ python -m butian.assets.export /absolute/new/runtime
 
 身份与口令仍写在工具的 schema 必填里（这些工具确实需要认证），但 `butian_connect` 之后由连接自动注入，**连一次就不必每次重传** `member_id`/`actor_member_id`/`token`；没连接时缺身份会直接得到“先 `butian_connect`”的下一步，而不是让人猜。只有 `butian_hypothesis_action_grant`、`butian_tool_security_review`、`butian_tool_repair_confirm`、`butian_dispatcher_set`、`butian_host_authorization_*` 这些 **member_id 指向别人或独立角色**的工具不会被注入——默认成自己会把“授权、独立复核”变成自我授权。可选参数传 `null` 视为未提供，不会因模板留空被判类型错。
 
-同一执行者重复提交同名目标不会失败，但会在返回里带 `duplicate_of` 与 `duplicate_note`（指出已有任务的 `task_id` 与状态）——静默产生两份互相看不见的工作才是真问题；刻意并行时改一句目标描述即可。
+同一执行者在同一模式下重复提交同名未结束目标不会失败，也不会新建：返回里带 `created: false`、`reused_existing: true` 与 `duplicate_of`（已有任务的 `task_id` 与状态），并附 `next_actions` 供接着推进。静默产生两份互相看不见的工作才是真问题；刻意并行时改一句目标描述即可。团队目标与单人目标分别去重——单人提交同名目标不会被团队根任务吸走。
 
 执行结果没有被执行器确认时（`status` 为 `unknown` / `provider_lost` / `failed`），返回里带 `trustworthy: false`、`diagnosis`（`reason` 与“为什么不能当完成”）和 `next_actions`（先 `butian_context` 看上下文与合法下一步，再 `butian_provider_start` 用新会话重发）。这类状态既不能写进审核，也不该手工改状态绕过确认。
 

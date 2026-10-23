@@ -139,8 +139,9 @@ def run(base: str, checks: Checks, service) -> None:
             checks.ok("已创建" in duplicate_notice, "单人目标提交成功", duplicate_notice)
 
             page.click('[data-form="goal"] button[type="submit"]')
-            repeat_notice = wait_text(page, "#notice", ["目标任务", "改写"])
-            checks.ok("目标任务" in repeat_notice or "改写" in repeat_notice, "重复目标给出提示但不拦截", repeat_notice)
+            repeat_notice = wait_text(page, "#notice", ["已复用", "已存在同名"])
+            checks.ok("已复用" in repeat_notice and "task_" in repeat_notice,
+                      "重复目标幂等复用已有任务（不再建第二份 todo）", repeat_notice)
 
             # 自省归属：给 m1 造材料并做梦，页面上只有 m1 有记录，m2 仍为空。
             memory = service.memory("m1")
@@ -193,7 +194,7 @@ def main() -> int:
             "SELECT task_id, title, parent_id FROM tasks ORDER BY rowid")]
         parent = [task for task in tasks if not task["parent_id"]]
         children = [task for task in tasks if task["parent_id"]]
-        checks.ok(len(parent) >= 2, "团队父任务与单人任务都已落库", f"根任务 {len(parent)} 个")
+        checks.ok(len(parent) == 2, "团队父任务与单人任务都已落库", f"根任务 {len(parent)} 个")
         checks.equal(len(children), 2, "团队目标为每位成员建立了子任务")
         titles = sorted(task["title"] for task in children)
         checks.equal(titles, ["复核边界条件", "整理输入数据"], "子任务标题与成员输入一一对应")

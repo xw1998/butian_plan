@@ -18,7 +18,7 @@ The sections after this one explain mechanisms; you do not need to read them bef
 2. Connect once: call `butian_connect` over MCP (loopback has no token; with more than one member you must pass `member_id` explicitly), then `butian_context` for the current member, mode, visible tasks and next legal action.
 3. Deliver once: `butian_goal_submit` records the goal and acceptance criteria → copy the `next_actions` returned by `butian_context` → `butian_evidence_record` registers real evidence → `butian_task_handoff` (or `butian_execution_submit`) delivers.
 
-Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are more than 40 tools, but you do not need the list up front: `butian_context` returns ready-to-copy arguments for the current state, and `butian_tools_catalog` (`query` substring filter) plus `butian_tool_schema` answer “which tool, which parameters”.
+Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are 124 tools, but you do not need the list up front: `tools/list` returns all of them in one page — including the ones that move a task forward and close it out (`task_claim`, `task_transition`, `task_review`, `execution_submit`, `context_compose`, `evidence_record`, `task_handoff`) — `butian_context` returns ready-to-copy arguments for the current state, and `butian_tools_catalog` (`query` substring filter) plus `butian_tool_schema` answer “which tool, which parameters”.
 
 The one thing that trips people up: **`butian_goal_submit` only registers a goal, it does not mean the work is done.** A task counts only after it was actually performed and left verifiable evidence.
 
@@ -27,6 +27,14 @@ The one thing that trips people up: **`butian_goal_submit` only registers a goal
 Single-turn work — one question, one paragraph, one code completion — is faster with the host AI alone. A full Butian cycle has fixed overhead: goal, context, evidence, handoff, review. Its payoff is continuity across sessions, reusable experience, evidence-based review and team separation of duties, not raw generation speed.
 
 The test is simple: use it when the work must continue later, must leave reviewable evidence, or needs several members to divide and cross-check.
+
+### MCP transport: Chinese text, tokens and duplicate goals
+
+- **UTF-8 end to end**: both the MCP server and the CLI read and write bytes as UTF-8 instead of inheriting the Windows ANSI code page. Chinese stays readable even when the host does not set `PYTHONUTF8`, and submitting Chinese no longer fails with `surrogates not allowed`; lone surrogates that arrive from a mis-decoding peer are repaired reversibly before anything is stored or echoed.
+- **`token` is optional**: loopback needs none and remote member access is the only case that does. It defaults to the value from `butian_connect` and is no longer listed in `required`, so you stop passing empty strings to satisfy the schema.
+- **Duplicated fields no longer fail**: when `acceptance_criteria` appears both at the top level and inside `problem`, lists are merged and scalars take the top-level value, echoed back as `problem_fields_merged` instead of raising `problem_field_conflict`.
+- **Duplicate goals are idempotent**: resubmitting the same unfinished goal in the same mode returns the existing task (`created: false`, `reused_existing: true`) with `next_actions`, instead of leaving a second invisible `todo`. Team and solo goals deduplicate separately.
+- **Submission returns the entry point**: `butian_goal_submit` includes `next_actions` with the advancing call (and, in team mode, the host-execution step for each subtask whose assignee has no Provider), so nothing has to guess `revision` or `operation_key`.
 
 ### Team mode works without a Provider
 
@@ -459,7 +467,7 @@ Three calls replace re-sending credentials, session ids and subtasks on every re
 2. `butian_mode` reads or switches solo/team **without a session_id**. The change applies to upcoming goals; running tasks are preserved.
 3. `butian_context` returns the current member, mode, visible tasks with revisions, and the next legal action.
 
-Submitting the same goal text again for the same operator does not fail, but the response carries `duplicate_of` and `duplicate_note` (the existing `task_id` and status) — two parallel tasks that cannot see each other is the real hazard; change one word of the goal when you genuinely want a parallel run.
+Submitting the same goal text again for the same operator in the same mode does not fail and does not create a second task: the response carries `created: false`, `reused_existing: true` and `duplicate_of` (the existing `task_id` and status), plus `next_actions` to keep going. Two parallel tasks that cannot see each other is the real hazard; change one word of the goal when you genuinely want a parallel run. Deduplication is per mode, so a solo submission with the same wording is never absorbed into a team root task.
 
 When the executor never confirmed the outcome (`status` is `unknown`, `provider_lost`, or `failed`), the response carries `trustworthy: false`, a `diagnosis` (`reason` plus why the result cannot count as done), and `next_actions` (call `butian_context` first for the legal next step, then `butian_provider_start` with a fresh session). Such a result must not be written into review, and the task status must not be hand-edited to bypass confirmation.
 

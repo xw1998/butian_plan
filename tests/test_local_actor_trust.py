@@ -73,11 +73,14 @@ def test_concurrent_members_do_not_knock_each_other_out(service):
 
     def worker(member):
         for _ in range(200):
-            service.enable_local_actor(member)
+            # 登记与校验都要收进 try：旧写法只包住后半段，线程在 enable_local_actor
+            # 上抛异常会静默死掉，用例照样“通过”——等于没测。
             try:
+                service.enable_local_actor(member)
                 service.require_member_access(member, actor_member_id=member)
             except Exception as exc:  # noqa: BLE001 - 收集后统一断言
                 errors.append((member, exc))
+                return
 
     threads = [threading.Thread(target=worker, args=(member,)) for member in ("m1", "m2")]
     for thread in threads:

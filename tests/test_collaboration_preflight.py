@@ -38,23 +38,33 @@ def test_preflight_missing_provider_and_status(runtime):
     assert 'provider_unavailable' in result['blockers']
     assert call_tool(service, 'butian_status', {})['collaboration_ready'] == 'unchecked'
 
-def test_tools_pagination_has_no_loss_or_duplicates():
-    names = []
-    cursor = None
+def test_tools_list_defaults_to_every_callable_tool():
+    """默认不再只给 8 个首屏工具：宿主只读第一页时，推进/收口工具会整片看不见。"""
+    page = list_tools_page()
+    names = [t['name'] for t in page['tools']]
+    assert 'nextCursor' not in page
+    assert len(names) == len(set(names)) == len(TOOLS)
+    assert set(names) == {t['name'] for t in TOOLS}
+    # 入口在前，但推进与收口必须都在同一份清单里。
+    assert names[:4] == ['butian_status', 'butian_connect', 'butian_context', 'butian_mode']
+    assert {'butian_task_claim', 'butian_task_transition', 'butian_task_review',
+            'butian_execution_submit', 'butian_context_compose', 'butian_evidence_record',
+            'butian_task_handoff'} <= set(names)
+    with pytest.raises(ValueError):
+        list_tools_page('tools:1')
+
+def test_tools_pagination_still_available_when_limit_is_requested():
+    names, cursor = [], None
     while True:
-        result = list_tools_page(cursor)
+        result = list_tools_page(cursor, 8)
         assert len(result['tools']) <= 8
         names.extend(t['name'] for t in result['tools'])
         cursor = result.get('nextCursor')
         if cursor is None:
             break
     assert len(names) == len(set(names)) == len(TOOLS)
-    assert set(names) == {t['name'] for t in TOOLS}
-    # 首屏放日常闭环（含任务推进入口），执行预检下沉到后续页但不得丢失。
-    assert 'butian_task_list' in names[:8]
-    assert 'butian_collaboration_preflight' in names
     with pytest.raises(ValueError):
-        list_tools_page('tools:1')
+        list_tools_page(None, 0)
 
 def test_start_is_blocked_without_mutation(runtime):
     service, auth = runtime

@@ -42,7 +42,7 @@ def test_mcp_snapshot_requires_owner_authentication(tmp_path):
         with pytest.raises(ValueError):
             call_tool(service,'butian_knowledge_source_read',dict(args,actor_member_id='other',member_id='other',token='test-other'))
         schema=next(t['inputSchema'] for t in TOOLS if t['name']=='butian_knowledge_source_read')
-        assert 'token' in schema['required'] and 'actor_member_id' in schema['required']
+        assert 'actor_member_id' in schema['required'] and 'token' not in schema['required']
     finally: service.close()
 
 
