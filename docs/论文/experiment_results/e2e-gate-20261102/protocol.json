@@ -1,0 +1,48 @@
+{
+  "protocol_version": 1,
+  "methods": [
+    "G0-index",
+    "G1-direct",
+    "G2-gate",
+    "G3-gate-inject",
+    "G4-reuse-inject",
+    "G5-inject-warm"
+  ],
+  "seeds": [
+    1103,
+    2207,
+    3301,
+    4409,
+    5519,
+    6619,
+    7723,
+    8837,
+    9941,
+    10151,
+    11257,
+    12301,
+    13309,
+    14387,
+    15401,
+    16411,
+    17417,
+    18427,
+    19433,
+    20441
+  ],
+  "rounds": 12,
+  "entities_per_family": 4,
+  "inject_rounds": [
+    6,
+    10
+  ],
+  "reusable_statuses": [
+    "hot",
+    "warm"
+  ],
+  "candidate_reusable": [
+    "G4-reuse-inject"
+  ],
+  "bootstrap_draws": 10000,
+  "written_before_execution": true
+}

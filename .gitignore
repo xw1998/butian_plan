@@ -50,3 +50,17 @@ _tmp_*.py
 !/docs/论文/任务包.v1.json
 !/docs/论文/fixtures/
 !/docs/论文/fixtures/nist-eda352-20261014.html
+
+# End-to-end gate study (2026-11-02): pre-registered protocol, results and
+# reproducible runner are public; raw per-task rows stay private.
+!/docs/论文/build_paper_docx.py
+!/docs/论文/run_endtoend_gate_study.py
+!/docs/论文/实验协议-端到端门槛验证.md
+!/docs/论文/端到端门槛验证结果-20261102.md
+!/docs/论文/experiment_results/e2e-gate-20261102/
+!/docs/论文/experiment_results/e2e-gate-20261102/protocol.json
+!/docs/论文/experiment_results/e2e-gate-20261102/environment.json
+!/docs/论文/experiment_results/e2e-gate-20261102/manifest.json
+!/docs/论文/experiment_results/e2e-gate-20261102/replication-check.json
+!/docs/论文/experiment_results/e2e-gate-20261102/lifecycle-probe.json
+!/docs/论文/experiment_results/e2e-gate-20261102/summary.json

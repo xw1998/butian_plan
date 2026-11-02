@@ -1,0 +1,50 @@
+{
+  "steps": [
+    [
+      "put_candidate",
+      "candidate"
+    ],
+    [
+      "success-1",
+      "success",
+      "candidate",
+      1,
+      0
+    ],
+    [
+      "success-2",
+      "success",
+      "warm",
+      2,
+      0
+    ],
+    [
+      "failure-1",
+      "failure",
+      "disputed",
+      2,
+      1
+    ],
+    [
+      "success-3",
+      "success",
+      "disputed",
+      3,
+      1
+    ],
+    [
+      "success-4",
+      "success",
+      "disputed",
+      4,
+      1
+    ],
+    [
+      "explicit_revision",
+      "candidate"
+    ]
+  ],
+  "automatic_rewarm_after_failure": "disputed",
+  "explicit_revision_restores_candidate": "candidate",
+  "automatic_path_closes_loop": false
+}
