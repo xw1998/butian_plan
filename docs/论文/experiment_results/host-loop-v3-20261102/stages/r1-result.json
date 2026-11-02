@@ -1,0 +1,355 @@
+{
+  "round": 1,
+  "results": [
+    {
+      "round": 1,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "calibration101-v1"
+      ],
+      "answer": {
+        "value": 3.1385,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration101",
+          "family": "calibration",
+          "offset": 2,
+          "scale": 2000,
+          "version": 1
+        }
+      },
+      "truth": 3.1385,
+      "memory_status": "disputed",
+      "successes": 3,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration201-v1"
+      ],
+      "answer": {
+        "value": 26.912,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration201",
+          "family": "calibration",
+          "offset": 61,
+          "scale": 125,
+          "version": 1
+        },
+        "from_memory": "calibration201-v1"
+      },
+      "truth": 27.208,
+      "memory_status": "disputed",
+      "successes": 2,
+      "failures": 1,
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration301-v1"
+      ],
+      "answer": {
+        "value": 39.516,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration301",
+          "family": "calibration",
+          "offset": 25,
+          "scale": 250,
+          "version": 1
+        },
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 39.516,
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 1,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "schema101-v1"
+      ],
+      "answer": {
+        "flow": 7.25,
+        "level": 8.951,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 1000,
+          "entity": "schema101",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 7.25,
+        "level": 8.951
+      },
+      "memory_status": "disputed",
+      "successes": 3,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema201-v1"
+      ],
+      "answer": {
+        "flow": 87.14018691588785,
+        "level": 18.2803738317757,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 107,
+          "entity": "schema201",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema201-v1"
+      },
+      "truth": {
+        "flow": 93.24,
+        "level": 19.56
+      },
+      "memory_status": "disputed",
+      "successes": 2,
+      "failures": 1,
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema301-v1"
+      ],
+      "answer": {
+        "flow": 10.34,
+        "level": 22.79,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema301",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 10.34,
+        "level": 22.79
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 1,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "tool101-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 340,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool101",
+          "entity": "tool101",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 340
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 3,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool201-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 3021,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool201",
+          "entity": "tool201",
+          "factor": 1007,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool201-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 3000
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 2,
+      "failures": 1,
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool301-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 400,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool301",
+          "entity": "tool301",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 400
+        }
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    }
+  ],
+  "revision": {
+    "calibration201": {
+      "memory_id": "calibration201-v1",
+      "version": 5,
+      "status": "candidate",
+      "old_content_hash": "e73f732d40ed3571119c0df8f86b5f4f799d76b6a151f97b380e3d74495fcd7e",
+      "new_content_hash": "5e0578873bd6e67217810c21ba865c54f80ec4ac5a9290e46329767a65c1db8c",
+      "evidence_refs": [
+        "ev_a7967f8594b6447289a07c4b03ab9342"
+      ],
+      "previous_status": "disputed"
+    },
+    "schema201": {
+      "memory_id": "schema201-v1",
+      "version": 5,
+      "status": "candidate",
+      "old_content_hash": "6e0fb717529926e5ed2890d145202cd114c9f60befafa5ef559b505cbadf1146",
+      "new_content_hash": "8f397e8965eda96ba41fbf4ee65ad6d7866ae985df414fb9639f42834d3936b6",
+      "evidence_refs": [
+        "ev_fce4c3d7f2774a0895a2926d51f806ef"
+      ],
+      "previous_status": "disputed"
+    },
+    "tool201": {
+      "memory_id": "tool201-v1",
+      "version": 5,
+      "status": "candidate",
+      "old_content_hash": "1bd24a83709376336c9d2154965b825b210aad53000cdaca9f1c84b780f19385",
+      "new_content_hash": "d47e6391d106651379b909a65501e5b6e6bf9fd55c93c952db8882fa4bcb1e89",
+      "evidence_refs": [
+        "ev_bba689035daa4f0b8069e182ce93c61c"
+      ],
+      "previous_status": "disputed"
+    }
+  }
+}

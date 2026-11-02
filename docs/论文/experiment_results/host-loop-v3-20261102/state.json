@@ -1,0 +1,20 @@
+{
+  "protocol": "host-loop-v3",
+  "source_id": "src_e6e5e5f183da454f85dc7ace140b4de3",
+  "source_sha256": "7f00d3c021c6ff9f710f97db51e9c18e14a289a6038b0b9a33f2893590b02e84",
+  "archive": "D:\\工作\\git_project\\butian_plan\\docs\\论文\\experiment_results\\host-loop-v3-20261102\\fixtures\\contract-manual-v1.txt",
+  "created_at": 1793635706.5086844,
+  "round": 0,
+  "decoy_count": 300,
+  "seeded_status": {
+    "calibration101": "disputed",
+    "calibration201": "warm",
+    "calibration301": "warm",
+    "schema101": "disputed",
+    "schema201": "warm",
+    "schema301": "warm",
+    "tool101": "disputed",
+    "tool201": "warm",
+    "tool301": "warm"
+  }
+}

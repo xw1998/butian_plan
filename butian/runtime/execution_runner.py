@@ -52,13 +52,19 @@ class ExecutionRunner:
                         self.adapter.authorize(permit['authorization_id'], permit['authorization_generation'], time.time() + 30)
                         try:
                             self.adapter.renew(request.execution_id, 10)
-                        except ValueError:
+                        except (ValueError, OSError):
                             # Renewal is advisory, not exit evidence: the owner
                             # releases the job as soon as the process exits, so a
                             # renewal can lose a race against completion (or
                             # against the stop it already started). The durable
                             # ledger stays authoritative and the next reconcile
                             # below reads the real terminal state.
+                            # OSError matters on the loopback transport: an owner
+                            # that already released the job answers 400, which
+                            # urllib raises as HTTPError (an OSError), and a
+                            # transient connect failure says nothing about the
+                            # process tree either. Neither may turn a completed
+                            # run into an unconfirmed one.
                             pass
                         lease_due = now + 2
                 if now >= reconciliation_deadline:

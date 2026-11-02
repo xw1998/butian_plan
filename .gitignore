@@ -125,3 +125,28 @@ _tmp_*.py
 # its output over the same 45 memories are public evidence for the before/after numbers.
 !/docs/论文/check_recall_precision.py
 !/docs/论文/experiment_results/host-loop-v2-20261102/recall-precision-fix.json
+
+# Real-host multiround arm 3 (2026-11-02, host-loop-v3): pre-registered protocol, runner,
+# result document, per-round host decisions/answers and the seeded/revised evidence are
+# public; the SQLite production home stays private (covered by the production/ rule), and
+# the throwaway pilot directory (host-loop-v3-20261102-pilot1) is not shipped at all.
+!/docs/论文/run_host_v3_multiround_study.py
+!/docs/论文/实验协议-真实宿主多轮-v3.md
+!/docs/论文/真实宿主多轮验证结果-v3-20261102.md
+!/docs/论文/experiment_results/host-loop-v3-20261102/
+!/docs/论文/experiment_results/host-loop-v3-20261102/summary.json
+!/docs/论文/experiment_results/host-loop-v3-20261102/state.json
+!/docs/论文/experiment_results/host-loop-v3-20261102/mcp-trace.jsonl
+!/docs/论文/experiment_results/host-loop-v3-20261102/fixtures/
+!/docs/论文/experiment_results/host-loop-v3-20261102/fixtures/contract-manual-v1.txt
+!/docs/论文/experiment_results/host-loop-v3-20261102/fixtures/rules.json
+!/docs/论文/experiment_results/host-loop-v3-20261102/fixtures/tasks.json
+!/docs/论文/experiment_results/host-loop-v3-20261102/fixtures/decoys.json
+!/docs/论文/experiment_results/host-loop-v3-20261102/stages/
+!/docs/论文/experiment_results/host-loop-v3-20261102/stages/*.json
+!/docs/论文/experiment_results/host-loop-v3-20261102/seed-evidence/
+!/docs/论文/experiment_results/host-loop-v3-20261102/seed-evidence/*.txt
+!/docs/论文/experiment_results/host-loop-v3-20261102/practice-evidence/
+!/docs/论文/experiment_results/host-loop-v3-20261102/practice-evidence/*.txt
+!/docs/论文/experiment_results/host-loop-v3-20261102/revision-evidence/
+!/docs/论文/experiment_results/host-loop-v3-20261102/revision-evidence/*.txt

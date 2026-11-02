@@ -1,0 +1,318 @@
+{
+  "round": 2,
+  "results": [
+    {
+      "round": 2,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "calibration101-v1"
+      ],
+      "answer": {
+        "value": 1.3545,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration101",
+          "family": "calibration",
+          "offset": 2,
+          "scale": 2000,
+          "version": 1
+        }
+      },
+      "truth": 1.3545,
+      "memory_status": "disputed",
+      "successes": 4,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "calibration201-v1"
+      ],
+      "answer": {
+        "value": 53.72,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration201",
+          "family": "calibration",
+          "offset": 24,
+          "scale": 125,
+          "version": 1
+        }
+      },
+      "truth": 53.72,
+      "memory_status": "candidate",
+      "successes": 1,
+      "failures": 0,
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration301-v1"
+      ],
+      "answer": {
+        "value": 12.5,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration301",
+          "family": "calibration",
+          "offset": 25,
+          "scale": 250,
+          "version": 1
+        },
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 12.5,
+      "memory_status": "warm",
+      "successes": 4,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "schema101-v1"
+      ],
+      "answer": {
+        "flow": 1.692,
+        "level": 0.063,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 1000,
+          "entity": "schema101",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 1.692,
+        "level": 0.063
+      },
+      "memory_status": "disputed",
+      "successes": 4,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "schema201-v1"
+      ],
+      "answer": {
+        "flow": 26.67,
+        "level": 71.26,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema201",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 26.67,
+        "level": 71.26
+      },
+      "memory_status": "candidate",
+      "successes": 1,
+      "failures": 0,
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema301-v1"
+      ],
+      "answer": {
+        "flow": 54.83,
+        "level": 62.54,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema301",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 54.83,
+        "level": 62.54
+      },
+      "memory_status": "warm",
+      "successes": 4,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "tool101-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 520,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool101",
+          "entity": "tool101",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 520
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 4,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "tool201-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 99000,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool201",
+          "entity": "tool201",
+          "factor": 1000,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 99000
+        }
+      },
+      "memory_status": "candidate",
+      "successes": 1,
+      "failures": 0,
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool301-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 440,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool301",
+          "entity": "tool301",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 440
+        }
+      },
+      "memory_status": "warm",
+      "successes": 4,
+      "failures": 0,
+      "status_after": "warm"
+    }
+  ],
+  "revision": {}
+}

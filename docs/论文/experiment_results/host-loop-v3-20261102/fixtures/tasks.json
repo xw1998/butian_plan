@@ -1,0 +1,566 @@
+[
+  {
+    "round": 1,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 6279,
+    "truth": 3.1385
+  },
+  {
+    "round": 2,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 2711,
+    "truth": 1.3545
+  },
+  {
+    "round": 3,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 2092,
+    "truth": 1.045
+  },
+  {
+    "round": 4,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 6893,
+    "truth": 3.4455
+  },
+  {
+    "round": 1,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 3425,
+    "truth": 27.208
+  },
+  {
+    "round": 2,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 6739,
+    "truth": 53.72
+  },
+  {
+    "round": 3,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 8552,
+    "truth": 68.224
+  },
+  {
+    "round": 4,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 7749,
+    "truth": 61.8
+  },
+  {
+    "round": 1,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 9904,
+    "truth": 39.516
+  },
+  {
+    "round": 2,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 3150,
+    "truth": 12.5
+  },
+  {
+    "round": 3,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 9262,
+    "truth": 36.948
+  },
+  {
+    "round": 4,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 6775,
+    "truth": 27.0
+  },
+  {
+    "round": 1,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 7250,
+      "f2": 9707,
+      "f3": 5308,
+      "f4": 3265,
+      "h1": 8951,
+      "h2": 8210,
+      "h3": 905,
+      "h4": 1415
+    },
+    "truth": {
+      "flow": 7.25,
+      "level": 8.951
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 1692,
+      "f2": 1208,
+      "f3": 8624,
+      "f4": 8889,
+      "h1": 63,
+      "h2": 328,
+      "h3": 7473,
+      "h4": 5888
+    },
+    "truth": {
+      "flow": 1.692,
+      "level": 0.063
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 9295,
+      "f2": 8929,
+      "f3": 1144,
+      "f4": 7041,
+      "h1": 9837,
+      "h2": 1957,
+      "h3": 3661,
+      "h4": 8231
+    },
+    "truth": {
+      "flow": 9.295,
+      "level": 9.837
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 9771,
+      "f2": 1623,
+      "f3": 4815,
+      "f4": 9232,
+      "h1": 8548,
+      "h2": 8728,
+      "h3": 7149,
+      "h4": 2038
+    },
+    "truth": {
+      "flow": 9.771,
+      "level": 8.548
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 9324,
+      "f2": 2593,
+      "f3": 4447,
+      "f4": 5280,
+      "h1": 1956,
+      "h2": 7844,
+      "h3": 378,
+      "h4": 8063
+    },
+    "truth": {
+      "flow": 93.24,
+      "level": 19.56
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 2667,
+      "f2": 5705,
+      "f3": 5618,
+      "f4": 8650,
+      "h1": 7126,
+      "h2": 2249,
+      "h3": 6633,
+      "h4": 1432
+    },
+    "truth": {
+      "flow": 26.67,
+      "level": 71.26
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 3762,
+      "f2": 7240,
+      "f3": 6864,
+      "f4": 4470,
+      "h1": 4342,
+      "h2": 59,
+      "h3": 4390,
+      "h4": 4926
+    },
+    "truth": {
+      "flow": 37.62,
+      "level": 43.42
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 1532,
+      "f2": 2672,
+      "f3": 4298,
+      "f4": 2420,
+      "h1": 4204,
+      "h2": 7512,
+      "h3": 8157,
+      "h4": 8233
+    },
+    "truth": {
+      "flow": 15.32,
+      "level": 42.04
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 1034,
+      "f2": 1506,
+      "f3": 1698,
+      "f4": 9965,
+      "h1": 2279,
+      "h2": 3665,
+      "h3": 2986,
+      "h4": 2892
+    },
+    "truth": {
+      "flow": 10.34,
+      "level": 22.79
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 5483,
+      "f2": 3043,
+      "f3": 2628,
+      "f4": 7236,
+      "h1": 6254,
+      "h2": 757,
+      "h3": 6096,
+      "h4": 5441
+    },
+    "truth": {
+      "flow": 54.83,
+      "level": 62.54
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 2137,
+      "f2": 4828,
+      "f3": 8903,
+      "f4": 6798,
+      "h1": 8671,
+      "h2": 4673,
+      "h3": 7706,
+      "h4": 7102
+    },
+    "truth": {
+      "flow": 21.37,
+      "level": 86.71
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 5722,
+      "f2": 7091,
+      "f3": 9020,
+      "f4": 7938,
+      "h1": 7182,
+      "h2": 7529,
+      "h3": 609,
+      "h4": 8288
+    },
+    "truth": {
+      "flow": 57.22,
+      "level": 71.82
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 34,
+    "truth": {
+      "endpoint": "/api/v1/tool101",
+      "kwargs": {
+        "limit_v1": 340
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 52,
+    "truth": {
+      "endpoint": "/api/v1/tool101",
+      "kwargs": {
+        "limit_v1": 520
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 9,
+    "truth": {
+      "endpoint": "/api/v1/tool101",
+      "kwargs": {
+        "limit_v1": 90
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "false-disputed",
+    "version": 1,
+    "stable": true,
+    "raw": 10,
+    "truth": {
+      "endpoint": "/api/v1/tool101",
+      "kwargs": {
+        "limit_v1": 100
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 3,
+    "truth": {
+      "endpoint": "/api/v1/tool201",
+      "kwargs": {
+        "limit_v1": 3000
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 99,
+    "truth": {
+      "endpoint": "/api/v1/tool201",
+      "kwargs": {
+        "limit_v1": 99000
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 61,
+    "truth": {
+      "endpoint": "/api/v1/tool201",
+      "kwargs": {
+        "limit_v1": 61000
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "repair",
+    "version": 1,
+    "stable": true,
+    "raw": 94,
+    "truth": {
+      "endpoint": "/api/v1/tool201",
+      "kwargs": {
+        "limit_v1": 94000
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 40,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 400
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 44,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 440
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 76,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 760
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "scale",
+    "version": 1,
+    "stable": true,
+    "raw": 85,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 850
+      }
+    }
+  }
+]

@@ -1,0 +1,1 @@
+entity=calibration201; round=1; kind=corrected_measurement; content=RULE {"entity": "calibration201", "family": "calibration", "offset": 24, "scale": 125, "version": 1}

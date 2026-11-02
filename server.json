@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.xw1998/butian-plan",
   "description": "AI team orchestration and durable memory over MCP: goals, tasks, evidence, review, handoff.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "repository": {
     "url": "https://gitee.com/xw19981010/butian_plan",
     "source": "gitee"

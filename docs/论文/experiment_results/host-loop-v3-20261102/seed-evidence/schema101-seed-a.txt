@@ -1,0 +1,2 @@
+entity=schema101; tag=seed-a; group=false-disputed; source=upstream_extraction
+content=RULE {"divisor": 1000, "entity": "schema101", "family": "schema", "flow_field": "f1", "level_field": "h1", "version": 1}

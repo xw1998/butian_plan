@@ -1,0 +1,50 @@
+{
+  "calibration101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "disputed memory needs revalidation; policy reads source"
+  },
+  "calibration201": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "candidate memory needs revalidation; policy reads source"
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "calibration301-v1",
+    "why": "recall has warm memory for this entity+version"
+  },
+  "schema101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "disputed memory needs revalidation; policy reads source"
+  },
+  "schema201": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "candidate memory needs revalidation; policy reads source"
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "schema301-v1",
+    "why": "recall has warm memory for this entity+version"
+  },
+  "tool101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "disputed memory needs revalidation; policy reads source"
+  },
+  "tool201": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "candidate memory needs revalidation; policy reads source"
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "tool301-v1",
+    "why": "recall has warm memory for this entity+version"
+  }
+}

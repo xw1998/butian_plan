@@ -1,4 +1,5 @@
 import sqlite3
+import urllib.error
 from types import SimpleNamespace
 
 import pytest
@@ -115,6 +116,56 @@ def test_lease_renewal_racing_job_completion_is_not_a_failed_execution(tmp_path,
     def renew(execution_id, seconds):
         calls['renew'] += 1
         raise ValueError('execution_lease_not_running')
+
+    adapter.renew = renew
+
+    def inspect(execution_id):
+        calls['inspect'] += 1
+        if calls['inspect'] == 1:
+            return ExecutionObservation(execution_id, caps.executor_id, caps.instance_id, 0, 'accepted')
+        if calls['renew']:
+            return ExecutionObservation(execution_id, caps.executor_id, caps.instance_id, 2, 'success', exit_code=0, tree_exit_confirmed=True)
+        return ExecutionObservation(execution_id, caps.executor_id, caps.instance_id, 1, 'running')
+
+    adapter.inspect = inspect
+    clock = Clock()
+    monkeypatch.setattr(runner_module, 'time', SimpleNamespace(monotonic=clock.monotonic, time=__import__('time').time))
+    db = sqlite3.connect(':memory:', isolation_level=None)
+    try:
+        observation = ExecutionRunner(ExecutionDispatch(db, adapter)).run(request, authorization_valid=lambda: True)
+        assert calls['renew'] >= 1, 'the renewal attempt must actually happen for the race to be covered'
+        assert observation.state == 'success'
+        assert observation.tree_exit_confirmed is True
+    finally:
+        db.close()
+
+def test_lease_renewal_transport_rejection_is_not_a_failed_execution(tmp_path, monkeypatch):
+    """同一条竞态在回环传输上表现为 HTTP 400（urllib 抛 HTTPError，是 OSError 而不是 ValueError）。
+    作业已释放时 owner 答 executor_request_rejected，续约就会拿到 400；续约只是租约续期，
+    真实终态仍须从持久账本读回，不能因为一次 400 把已经跑完的执行记成 provider_executor_unconfirmed。
+    """
+    import butian.runtime.execution_runner as runner_module
+    from butian.runtime.execution_contract import ExecutionObservation
+    from test_execution_dispatch import Adapter
+    from test_execution_permit import fixture as make_request
+    request, caps, _ = make_request(tmp_path)
+    calls = {'renew': 0, 'inspect': 0}
+
+    class Clock:
+        def __init__(self):
+            self.now = 0.0
+
+        def monotonic(self):
+            self.now += 0.5
+            return self.now
+
+    adapter = Adapter()
+    adapter.capabilities = lambda: caps
+    adapter.authorize = lambda *args: None
+
+    def renew(execution_id, seconds):
+        calls['renew'] += 1
+        raise urllib.error.HTTPError('http://127.0.0.1/execution/v1', 400, 'Bad Request', None, None)
 
     adapter.renew = renew
 

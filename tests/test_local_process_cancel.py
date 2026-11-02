@@ -18,10 +18,18 @@ def test_cancel_running_process_and_prevent_reexecution(tmp_path, operator_local
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(lambda: list(provider.stream(remote, '工作')))
         assert started.wait(5)
-        deadline = time.monotonic() + 5
-        while not marker.exists() and time.monotonic() < deadline:
+        # 子进程先建文件再写内容，只等「文件存在」会读到空串；并行全量回归里踩到过这个窗口。
+        deadline = time.monotonic() + 20
+        content = ''
+        while time.monotonic() < deadline:
+            try:
+                content = marker.read_text()
+            except OSError:
+                content = ''
+            if content == 'started':
+                break
             threading.Event().wait(0.02)
-        assert marker.read_text() == 'started'
+        assert content == 'started'
         assert provider.cancel(remote).status == 'cancelled'
         events = future.result(timeout=15)
     assert events[-1].status == 'cancelled'

@@ -1,0 +1,1 @@
+entity=calibration301; round=1; verdict=correct; rule={"entity": "calibration301", "family": "calibration", "offset": 25, "scale": 250, "version": 1}

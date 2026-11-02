@@ -1,0 +1,2 @@
+entity=schema301; tag=seed-a; group=scale; source=upstream_extraction
+content=RULE {"divisor": 100, "entity": "schema301", "family": "schema", "flow_field": "f1", "level_field": "h1", "version": 1}

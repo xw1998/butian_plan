@@ -1,0 +1,119 @@
+{
+  "calibration101": {
+    "value": 1.045,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration101",
+      "family": "calibration",
+      "offset": 2,
+      "scale": 2000,
+      "version": 1
+    }
+  },
+  "calibration201": {
+    "value": 68.224,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration201",
+      "family": "calibration",
+      "offset": 24,
+      "scale": 125,
+      "version": 1
+    }
+  },
+  "calibration301": {
+    "value": 36.948,
+    "basis": "experience",
+    "rule_used": {
+      "entity": "calibration301",
+      "family": "calibration",
+      "offset": 25,
+      "scale": 250,
+      "version": 1
+    },
+    "from_memory": "calibration301-v1"
+  },
+  "schema101": {
+    "flow": 9.295,
+    "level": 9.837,
+    "basis": "source",
+    "rule_used": {
+      "divisor": 1000,
+      "entity": "schema101",
+      "family": "schema",
+      "flow_field": "f1",
+      "level_field": "h1",
+      "version": 1
+    }
+  },
+  "schema201": {
+    "flow": 37.62,
+    "level": 43.42,
+    "basis": "source",
+    "rule_used": {
+      "divisor": 100,
+      "entity": "schema201",
+      "family": "schema",
+      "flow_field": "f1",
+      "level_field": "h1",
+      "version": 1
+    }
+  },
+  "schema301": {
+    "flow": 21.37,
+    "level": 86.71,
+    "basis": "experience",
+    "rule_used": {
+      "divisor": 100,
+      "entity": "schema301",
+      "family": "schema",
+      "flow_field": "f1",
+      "level_field": "h1",
+      "version": 1
+    },
+    "from_memory": "schema301-v1"
+  },
+  "tool101": {
+    "endpoint": "/api/v1/tool101",
+    "parameter": "limit_v1",
+    "value": 90,
+    "basis": "source",
+    "rule_used": {
+      "endpoint": "/api/v1/tool101",
+      "entity": "tool101",
+      "factor": 10,
+      "family": "tool",
+      "parameter": "limit_v1",
+      "version": 1
+    }
+  },
+  "tool201": {
+    "endpoint": "/api/v1/tool201",
+    "parameter": "limit_v1",
+    "value": 61000,
+    "basis": "source",
+    "rule_used": {
+      "endpoint": "/api/v1/tool201",
+      "entity": "tool201",
+      "factor": 1000,
+      "family": "tool",
+      "parameter": "limit_v1",
+      "version": 1
+    }
+  },
+  "tool301": {
+    "endpoint": "/api/v1/tool301",
+    "parameter": "limit_v1",
+    "value": 760,
+    "basis": "experience",
+    "rule_used": {
+      "endpoint": "/api/v1/tool301",
+      "entity": "tool301",
+      "factor": 10,
+      "family": "tool",
+      "parameter": "limit_v1",
+      "version": 1
+    },
+    "from_memory": "tool301-v1"
+  }
+}

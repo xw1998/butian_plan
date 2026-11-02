@@ -1,0 +1,1549 @@
+{
+  "execution_kind": "real_host_multiround_loop_v3",
+  "protocol": "host-loop-v3",
+  "verdict": "v3_false_dispute_and_repair_confirmed",
+  "host_kind": "real_model_current_conversation",
+  "llm_inference_calls": "unmetered: host is the conversational model, calls not instrumented",
+  "model_weights_changed": false,
+  "rounds": 4,
+  "entities": 9,
+  "total_answers": 36,
+  "decoy_count": 300,
+  "by_round": {
+    "r1-false-disputed": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "status_before": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      },
+      "status_after": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      }
+    },
+    "r1-repair": {
+      "n": 3,
+      "correct": 0,
+      "wrong": 3,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 3,
+      "status_before": {
+        "calibration201": "warm",
+        "schema201": "warm",
+        "tool201": "warm"
+      },
+      "status_after": {
+        "calibration201": "candidate",
+        "schema201": "candidate",
+        "tool201": "candidate"
+      }
+    },
+    "r1-scale": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 3,
+      "status_before": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      },
+      "status_after": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      }
+    },
+    "r2-false-disputed": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "status_before": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      },
+      "status_after": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      }
+    },
+    "r2-repair": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "status_before": {
+        "calibration201": "candidate",
+        "schema201": "candidate",
+        "tool201": "candidate"
+      },
+      "status_after": {
+        "calibration201": "candidate",
+        "schema201": "candidate",
+        "tool201": "candidate"
+      }
+    },
+    "r2-scale": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 3,
+      "status_before": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      },
+      "status_after": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      }
+    },
+    "r3-false-disputed": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "status_before": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      },
+      "status_after": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      }
+    },
+    "r3-repair": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "status_before": {
+        "calibration201": "candidate",
+        "schema201": "candidate",
+        "tool201": "candidate"
+      },
+      "status_after": {
+        "calibration201": "warm",
+        "schema201": "warm",
+        "tool201": "warm"
+      }
+    },
+    "r3-scale": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 3,
+      "status_before": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      },
+      "status_after": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      }
+    },
+    "r4-false-disputed": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "status_before": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      },
+      "status_after": {
+        "calibration101": "disputed",
+        "schema101": "disputed",
+        "tool101": "disputed"
+      }
+    },
+    "r4-repair": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 3,
+      "status_before": {
+        "calibration201": "warm",
+        "schema201": "warm",
+        "tool201": "warm"
+      },
+      "status_after": {
+        "calibration201": "warm",
+        "schema201": "warm",
+        "tool201": "warm"
+      }
+    },
+    "r4-scale": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 3,
+      "status_before": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      },
+      "status_after": {
+        "calibration301": "warm",
+        "schema301": "warm",
+        "tool301": "warm"
+      }
+    }
+  },
+  "criteria": {
+    "M1_false_dispute_no_wrong_answer_but_zero_reuse": true,
+    "M2_revision_restores_reuse": true,
+    "M3_scale_keeps_recall_precise": true,
+    "M4_behaviour_auditable": true
+  },
+  "m1_detail": {
+    "all_correct": true,
+    "all_read_source": true,
+    "no_experience_basis": true,
+    "still_disputed_at_end": true
+  },
+  "m2_detail": {
+    "r1_poisoned_use_and_wrong": true,
+    "r2_r4_all_correct": true,
+    "r4_reuse_without_read": true,
+    "revision_executed": true,
+    "revisions": {
+      "calibration201": {
+        "previous_status": "disputed",
+        "status": "candidate"
+      },
+      "schema201": {
+        "previous_status": "disputed",
+        "status": "candidate"
+      },
+      "tool201": {
+        "previous_status": "disputed",
+        "status": "candidate"
+      }
+    }
+  },
+  "m3_detail": {
+    "irrelevant_total": 0,
+    "recall_sizes": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "median_size": 1,
+    "all_correct": true,
+    "reuse_all_rounds": true
+  },
+  "m4_violations": [],
+  "recall_limit": 100,
+  "limitations": [
+    "宿主同时是实验设计者，非盲；本轮更重，因为宿主知道三组构造",
+    "单宿主、单次运行，不能跨模型外推，不报告 p 值",
+    "坏经验、误伤、300 条无关记忆都是 harness 直接注入的构造，不是真实历史事故",
+    "任务是契约化合成任务，真值来自 solve()",
+    "不测量 token 成本与延迟，不声称模型参数变化",
+    "repair 组的恢复节律由「successes>=2 且无失败 → warm」这条规则决定，不是普适常数",
+    "scale 组只到 300 条；千条以上的召回仍用子串匹配 + IDF 闸门，不外推"
+  ],
+  "rows": [
+    {
+      "round": 1,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "calibration101-v1"
+      ],
+      "answer": {
+        "value": 3.1385,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration101",
+          "family": "calibration",
+          "offset": 2,
+          "scale": 2000,
+          "version": 1
+        }
+      },
+      "truth": 3.1385,
+      "memory_status": "disputed",
+      "successes": 3,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration201-v1"
+      ],
+      "answer": {
+        "value": 26.912,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration201",
+          "family": "calibration",
+          "offset": 61,
+          "scale": 125,
+          "version": 1
+        },
+        "from_memory": "calibration201-v1"
+      },
+      "truth": 27.208,
+      "memory_status": "disputed",
+      "successes": 2,
+      "failures": 1,
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration301-v1"
+      ],
+      "answer": {
+        "value": 39.516,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration301",
+          "family": "calibration",
+          "offset": 25,
+          "scale": 250,
+          "version": 1
+        },
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 39.516,
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 1,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "schema101-v1"
+      ],
+      "answer": {
+        "flow": 7.25,
+        "level": 8.951,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 1000,
+          "entity": "schema101",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 7.25,
+        "level": 8.951
+      },
+      "memory_status": "disputed",
+      "successes": 3,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema201-v1"
+      ],
+      "answer": {
+        "flow": 87.14018691588785,
+        "level": 18.2803738317757,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 107,
+          "entity": "schema201",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema201-v1"
+      },
+      "truth": {
+        "flow": 93.24,
+        "level": 19.56
+      },
+      "memory_status": "disputed",
+      "successes": 2,
+      "failures": 1,
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema301-v1"
+      ],
+      "answer": {
+        "flow": 10.34,
+        "level": 22.79,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema301",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 10.34,
+        "level": 22.79
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 1,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "tool101-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 340,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool101",
+          "entity": "tool101",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 340
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 3,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool201-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 3021,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool201",
+          "entity": "tool201",
+          "factor": 1007,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool201-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 3000
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 2,
+      "failures": 1,
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool301-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 400,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool301",
+          "entity": "tool301",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 400
+        }
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "calibration101-v1"
+      ],
+      "answer": {
+        "value": 1.3545,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration101",
+          "family": "calibration",
+          "offset": 2,
+          "scale": 2000,
+          "version": 1
+        }
+      },
+      "truth": 1.3545,
+      "memory_status": "disputed",
+      "successes": 4,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "calibration201-v1"
+      ],
+      "answer": {
+        "value": 53.72,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration201",
+          "family": "calibration",
+          "offset": 24,
+          "scale": 125,
+          "version": 1
+        }
+      },
+      "truth": 53.72,
+      "memory_status": "candidate",
+      "successes": 1,
+      "failures": 0,
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration301-v1"
+      ],
+      "answer": {
+        "value": 12.5,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration301",
+          "family": "calibration",
+          "offset": 25,
+          "scale": 250,
+          "version": 1
+        },
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 12.5,
+      "memory_status": "warm",
+      "successes": 4,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "schema101-v1"
+      ],
+      "answer": {
+        "flow": 1.692,
+        "level": 0.063,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 1000,
+          "entity": "schema101",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 1.692,
+        "level": 0.063
+      },
+      "memory_status": "disputed",
+      "successes": 4,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "schema201-v1"
+      ],
+      "answer": {
+        "flow": 26.67,
+        "level": 71.26,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema201",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 26.67,
+        "level": 71.26
+      },
+      "memory_status": "candidate",
+      "successes": 1,
+      "failures": 0,
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema301-v1"
+      ],
+      "answer": {
+        "flow": 54.83,
+        "level": 62.54,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema301",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 54.83,
+        "level": 62.54
+      },
+      "memory_status": "warm",
+      "successes": 4,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "tool101-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 520,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool101",
+          "entity": "tool101",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 520
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 4,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "tool201-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 99000,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool201",
+          "entity": "tool201",
+          "factor": 1000,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 99000
+        }
+      },
+      "memory_status": "candidate",
+      "successes": 1,
+      "failures": 0,
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool301-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 440,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool301",
+          "entity": "tool301",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 440
+        }
+      },
+      "memory_status": "warm",
+      "successes": 4,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "calibration101-v1"
+      ],
+      "answer": {
+        "value": 1.045,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration101",
+          "family": "calibration",
+          "offset": 2,
+          "scale": 2000,
+          "version": 1
+        }
+      },
+      "truth": 1.045,
+      "memory_status": "disputed",
+      "successes": 5,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 3,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "calibration201-v1"
+      ],
+      "answer": {
+        "value": 68.224,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration201",
+          "family": "calibration",
+          "offset": 24,
+          "scale": 125,
+          "version": 1
+        }
+      },
+      "truth": 68.224,
+      "memory_status": "warm",
+      "successes": 2,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration301-v1"
+      ],
+      "answer": {
+        "value": 36.948,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration301",
+          "family": "calibration",
+          "offset": 25,
+          "scale": 250,
+          "version": 1
+        },
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 36.948,
+      "memory_status": "warm",
+      "successes": 5,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "schema101-v1"
+      ],
+      "answer": {
+        "flow": 9.295,
+        "level": 9.837,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 1000,
+          "entity": "schema101",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 9.295,
+        "level": 9.837
+      },
+      "memory_status": "disputed",
+      "successes": 5,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 3,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "schema201-v1"
+      ],
+      "answer": {
+        "flow": 37.62,
+        "level": 43.42,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema201",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 37.62,
+        "level": 43.42
+      },
+      "memory_status": "warm",
+      "successes": 2,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema301-v1"
+      ],
+      "answer": {
+        "flow": 21.37,
+        "level": 86.71,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema301",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 21.37,
+        "level": 86.71
+      },
+      "memory_status": "warm",
+      "successes": 5,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "tool101-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 90,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool101",
+          "entity": "tool101",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 90
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 5,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 3,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "candidate",
+      "recall_ids": [
+        "tool201-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 61000,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool201",
+          "entity": "tool201",
+          "factor": 1000,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 61000
+        }
+      },
+      "memory_status": "warm",
+      "successes": 2,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool301-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 760,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool301",
+          "entity": "tool301",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 760
+        }
+      },
+      "memory_status": "warm",
+      "successes": 5,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "calibration101-v1"
+      ],
+      "answer": {
+        "value": 3.4455,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration101",
+          "family": "calibration",
+          "offset": 2,
+          "scale": 2000,
+          "version": 1
+        }
+      },
+      "truth": 3.4455,
+      "memory_status": "disputed",
+      "successes": 6,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration201-v1"
+      ],
+      "answer": {
+        "value": 61.8,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration201",
+          "family": "calibration",
+          "offset": 24,
+          "scale": 125,
+          "version": 1
+        },
+        "from_memory": "calibration201-v1"
+      },
+      "truth": 61.8,
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration301-v1"
+      ],
+      "answer": {
+        "value": 27.0,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration301",
+          "family": "calibration",
+          "offset": 25,
+          "scale": 250,
+          "version": 1
+        },
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 27.0,
+      "memory_status": "warm",
+      "successes": 6,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "schema101-v1"
+      ],
+      "answer": {
+        "flow": 9.771,
+        "level": 8.548,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 1000,
+          "entity": "schema101",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 9.771,
+        "level": 8.548
+      },
+      "memory_status": "disputed",
+      "successes": 6,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema201-v1"
+      ],
+      "answer": {
+        "flow": 15.32,
+        "level": 42.04,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema201",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema201-v1"
+      },
+      "truth": {
+        "flow": 15.32,
+        "level": 42.04
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema301-v1"
+      ],
+      "answer": {
+        "flow": 57.22,
+        "level": 71.82,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema301",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 57.22,
+        "level": 71.82
+      },
+      "memory_status": "warm",
+      "successes": 6,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "tool101-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 100,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool101",
+          "entity": "tool101",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 100
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 6,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool201-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 94000,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool201",
+          "entity": "tool201",
+          "factor": 1000,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool201-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 94000
+        }
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool301-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 850,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool301",
+          "entity": "tool301",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 850
+        }
+      },
+      "memory_status": "warm",
+      "successes": 6,
+      "failures": 0,
+      "status_after": "warm"
+    }
+  ]
+}

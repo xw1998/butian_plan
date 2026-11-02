@@ -1,0 +1,2 @@
+entity=tool201; tag=seed-a; group=repair; source=upstream_extraction
+content=RULE {"endpoint": "/api/v1/tool201", "entity": "tool201", "factor": 1007, "family": "tool", "parameter": "limit_v1", "version": 1}

@@ -1,0 +1,186 @@
+{
+  "round": 1,
+  "items": [
+    {
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "question": "实体 calibration101（calibration 族），当前文档版本 v1。\n原始读数 raw = 6279，请按 calibration 族的换算规则给出工程值（kPa）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_3335b9eaf15a486f97065e66e63924f3",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "calibration101-v1",
+          "status": "disputed",
+          "content": "RULE {\"entity\": \"calibration101\", \"family\": \"calibration\", \"offset\": 2, \"scale\": 2000, \"version\": 1}",
+          "needs_revalidation": true,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "question": "实体 calibration201（calibration 族），当前文档版本 v1。\n原始读数 raw = 3425，请按 calibration 族的换算规则给出工程值（kPa）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_212735489ed4404f970fed8515eed2cc",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "calibration201-v1",
+          "status": "warm",
+          "content": "RULE {\"entity\": \"calibration201\", \"family\": \"calibration\", \"offset\": 61, \"scale\": 125, \"version\": 1}",
+          "needs_revalidation": false,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "question": "实体 calibration301（calibration 族），当前文档版本 v1。\n原始读数 raw = 9904，请按 calibration 族的换算规则给出工程值（kPa）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_dd6718f2db1348e3ab859d9030711c93",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "calibration301-v1",
+          "status": "warm",
+          "content": "RULE {\"entity\": \"calibration301\", \"family\": \"calibration\", \"offset\": 25, \"scale\": 250, \"version\": 1}",
+          "needs_revalidation": false,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "question": "实体 schema101（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 7250, \"f2\": 9707, \"f3\": 5308, \"f4\": 3265, \"h1\": 8951, \"h2\": 8210, \"h3\": 905, \"h4\": 1415}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_f89c02aa7adc44f8bdb9d7b159251f59",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "schema101-v1",
+          "status": "disputed",
+          "content": "RULE {\"divisor\": 1000, \"entity\": \"schema101\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}",
+          "needs_revalidation": true,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "question": "实体 schema201（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 9324, \"f2\": 2593, \"f3\": 4447, \"f4\": 5280, \"h1\": 1956, \"h2\": 7844, \"h3\": 378, \"h4\": 8063}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_a3a237f83d5f4bc08629e512d0faee82",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "schema201-v1",
+          "status": "warm",
+          "content": "RULE {\"divisor\": 107, \"entity\": \"schema201\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}",
+          "needs_revalidation": false,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "question": "实体 schema301（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 1034, \"f2\": 1506, \"f3\": 1698, \"f4\": 9965, \"h1\": 2279, \"h2\": 3665, \"h3\": 2986, \"h4\": 2892}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_d7eff78f11cf428ab6ab1509dcb2e92e",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "schema301-v1",
+          "status": "warm",
+          "content": "RULE {\"divisor\": 100, \"entity\": \"schema301\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}",
+          "needs_revalidation": false,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "question": "实体 tool101（tool 族），当前文档版本 v1。\n调用参数 raw = 34，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_754d32a2178e4268852ec419b541f704",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "tool101-v1",
+          "status": "disputed",
+          "content": "RULE {\"endpoint\": \"/api/v1/tool101\", \"entity\": \"tool101\", \"factor\": 10, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+          "needs_revalidation": true,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "question": "实体 tool201（tool 族），当前文档版本 v1。\n调用参数 raw = 3，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_d563dae4cc7f4e4d8738708abab38364",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "tool201-v1",
+          "status": "warm",
+          "content": "RULE {\"endpoint\": \"/api/v1/tool201\", \"entity\": \"tool201\", \"factor\": 1007, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+          "needs_revalidation": false,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    },
+    {
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "question": "实体 tool301（tool 族），当前文档版本 v1。\n调用参数 raw = 40，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。",
+      "recall_id": "recall_6bcb8bca77be4fcba23f1298503849a1",
+      "no_match": false,
+      "memories": [
+        {
+          "memory_id": "tool301-v1",
+          "status": "warm",
+          "content": "RULE {\"endpoint\": \"/api/v1/tool301\", \"entity\": \"tool301\", \"factor\": 10, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+          "needs_revalidation": false,
+          "environment_match": null
+        }
+      ],
+      "n_memories": 1,
+      "irrelevant": 0
+    }
+  ],
+  "instruction": "宿主策略（协议第 2 节，已冻结）：召回里有 warm/hot 且版本一致 → 用经验作答；candidate/disputed/缺版本 → 读源；两者都不成立 → unknown。"
+}

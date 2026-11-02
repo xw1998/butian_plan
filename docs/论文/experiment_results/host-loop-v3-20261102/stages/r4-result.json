@@ -1,0 +1,321 @@
+{
+  "round": 4,
+  "results": [
+    {
+      "round": 4,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "calibration101-v1"
+      ],
+      "answer": {
+        "value": 3.4455,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration101",
+          "family": "calibration",
+          "offset": 2,
+          "scale": 2000,
+          "version": 1
+        }
+      },
+      "truth": 3.4455,
+      "memory_status": "disputed",
+      "successes": 6,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration201-v1"
+      ],
+      "answer": {
+        "value": 61.8,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration201",
+          "family": "calibration",
+          "offset": 24,
+          "scale": 125,
+          "version": 1
+        },
+        "from_memory": "calibration201-v1"
+      },
+      "truth": 61.8,
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "calibration301-v1"
+      ],
+      "answer": {
+        "value": 27.0,
+        "basis": "experience",
+        "rule_used": {
+          "entity": "calibration301",
+          "family": "calibration",
+          "offset": 25,
+          "scale": 250,
+          "version": 1
+        },
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 27.0,
+      "memory_status": "warm",
+      "successes": 6,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "schema101-v1"
+      ],
+      "answer": {
+        "flow": 9.771,
+        "level": 8.548,
+        "basis": "source",
+        "rule_used": {
+          "divisor": 1000,
+          "entity": "schema101",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "flow": 9.771,
+        "level": 8.548
+      },
+      "memory_status": "disputed",
+      "successes": 6,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema201-v1"
+      ],
+      "answer": {
+        "flow": 15.32,
+        "level": 42.04,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema201",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema201-v1"
+      },
+      "truth": {
+        "flow": 15.32,
+        "level": 42.04
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "schema301-v1"
+      ],
+      "answer": {
+        "flow": 57.22,
+        "level": 71.82,
+        "basis": "experience",
+        "rule_used": {
+          "divisor": 100,
+          "entity": "schema301",
+          "family": "schema",
+          "flow_field": "f1",
+          "level_field": "h1",
+          "version": 1
+        },
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 57.22,
+        "level": 71.82
+      },
+      "memory_status": "warm",
+      "successes": 6,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "false-disputed",
+      "version": 1,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "status_before": "disputed",
+      "recall_ids": [
+        "tool101-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 100,
+        "basis": "source",
+        "rule_used": {
+          "endpoint": "/api/v1/tool101",
+          "entity": "tool101",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 100
+        }
+      },
+      "memory_status": "disputed",
+      "successes": 6,
+      "failures": 1,
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "repair",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool201-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 94000,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool201",
+          "entity": "tool201",
+          "factor": 1000,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool201-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 94000
+        }
+      },
+      "memory_status": "warm",
+      "successes": 3,
+      "failures": 0,
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "scale",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "status_before": "warm",
+      "recall_ids": [
+        "tool301-v1"
+      ],
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 850,
+        "basis": "experience",
+        "rule_used": {
+          "endpoint": "/api/v1/tool301",
+          "entity": "tool301",
+          "factor": 10,
+          "family": "tool",
+          "parameter": "limit_v1",
+          "version": 1
+        },
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 850
+        }
+      },
+      "memory_status": "warm",
+      "successes": 6,
+      "failures": 0,
+      "status_after": "warm"
+    }
+  ],
+  "revision": {}
+}

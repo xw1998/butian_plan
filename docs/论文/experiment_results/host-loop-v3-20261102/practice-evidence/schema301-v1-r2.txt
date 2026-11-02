@@ -1,0 +1,1 @@
+entity=schema301; round=2; verdict=correct; rule={"divisor": 100, "entity": "schema301", "family": "schema", "flow_field": "f1", "level_field": "h1", "version": 1}

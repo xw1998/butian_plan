@@ -1,0 +1,2 @@
+entity=tool101; tag=seed-b; group=false-disputed; source=upstream_extraction
+content=RULE {"endpoint": "/api/v1/tool101", "entity": "tool101", "factor": 10, "family": "tool", "parameter": "limit_v1", "version": 1}

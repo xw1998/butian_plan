@@ -283,3 +283,30 @@ def test_recording_verification_does_not_complete_unstarted_actions(tmp_path):
     row = memory.db.execute("SELECT status FROM verification_actions WHERE action_id=?", (action["action_id"],)).fetchone()
     assert row["status"] == "queued"
     memory.close()
+
+
+def test_national_id_scan_ignores_digests_and_requires_valid_checksum(tmp_path):
+    """身份证号识别不得被十六进制摘要/流水号误伤，也不得漏掉真实号码。
+
+    并行全量回归里出现过一次 `sensitive_memory_content_rejected:national_id`，
+    来源是随机十六进制串里偶然凑出的 18 位数字段——它既不是身份证号，
+    也和被测功能无关。
+    """
+    from butian.runtime.security import find_sensitive
+    from butian.runtime.memory import MemoryStore
+
+    # 真实号码（年份/月日合法、GB 11643 校验位正确，含 X 结尾）必须拦住。
+    assert [item.category for item in find_sensitive("身份证 31010119900307823X 已登记")] == ["national_id"]
+    # 同一串数字嵌在十六进制摘要里时是 id 的一部分，不是独立 token。
+    assert find_sensitive("digest=3f2a31010119900307823X9c41") == []
+    assert find_sensitive("a31010119900307823X") == []
+    # 校验位不对的 18 位流水号不是身份证号。
+    assert find_sensitive("流水号 310101199003078888 已入账") == []
+    # 其他类别不受影响。
+    assert [item.category for item in find_sensitive("password=topsecret")] == ["password"]
+
+    memory = MemoryStore(tmp_path / "memory.db")
+    try:
+        memory.put("abstract_3f2a31010119900307823X9c41", "experience", "摘要 id 里的数字段不该被当成身份证号")
+    finally:
+        memory.close()
