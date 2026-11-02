@@ -484,6 +484,18 @@ python -m butian.assets.export /absolute/new/runtime
 
 自动扫查里“没新材料 / 时间没到”这类没有实际动作的结果不写库：一名成员每小时一条、十人一年约 8.8 万条，会把真正的 `completed` 从看板和“最近 20 条”里挤出去，也让 `dream_skipped` 凭空线性增长。手动触发的跳过仍然照常记录，返回里 `recorded` 字段标明这次结果是否入账。
 
+## v0.1.11 更新
+
+- 本地执行回到本进程：本机跑工具或本地 Provider 不再需要连接文件（`connection.json`）、配对密钥（`pairing.bin`）与回环端口，也不再签请求、不再走授权代次租约。进程内执行器直接托管子进程并写持久账本，保留执行记录与终态、超时、输出字节上限、取消与纠正、退出确认。
+- 开关默认关、入口默认开：`ButianService(..., local_executor=True)` 由 `butian mcp` / `butian serve` / CLI 业务命令传入；作为库直接构造时行为与体积零变化，也可用 `BUTIAN_LOCAL_EXECUTOR=1` 打开。
+- 懒挂载：执行器只在真有执行请求时构建。自检要真起三个子进程，没有执行请求的进程不付这笔启动成本。
+- 自检失败拒绝执行：`local_executor_self_test_failed` 表示这台机器上无法确认进程控制，宁可拒绝，也不给“跑了但杀不掉”的答案。
+- 跨机执行器保留为可选组件：设 `BUTIAN_EXECUTOR_CONNECTION` 时仍优先走配对执行器，回环传输、配对密钥与授权代次全部生效。
+- 修掉并行回归里的一处假失败：前置验证的超时余量从 60 提到 300 秒。宿主负载极端时一个 2 秒脚本可以拖到分钟级，而 runner 兜底期限是 `timeout + 15` 秒，越过就被记成 `unknown`——那是“机器忙”，不是工具坏了。
+- 项目及 MCP 共享版本更新为 **0.1.11**。源码安装后重启 HTTP 后台、重新连接 MCP，分别加载新代码；两者为独立进程。
+
+[v0.1.11 源码](https://gitee.com/xw19981010/butian_plan/tree/v0.1.11)
+
 ## v0.1.10 更新
 
 - 未知参数不再静默忽略：124 个工具的入参 schema 全部闭合（`additionalProperties: false`），未声明的顶层参数返回 `unknown_argument`，附 `accepted`、`unexpected` 与 `did_you_mean`；连接信封字段与 `butian_goal_submit` 的顶层问题字段仍可直接写。

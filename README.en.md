@@ -484,6 +484,18 @@ The dashboard also reports a content-free `stalled` count for the authenticated 
 
 Dreams belong to the member who triggered them: one member running a dream only changes that member's counters and records. The scheduled maintenance loop (`BUTIAN_MAINTENANCE_ENABLED`, on by default) performs memory maintenance, queue dispatch and due checks, and by default does **not** run dreams for any member, so one member's dream no longer raises everyone else's count. Set `BUTIAN_AUTO_DREAM=1` to restore automatic dreaming; such runs carry `source="auto"`, manual runs carry `source="manual"`, and legacy rows show an unrecorded source. Dashboards report `dream_auto` separately.
 
+## v0.1.11 update
+
+- Local execution is back in this process: running a tool or a local Provider on this machine no longer needs a connection file (`connection.json`), a pairing key (`pairing.bin`) or a loopback port, and no longer signs requests or carries authorization-generation leases. The in-process executor owns the child process and writes the durable ledger directly, keeping the execution record and final state, timeouts, output byte limits, cancellation and correction, and exit confirmation.
+- Off by default, on at the entry points: `ButianService(..., local_executor=True)` is what `butian mcp`, `butian serve` and the CLI business commands pass; constructed as a library it attaches nothing, so behaviour and footprint are unchanged. `BUTIAN_LOCAL_EXECUTOR=1` also enables it.
+- Lazy attach: the executor is built only when something actually asks to run. Its self-test really spawns three processes; a process that never executes does not pay that startup cost.
+- A failed self-test refuses to execute: `local_executor_self_test_failed` means process control could not be confirmed on this machine. Refusing beats returning "it ran, but nothing can kill it".
+- The remote executor stays as an optional component: with `BUTIAN_EXECUTOR_CONNECTION` set, the pairing executor still takes priority and the loopback transport, pairing key and authorization generations all apply.
+- Fixed a false failure in the parallel regression: the prerequisite verification headroom went from 60 to 300 seconds. Under extreme host load a 2-second script can take minutes to start and confirm exit, while the runner's safety deadline is `timeout + 15` seconds — past it the execution is recorded as `unknown`, which is the machine being busy, not the tool being broken.
+- Package and shared MCP version: **0.1.11**. Restart the HTTP backend and reconnect MCP after updating a source installation; these are separate processes.
+
+[v0.1.11 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.11)
+
 ## v0.1.10 update
 
 - Undeclared top-level arguments are no longer ignored: all 124 tool schemas are closed objects (`additionalProperties: false`) and such calls return `unknown_argument` with `accepted`, `unexpected` and `did_you_mean`. Connection-envelope fields and the top-level problem fields of `butian_goal_submit` remain accepted.
