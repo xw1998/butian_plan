@@ -1,5 +1,7 @@
 from __future__ import annotations
+import hashlib
 import json
+import math
 import sqlite3
 import time
 import uuid
@@ -197,18 +199,64 @@ class MemoryStore:
                 item["last_recalled_at"] = now
         return result
 
-    def recall_for_decision(self, query: str, *, limit=20, environment=None, decision_id=None):
-        tokens = list(dict.fromkeys(token for token in query.split() if len(token) >= 2))
-        if len(tokens) <= 1 and len(query.strip()) >= 2:
+    def _token_stats(self, tokens: list[str]) -> tuple[int, dict[str, tuple[int, float]]]:
+        """词在该成员自有记忆里的文档频率与权重。
+
+        召回一直有「几乎把全部记忆都端回来」的毛病：查询按空白切词后走 LIKE 或链，
+        任何一条记忆只要撞上一个到处都出现的词（校准系数、offset、版本）就进候选，
+        排序又按 status/weight 走，于是提问的实体反而混在噪声里。
+        这里给每个词算文档频率，只有「长且稀有」的词才当硬闸门；权重按 IDF 算。
+        """
+        active = "status NOT IN ('invalidated','archived')"
+        total = int(self.db.execute(f"SELECT COUNT(*) FROM memories WHERE {active}").fetchone()[0] or 0)
+        stats: dict[str, tuple[int, float]] = {}
+        for token in tokens:
+            df = int(self.db.execute(f"SELECT COUNT(*) FROM memories WHERE content LIKE ? AND {active}", (f"%{token}%",)).fetchone()[0] or 0)
+            stats[token] = (df, math.log((total + 1) / (df + 1)) + 1.0)
+        return total, stats
+
+    def recall_for_decision(self, query: str, *, limit=20, environment=None, decision_id=None, kind=None, statuses=None, min_score=0.0):
+        words = list(dict.fromkeys(word for word in query.split() if len(word) >= 2))
+        # 单个词时补中文二元组做兜底匹配，但不能顶掉原词：之前把 "calibration004" 拆成一堆二元组，
+        # 实体这个名字就消失了，闸门与排序全都无从谈起，结果 36 条记忆一起端回来。
+        grams = []
+        if len(words) <= 1 and len(query.strip()) >= 2:
             normalized = query.strip().replace(" ", "")
-            tokens = list(dict.fromkeys(normalized[index:index + 2] for index in range(len(normalized) - 1)))
+            grams = [normalized[index:index + 2] for index in range(len(normalized) - 1)]
+        tokens = list(dict.fromkeys(words + grams))
         if not tokens:
             return []
-        clauses = " OR ".join("content LIKE ?" for _ in tokens)
-        args: list[object] = [f"%{token}%" for token in tokens]
-        args.extend([limit])
-        rows = list(self.db.execute(f"SELECT * FROM memories WHERE ({clauses}) AND status NOT IN ('invalidated','archived') ORDER BY CASE status WHEN 'hot' THEN 0 WHEN 'warm' THEN 1 WHEN 'candidate' THEN 2 WHEN 'disputed' THEN 3 ELSE 4 END, weight DESC, updated_at DESC LIMIT ?", args))
-        result = [dict(row) for row in rows]
+        total, stats = self._token_stats(tokens)
+        # 「有指向性的词」= 4 字以上、且在库里稀有（df <= N/4，至少放过 df=1）。
+        # 两字词（中文二元组全在这里）只参与排序，不做闸门：把二元组当闸门会把同族记忆切碎。
+        # 闸门只在确实命中时收窄候选；查询里的实体素未谋面则退回或链，宁可多给一条也不要装作没经验。
+        gates = [word for word in words if len(word) >= 4 and 0 < stats[word][0] <= max(1, total // 4)]
+        clauses: list[str] = []
+        args: list[object] = []
+        gate_tokens = gates or tokens
+        clauses.append("(" + " OR ".join("content LIKE ?" for _ in gate_tokens) + ")")
+        args.extend(f"%{token}%" for token in gate_tokens)
+        if kind:
+            clauses.append("kind=?")
+            args.append(kind)
+        wanted_status = [status for status in (statuses or []) if status]
+        if wanted_status:
+            clauses.append("status IN (" + ",".join("?" for _ in wanted_status) + ")")
+            args.extend(wanted_status)
+        rows = list(self.db.execute("SELECT * FROM memories WHERE " + " AND ".join(clauses) + " AND status NOT IN ('invalidated','archived')", args))
+        total_weight = sum(weight for _, weight in stats.values()) or 1.0
+        scored: list[dict] = []
+        for raw in rows:
+            item = dict(raw)
+            matched = [token for token in tokens if token in item["content"]]
+            item["match_score"] = round(sum(stats[token][1] for token in matched) / total_weight, 4)
+            item["matched_tokens"] = matched
+            item["gated_by"] = gates
+            if item["match_score"] >= min_score:
+                scored.append(item)
+        rank = {"hot": 0, "warm": 1, "candidate": 2, "disputed": 3}
+        scored.sort(key=lambda item: (-item["match_score"], rank.get(item["status"], 4), -float(item["weight"]), -float(item["updated_at"])))
+        result = scored[:limit]
         now = time.time()
         with self.db:
             for item in result:
@@ -245,8 +293,11 @@ class MemoryStore:
                 self.put(memory_id, kind, content, confidence=0.2, weight=0.5, environment=environment, source_event_ids=list(source_event_ids or []), status="candidate", change_reason="practice_observation")
                 row = self.get(memory_id)
             self.db.execute("INSERT INTO practice_observations VALUES (?,?,?,?,?,?,?)", (f"obs_{uuid.uuid4().hex}", memory_id, independent_key, outcome, evidence_ref, json.dumps(environment or {}, ensure_ascii=False), time.time()))
-            successes = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='success' AND evidence_ref IS NOT NULL", (memory_id,)).fetchone()[0]
-            failures = self.db.execute("SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='failure'", (memory_id,)).fetchone()[0]
+            window_start = self._counting_window_start(memory_id)
+            window_sql = "" if window_start is None else " AND created_at>=?"
+            window_args: tuple = () if window_start is None else (window_start,)
+            successes = self.db.execute(f"SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='success' AND evidence_ref IS NOT NULL{window_sql}", (memory_id, *window_args)).fetchone()[0]
+            failures = self.db.execute(f"SELECT COUNT(*) FROM practice_observations WHERE memory_id=? AND outcome='failure'{window_sql}", (memory_id, *window_args)).fetchone()[0]
             status, confidence, weight = row["status"], float(row["confidence"]), float(row["weight"])
             if outcome == "failure":
                 status = "disputed" if status in {"warm", "hot", "disputed"} else "candidate"
@@ -267,6 +318,46 @@ class MemoryStore:
         except Exception:
             self.db.rollback()
             raise
+
+    def _counting_window_start(self, memory_id: str) -> float | None:
+        """最近一次内容修订的时间点；没有修订过就返回 None（计数口径与老版本一致）。"""
+        row = self.db.execute("SELECT MAX(created_at) FROM memory_versions WHERE memory_id=? AND change_reason LIKE 'revision:%'", (memory_id,)).fetchone()
+        return None if not row or row[0] is None else float(row[0])
+
+    def revise(self, memory_id: str, content: str, *, reason: str, evidence_refs, expected_content_hash: str | None = None, status: str = "candidate"):
+        """用新证据改写一条已被证伪的记忆内容。
+
+        老实现只会把状态打到 disputed：内容一个字都改不了，随后再攒多少成功也抬不回来，
+        坏经验就永久卡在那儿。这里补上内容级通道——改写要带新证据、老版本留档、
+        观测计数从修订时刻重新起算，于是「纠正 → 重新验证 → 回到 warm」这条链才走得通。
+        """
+        row = self.get(memory_id)
+        if not row:
+            raise ValueError("memory_not_found")
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("revision_content_required")
+        content = content.strip()
+        if content == row["content"]:
+            raise ValueError("revision_no_change")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("revision_reason_required")
+        refs = [ref for ref in dict.fromkeys(evidence_refs or []) if ref]
+        if not refs:
+            raise ValueError("revision_evidence_required")
+        if expected_content_hash is not None and hashlib.sha256(row["content"].encode("utf-8")).hexdigest() != expected_content_hash:
+            raise ValueError("memory_review_content_changed")
+        used = {item[0] for item in self.db.execute("SELECT evidence_ref FROM practice_observations WHERE memory_id=? AND evidence_ref IS NOT NULL", (memory_id,))}
+        if used and all(ref in used for ref in refs):
+            raise ValueError("revision_evidence_must_be_independent")
+        old_hash = hashlib.sha256(row["content"].encode("utf-8")).hexdigest()
+        new_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        latest = self.db.execute("SELECT MAX(version) FROM memory_versions WHERE memory_id=?", (memory_id,)).fetchone()[0] or 0
+        self.db.execute("UPDATE memory_versions SET version_status='superseded' WHERE memory_id=? AND version_status!='invalidated'", (memory_id,))
+        self.put(memory_id, row["kind"], content, status=status, confidence=min(0.5, float(row["confidence"])), weight=float(row["weight"]), environment=json.loads(row["environment"] or "{}"), source_event_ids=refs, change_reason="revision:" + reason.strip()[:200])
+        with self.db:
+            self.db.execute("DELETE FROM memory_degradation WHERE memory_id=?", (memory_id,))
+            self.db.execute("INSERT INTO memory_events VALUES (?,?,?,?,?)", (f"evt_{uuid.uuid4().hex}", memory_id, "content_revision", json.dumps({"reason": reason.strip(), "old_content_hash": old_hash, "new_content_hash": new_hash, "evidence_refs": refs, "previous_status": row["status"]}, ensure_ascii=False), time.time()))
+        return {"memory_id": memory_id, "version": int(latest) + 1, "status": status, "old_content_hash": old_hash, "new_content_hash": new_hash, "evidence_refs": refs, "previous_status": row["status"]}
 
     def record_usage_feedback(self, memory_id: str, *, outcome: str, evidence_ref: str | None = None, evidence_digest: str | None = None):
         if outcome not in {"useful", "harmful", "unused", "unknown"}:

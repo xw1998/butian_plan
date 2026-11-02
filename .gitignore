@@ -120,3 +120,8 @@ _tmp_*.py
 !/docs/论文/experiment_results/host-loop-v2-20261102/stages/r2-result.json
 !/docs/论文/experiment_results/host-loop-v2-20261102/stages/r3-result.json
 !/docs/论文/experiment_results/host-loop-v2-20261102/stages/r4-result.json
+
+# Recall-precision / revision-channel fix re-measurement (2026-11-02): the replay script and
+# its output over the same 45 memories are public evidence for the before/after numbers.
+!/docs/论文/check_recall_precision.py
+!/docs/论文/experiment_results/host-loop-v2-20261102/recall-precision-fix.json

@@ -1023,12 +1023,12 @@ class ButianService:
             raise ValueError("member_memory_access_denied")
         return MemoryStore(self.home / "members" / member_id / "memory.db")
 
-    def recall_for_decision(self, member_id: str, query: str, *, decision_id: str, environment=None, limit=20):
+    def recall_for_decision(self, member_id: str, query: str, *, decision_id: str, environment=None, limit=20, kind=None, statuses=None):
         if not decision_id.strip() or not query.strip():
             raise ValueError("decision_id_and_query_required")
         memory = self.memory(member_id)
         try:
-            items = memory.recall_for_decision(query, limit=limit, environment=environment, decision_id=decision_id)
+            items = memory.recall_for_decision(query, limit=limit, environment=environment, decision_id=decision_id, kind=kind, statuses=statuses)
             recall_id = f"recall_{uuid.uuid4().hex}"
             memory.record_decision_recall(recall_id, decision_id, query, "recalled" if items else "no_match", False)
             for item in items:
@@ -1060,6 +1060,23 @@ class ButianService:
         try:
             result = memory.record_practice_outcome(memory_id=memory_id, kind=kind, content=content, outcome=outcome, independent_key=independent_key, evidence_ref=evidence_ref, environment=environment, source_event_ids=source_event_ids, evidence_digest=evidence_digest)
             self.store.append_event(member_id, "practice_observed", {**result, "outcome": outcome, "independent_key": independent_key}, f"practice_{member_id}_{memory_id}_{independent_key}")
+            return result
+        finally:
+            memory.close()
+
+    def revise_memory(self, member_id: str, memory_id: str, *, content: str, reason: str, evidence_refs, expected_content_hash: str | None = None):
+        """内容级纠正：把被证伪的记忆改写成新内容，旧版本留档，改写必须带独立证据。"""
+        refs = [ref for ref in dict.fromkeys(evidence_refs or []) if ref]
+        if not refs:
+            raise ValueError("revision_evidence_required")
+        for ref in refs:
+            proof = self.store.verify_evidence(ref, actor_member_id=member_id)
+            if proof["status"] != "valid":
+                raise ValueError("revision_evidence_not_valid")
+        memory = self.memory(member_id)
+        try:
+            result = memory.revise(memory_id, content, reason=reason, evidence_refs=refs, expected_content_hash=expected_content_hash)
+            self.store.append_event(member_id, "memory_revised", {"memory_id": memory_id, "version": result["version"], "previous_status": result["previous_status"], "status": result["status"], "evidence_refs": refs}, f"revision_{member_id}_{memory_id}_{result['version']}")
             return result
         finally:
             memory.close()

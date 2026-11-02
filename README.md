@@ -2,7 +2,7 @@
 
 **简体中文** | [English](README.en.md)
 
-`MCP Server` · Model Context Protocol · 本地 stdio · Python 3.11+ · 零第三方依赖 · 124 个工具
+`MCP Server` · Model Context Protocol · 本地 stdio · Python 3.11+ · 零第三方依赖 · 125 个工具
 
 > **实践是检验真理的唯一标准**
 
@@ -30,11 +30,11 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
    }
    ```
 
-   装好后验证一次：`butian mcp` 直接起 stdio 服务（没有参数会一直等 JSON-RPC 输入）；工具清单不用记，客户端连上后 `tools/list` 一次返回全部 124 个。
+   装好后验证一次：`butian mcp` 直接起 stdio 服务（没有参数会一直等 JSON-RPC 输入）；工具清单不用记，客户端连上后 `tools/list` 一次返回全部 125 个。
 3. 连一次：在 MCP 里调 `butian_connect`（本机回环免口令；成员多于一个时必须显式给 `member_id`），紧接着调 `butian_context` 拿到当前成员、模式、可见任务与下一步动作。
 3. 交一次活：`butian_goal_submit` 写目标与验收条件 → 照抄 `butian_context` 返回的 `next_actions` 一步步执行 → `butian_evidence_record` 登记真实证据 → `butian_task_handoff`（或 `butian_execution_submit`）交付。
 
-要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数 124 个，但不必先背表——`tools/list` 默认一次返回全部工具（含 `task_claim`、`task_transition`、`task_review`、`execution_submit`、`context_compose`、`evidence_record`、`task_handoff` 这些推进与收口的入口），`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数；找不到工具时用 `butian_tools_catalog`（`query` 子串过滤）加 `butian_tool_schema` 查单个参数。
+要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数 125 个，但不必先背表——`tools/list` 默认一次返回全部工具（含 `task_claim`、`task_transition`、`task_review`、`execution_submit`、`context_compose`、`evidence_record`、`task_handoff` 这些推进与收口的入口），`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数；找不到工具时用 `butian_tools_catalog`（`query` 子串过滤）加 `butian_tool_schema` 查单个参数。
 
 仓库根目录的 `server.json` 是按 MCP 官方 registry schema（2025-09-29）写的服务清单，目录站与注册表直接读它；`tools/list` 里的每个工具都带 `inputSchema`，可以先用 `butian_tool_schema` 查单个工具的参数再调用。
 
@@ -53,7 +53,7 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 - **同一字段两处写法不再报错**：`acceptance_criteria` 既写在顶层又写在 `problem` 里时，列表取并集、标量以顶层为准，并在返回的 `problem_fields_merged` 里回显，不再抛 `problem_field_conflict`。
 - **同名目标幂等**：同一执行者在同一模式下重复提交未结束的同一目标时，返回已有任务（`created: false`、`reused_existing: true`）并附 `next_actions`，不会再多出一条互相看不见的 `todo`。去重按模式分开算：团队目标的根任务挂在派活者名下，单人提交同名目标仍然单独建单，不会被吸进团队任务。
 - **提交即给出入口**：`butian_goal_submit` 返回的 `next_actions` 直接给出推进动作（以及团队模式里每个无 Provider 子任务的宿主执行动作），不必自己猜 revision 与 operation_key。
-- **拼错的参数直接报错**：124 个工具的入参 schema 都是闭合对象（`additionalProperties: false`），未声明的顶层参数不再被静默忽略，而是返回 `unknown_argument`，并附 `accepted`（全部合法字段名）、`unexpected`（你传错的）与 `did_you_mean`（最近似的正确写法）。以前把 `acceptance_criteria` 写成 `acceptance_criterai` 既不报错也不生效，看起来像系统坏了。
+- **拼错的参数直接报错**：125 个工具的入参 schema 都是闭合对象（`additionalProperties: false`），未声明的顶层参数不再被静默忽略，而是返回 `unknown_argument`，并附 `accepted`（全部合法字段名）、`unexpected`（你传错的）与 `did_you_mean`（最近似的正确写法）。以前把 `acceptance_criteria` 写成 `acceptance_criterai` 既不报错也不生效，看起来像系统坏了。
 - **批量写先预览再落盘**：`butian_dream_distill` 与 `butian_dream_abstract` 支持 `preview_only: true`，只读返回 `preview_token`、受影响记忆（`source_states`）、将写几行（`writes`）与是否已有等价记录（`existing`）；把令牌和同样内容传回同一工具才真正写库。预览之后源记忆正文或状态变了，令牌失效并返回 `preview_stale`（带当前令牌与重新预览的动作），不会把基于过期快照的结论写进记忆。设置 `BUTIAN_REQUIRE_DREAM_PREVIEW=1` 可强制两段式（默认关闭，关闭时行为与以前一致）。
 
 ### 没有 Provider 也能走完团队模式
@@ -151,7 +151,9 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 
 ### 5. 独立记忆、实践反馈与召回审计
 
-每个数字人使用隔离的记忆空间，保存方法、经验、教训及其来源、环境、证据、适用条件和失效条件。召回结合查询与环境，提供后续决策参考；软件版本无法确认时标记 unknown，不能自动把不同环境的行为合并成一条确定规律。
+每个数字人使用隔离的记忆空间，保存方法、经验、教训及其来源、环境、证据、适用条件和失效条件。召回结合查询与环境，提供后续决策参考；软件版本无法确认时标记 unknown，不能自动把不同环境的行为合并成一条确定规律。召回先按词频算权重，只让「够长且在库里稀有」的词当闸门：问 calibration004 就把同族 calibration005 挡在外面，返回条目从整库 45 条降到 1～4 条，每条还带上 match_score、matched_tokens、gated_by 三个可审计字段；查询里没有库内稀有词时退回普通或链，宁可多给一条也不装作没经验。
+
+被证据证伪的记忆不止能降级，还能改写：butian_memory_revise 用新证据写下一版内容、把旧版本标成 superseded、并把成功与失败计数从修订时刻重新起算，于是「纠正 → 重新验证 → 回到 warm」这条路走得通；改写必须带这条记忆没用过的新证据，不接受无改动和无理由的修订。
 
 实践结果以独立观察标识记录成功、失败或未知；重复观察受到去重与独立性约束。成功与失败更新经验和教训权重，重复收益采用 log1p 饱和方式，防止仅靠重复次数无限抬高可信度。召回结果另记录哪些记忆被使用、哪些有用或有害、是否漏召回及证据，便于追踪记忆是否真正帮助了任务。
 
@@ -498,7 +500,7 @@ python -m butian.assets.export /absolute/new/runtime
 
 ## v0.1.10 更新
 
-- 未知参数不再静默忽略：124 个工具的入参 schema 全部闭合（`additionalProperties: false`），未声明的顶层参数返回 `unknown_argument`，附 `accepted`、`unexpected` 与 `did_you_mean`；连接信封字段与 `butian_goal_submit` 的顶层问题字段仍可直接写。
+- 未知参数不再静默忽略：125 个工具的入参 schema 全部闭合（`additionalProperties: false`），未声明的顶层参数返回 `unknown_argument`，附 `accepted`、`unexpected` 与 `did_you_mean`；连接信封字段与 `butian_goal_submit` 的顶层问题字段仍可直接写。
 - 批量写改成两段式：`butian_dream_distill` / `butian_dream_abstract` 支持 `preview_only` 取 `preview_token`，只读回受影响记忆、将写行数与是否已有等价记录；带令牌提交时在事务内重算指纹，源记忆变了就回 `preview_stale` 并给重新预览动作。`BUTIAN_REQUIRE_DREAM_PREVIEW=1` 可强制两段式，默认关闭时行为不变。
 - 总看板新增 **停滞任务** 计数：`todo`/`ready`/`waiting_user`/`blocked`/`failed`/`provider_lost`/`unknown` 的数量与状态分布，只给数不给任务 id 与标题。
 - 执行收尾竞态不再被记成 `unknown`：真实子进程一退出，执行方就释放作业，续约回来会被拒（`execution_lease_not_running`）；续约现在只当租约续期，真实终态一律从持久账本读回，成功不会被写成 `unknown`。

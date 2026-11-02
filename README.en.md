@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-`MCP server` · Model Context Protocol · local stdio · Python 3.11+ · zero dependencies · 124 tools
+`MCP server` · Model Context Protocol · local stdio · Python 3.11+ · zero dependencies · 125 tools
 
 > **Practice is the sole criterion for testing truth.**
 
@@ -30,11 +30,11 @@ The sections after this one explain mechanisms; you do not need to read them bef
    }
    ```
 
-   Sanity check right after install: `butian mcp` starts the stdio server directly (with no arguments it waits for JSON-RPC input); you do not need the tool list by heart — once a client connects, `tools/list` returns all 124 in one page.
+   Sanity check right after install: `butian mcp` starts the stdio server directly (with no arguments it waits for JSON-RPC input); you do not need the tool list by heart — once a client connects, `tools/list` returns all 125 in one page.
 3. Connect once: call `butian_connect` over MCP (loopback has no token; with more than one member you must pass `member_id` explicitly), then `butian_context` for the current member, mode, visible tasks and next legal action.
 3. Deliver once: `butian_goal_submit` records the goal and acceptance criteria → copy the `next_actions` returned by `butian_context` → `butian_evidence_record` registers real evidence → `butian_task_handoff` (or `butian_execution_submit`) delivers.
 
-Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are 124 tools, but you do not need the list up front: `tools/list` returns all of them in one page — including the ones that move a task forward and close it out (`task_claim`, `task_transition`, `task_review`, `execution_submit`, `context_compose`, `evidence_record`, `task_handoff`) — `butian_context` returns ready-to-copy arguments for the current state, and `butian_tools_catalog` (`query` substring filter) plus `butian_tool_schema` answer “which tool, which parameters”.
+Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are 125 tools, but you do not need the list up front: `tools/list` returns all of them in one page — including the ones that move a task forward and close it out (`task_claim`, `task_transition`, `task_review`, `execution_submit`, `context_compose`, `evidence_record`, `task_handoff`) — `butian_context` returns ready-to-copy arguments for the current state, and `butian_tools_catalog` (`query` substring filter) plus `butian_tool_schema` answer “which tool, which parameters”.
 
 `server.json` in the repository root is a service manifest written against the official MCP registry schema (2025-09-29), so directories and registries can read it directly; every tool in `tools/list` carries an `inputSchema`, and `butian_tool_schema` returns one tool's parameters before you call it.
 
@@ -53,7 +53,7 @@ The test is simple: use it when the work must continue later, must leave reviewa
 - **Duplicated fields no longer fail**: when `acceptance_criteria` appears both at the top level and inside `problem`, lists are merged and scalars take the top-level value, echoed back as `problem_fields_merged` instead of raising `problem_field_conflict`.
 - **Duplicate goals are idempotent**: resubmitting the same unfinished goal in the same mode returns the existing task (`created: false`, `reused_existing: true`) with `next_actions`, instead of leaving a second invisible `todo`. Team and solo goals deduplicate separately.
 - **Submission returns the entry point**: `butian_goal_submit` includes `next_actions` with the advancing call (and, in team mode, the host-execution step for each subtask whose assignee has no Provider), so nothing has to guess `revision` or `operation_key`.
-- **Misspelled arguments fail loudly**: every one of the 124 tool schemas is now a closed object (`additionalProperties: false`). An undeclared top-level argument is no longer dropped silently; the call returns `unknown_argument` with `accepted` (every legal field name), `unexpected` (what you sent) and `did_you_mean` (the closest match). Writing `acceptance_criterai` for `acceptance_criteria` used to change nothing and look like a broken system.
+- **Misspelled arguments fail loudly**: every one of the 125 tool schemas is now a closed object (`additionalProperties: false`). An undeclared top-level argument is no longer dropped silently; the call returns `unknown_argument` with `accepted` (every legal field name), `unexpected` (what you sent) and `did_you_mean` (the closest match). Writing `acceptance_criterai` for `acceptance_criteria` used to change nothing and look like a broken system.
 - **Bulk writes preview before they land**: `butian_dream_distill` and `butian_dream_abstract` accept `preview_only: true`, which read-only returns a `preview_token`, the affected memories (`source_states`), how many rows would be written (`writes`) and whether an equivalent record already exists (`existing`). Sending the token back with the same inputs performs the write. If a source memory changed in between, the token goes stale and the call fails with `preview_stale` (current token plus the re-preview action) instead of storing a conclusion built on an expired snapshot. Set `BUTIAN_REQUIRE_DREAM_PREVIEW=1` to force the two-step flow (off by default, and off means behaviour is unchanged).
 
 ### Team mode works without a Provider
@@ -151,7 +151,9 @@ Snapshots retain parent relationships, event ranges, and integrity information. 
 
 ### 5. Independent memory, practice feedback, and recall audits
 
-Members have isolated memory spaces containing methods, experience, lessons, provenance, environment, evidence, applicability, and invalidation conditions. Recall uses the query and environment. Unconfirmed software versions remain unknown rather than silently merging behavior across incompatible environments.
+Members have isolated memory spaces containing methods, experience, lessons, provenance, environment, evidence, applicability, and invalidation conditions. Recall uses the query and environment. Candidate scoring weights every query token by its document frequency inside that member's own memory, and only a token that is both long (>= 4 characters) and rare in the store acts as a gate: asking about calibration004 no longer drags calibration005 in. On the 45-memory replay the result set drops from the whole store to 1-4 items, and each item now carries match_score, matched_tokens and gated_by. When the query contains no rare token the gate opens and plain OR matching returns, so a genuinely unknown entity still gets neighbouring experience instead of an empty answer. Unconfirmed software versions remain unknown rather than silently merging behavior across incompatible environments.
+
+A memory contradicted by evidence can now be rewritten, not just downgraded: butian_memory_revise writes a new version with new evidence, marks the old version superseded, and restarts the success/failure window from the revision, so "correct, then re-verify, then back to warm" is reachable. Revisions are rejected without new evidence that this memory has not already used, without a reason, and when the content is unchanged.
 
 Practice records success, failure, or unknown with independent observation identifiers and duplicate checks. Repeated outcomes use log1p saturation, limiting the benefit of repetition. Recall feedback records which memories were used, useful, harmful, or missed and retains supporting evidence, making practical usefulness auditable.
 
@@ -498,7 +500,7 @@ Dreams belong to the member who triggered them: one member running a dream only 
 
 ## v0.1.10 update
 
-- Undeclared top-level arguments are no longer ignored: all 124 tool schemas are closed objects (`additionalProperties: false`) and such calls return `unknown_argument` with `accepted`, `unexpected` and `did_you_mean`. Connection-envelope fields and the top-level problem fields of `butian_goal_submit` remain accepted.
+- Undeclared top-level arguments are no longer ignored: all 125 tool schemas are closed objects (`additionalProperties: false`) and such calls return `unknown_argument` with `accepted`, `unexpected` and `did_you_mean`. Connection-envelope fields and the top-level problem fields of `butian_goal_submit` remain accepted.
 - Bulk writes are two-step: `butian_dream_distill` / `butian_dream_abstract` take `preview_only` to return a `preview_token` plus affected memories, rows to be written and whether an equivalent record already exists; sending the token back re-computes the fingerprint inside the transaction and returns `preview_stale` (with the re-preview action) if any source changed. `BUTIAN_REQUIRE_DREAM_PREVIEW=1` forces the flow; off by default with unchanged behaviour.
 - The dashboard reports a content-free **stalled** count (`todo`/`ready`/`waiting_user`/`blocked`/`failed`/`provider_lost`/`unknown`) with state buckets only, never task ids or titles.
 - A completion race no longer turns into `unknown`: the executor releases a job as soon as its process exits, so a lease renewal can be refused (`execution_lease_not_running`). Renewal is now treated as advisory only and the terminal state is always read back from the durable ledger, so a finished success is never reported as `unknown`.

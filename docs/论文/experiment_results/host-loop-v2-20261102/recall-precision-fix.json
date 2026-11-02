@@ -1,0 +1,790 @@
+{
+  "source": "host-loop-v2 / 45 memories / 4 rounds x 18 entities",
+  "limit": 100,
+  "queries": 72,
+  "before": {
+    "items_median": 45.0,
+    "items_mean": 45,
+    "items_max": 45,
+    "items_total": 3240,
+    "relevant_total": 180,
+    "precision": 0.0556,
+    "queries_with_foreign_items": 72
+  },
+  "after": {
+    "items_median": 2.5,
+    "items_mean": 2.5,
+    "items_max": 4,
+    "items_total": 180,
+    "relevant_total": 180,
+    "precision": 1.0,
+    "queries_with_foreign_items": 0,
+    "queries_empty": 0
+  },
+  "per_round": {
+    "1": [
+      {
+        "entity": "calibration000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration000-v1"
+        ]
+      },
+      {
+        "entity": "calibration001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration001-v1"
+        ]
+      },
+      {
+        "entity": "calibration002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration002-v4",
+          "calibration002-v3",
+          "calibration002-v2",
+          "calibration002-v1"
+        ]
+      },
+      {
+        "entity": "calibration003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration003-v4",
+          "calibration003-v3",
+          "calibration003-v2",
+          "calibration003-v1"
+        ]
+      },
+      {
+        "entity": "calibration004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration004-v1"
+        ]
+      },
+      {
+        "entity": "calibration005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration005-v4",
+          "calibration005-v3",
+          "calibration005-v2",
+          "calibration005-v1"
+        ]
+      },
+      {
+        "entity": "schema000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema000-v1"
+        ]
+      },
+      {
+        "entity": "schema001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema001-v1"
+        ]
+      },
+      {
+        "entity": "schema002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema002-v4",
+          "schema002-v3",
+          "schema002-v2",
+          "schema002-v1"
+        ]
+      },
+      {
+        "entity": "schema003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema003-v4",
+          "schema003-v3",
+          "schema003-v2",
+          "schema003-v1"
+        ]
+      },
+      {
+        "entity": "schema004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema004-v1"
+        ]
+      },
+      {
+        "entity": "schema005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema005-v4",
+          "schema005-v2",
+          "schema005-v3",
+          "schema005-v1"
+        ]
+      },
+      {
+        "entity": "tool000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool000-v1"
+        ]
+      },
+      {
+        "entity": "tool001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool001-v1"
+        ]
+      },
+      {
+        "entity": "tool002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool002-v4",
+          "tool002-v3",
+          "tool002-v2",
+          "tool002-v1"
+        ]
+      },
+      {
+        "entity": "tool003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool003-v4",
+          "tool003-v3",
+          "tool003-v2",
+          "tool003-v1"
+        ]
+      },
+      {
+        "entity": "tool004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool004-v1"
+        ]
+      },
+      {
+        "entity": "tool005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool005-v4",
+          "tool005-v3",
+          "tool005-v2",
+          "tool005-v1"
+        ]
+      }
+    ],
+    "2": [
+      {
+        "entity": "calibration000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration000-v1"
+        ]
+      },
+      {
+        "entity": "calibration001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration001-v1"
+        ]
+      },
+      {
+        "entity": "calibration002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration002-v4",
+          "calibration002-v3",
+          "calibration002-v2",
+          "calibration002-v1"
+        ]
+      },
+      {
+        "entity": "calibration003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration003-v4",
+          "calibration003-v3",
+          "calibration003-v2",
+          "calibration003-v1"
+        ]
+      },
+      {
+        "entity": "calibration004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration004-v1"
+        ]
+      },
+      {
+        "entity": "calibration005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration005-v4",
+          "calibration005-v3",
+          "calibration005-v2",
+          "calibration005-v1"
+        ]
+      },
+      {
+        "entity": "schema000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema000-v1"
+        ]
+      },
+      {
+        "entity": "schema001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema001-v1"
+        ]
+      },
+      {
+        "entity": "schema002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema002-v4",
+          "schema002-v3",
+          "schema002-v2",
+          "schema002-v1"
+        ]
+      },
+      {
+        "entity": "schema003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema003-v4",
+          "schema003-v3",
+          "schema003-v2",
+          "schema003-v1"
+        ]
+      },
+      {
+        "entity": "schema004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema004-v1"
+        ]
+      },
+      {
+        "entity": "schema005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema005-v4",
+          "schema005-v2",
+          "schema005-v3",
+          "schema005-v1"
+        ]
+      },
+      {
+        "entity": "tool000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool000-v1"
+        ]
+      },
+      {
+        "entity": "tool001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool001-v1"
+        ]
+      },
+      {
+        "entity": "tool002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool002-v4",
+          "tool002-v3",
+          "tool002-v2",
+          "tool002-v1"
+        ]
+      },
+      {
+        "entity": "tool003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool003-v4",
+          "tool003-v3",
+          "tool003-v2",
+          "tool003-v1"
+        ]
+      },
+      {
+        "entity": "tool004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool004-v1"
+        ]
+      },
+      {
+        "entity": "tool005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool005-v4",
+          "tool005-v3",
+          "tool005-v2",
+          "tool005-v1"
+        ]
+      }
+    ],
+    "3": [
+      {
+        "entity": "calibration000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration000-v1"
+        ]
+      },
+      {
+        "entity": "calibration001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration001-v1"
+        ]
+      },
+      {
+        "entity": "calibration002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration002-v4",
+          "calibration002-v3",
+          "calibration002-v2",
+          "calibration002-v1"
+        ]
+      },
+      {
+        "entity": "calibration003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration003-v4",
+          "calibration003-v3",
+          "calibration003-v2",
+          "calibration003-v1"
+        ]
+      },
+      {
+        "entity": "calibration004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration004-v1"
+        ]
+      },
+      {
+        "entity": "calibration005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration005-v4",
+          "calibration005-v3",
+          "calibration005-v2",
+          "calibration005-v1"
+        ]
+      },
+      {
+        "entity": "schema000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema000-v1"
+        ]
+      },
+      {
+        "entity": "schema001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema001-v1"
+        ]
+      },
+      {
+        "entity": "schema002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema002-v4",
+          "schema002-v3",
+          "schema002-v2",
+          "schema002-v1"
+        ]
+      },
+      {
+        "entity": "schema003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema003-v4",
+          "schema003-v3",
+          "schema003-v2",
+          "schema003-v1"
+        ]
+      },
+      {
+        "entity": "schema004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema004-v1"
+        ]
+      },
+      {
+        "entity": "schema005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema005-v4",
+          "schema005-v2",
+          "schema005-v3",
+          "schema005-v1"
+        ]
+      },
+      {
+        "entity": "tool000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool000-v1"
+        ]
+      },
+      {
+        "entity": "tool001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool001-v1"
+        ]
+      },
+      {
+        "entity": "tool002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool002-v4",
+          "tool002-v3",
+          "tool002-v2",
+          "tool002-v1"
+        ]
+      },
+      {
+        "entity": "tool003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool003-v4",
+          "tool003-v3",
+          "tool003-v2",
+          "tool003-v1"
+        ]
+      },
+      {
+        "entity": "tool004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool004-v1"
+        ]
+      },
+      {
+        "entity": "tool005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool005-v4",
+          "tool005-v3",
+          "tool005-v2",
+          "tool005-v1"
+        ]
+      }
+    ],
+    "4": [
+      {
+        "entity": "calibration000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration000-v1"
+        ]
+      },
+      {
+        "entity": "calibration001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration001-v1"
+        ]
+      },
+      {
+        "entity": "calibration002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration002-v4",
+          "calibration002-v3",
+          "calibration002-v2",
+          "calibration002-v1"
+        ]
+      },
+      {
+        "entity": "calibration003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration003-v4",
+          "calibration003-v3",
+          "calibration003-v2",
+          "calibration003-v1"
+        ]
+      },
+      {
+        "entity": "calibration004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "calibration004-v1"
+        ]
+      },
+      {
+        "entity": "calibration005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "calibration005-v4",
+          "calibration005-v3",
+          "calibration005-v2",
+          "calibration005-v1"
+        ]
+      },
+      {
+        "entity": "schema000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema000-v1"
+        ]
+      },
+      {
+        "entity": "schema001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema001-v1"
+        ]
+      },
+      {
+        "entity": "schema002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema002-v4",
+          "schema002-v3",
+          "schema002-v2",
+          "schema002-v1"
+        ]
+      },
+      {
+        "entity": "schema003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema003-v4",
+          "schema003-v3",
+          "schema003-v2",
+          "schema003-v1"
+        ]
+      },
+      {
+        "entity": "schema004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "schema004-v1"
+        ]
+      },
+      {
+        "entity": "schema005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "schema005-v4",
+          "schema005-v2",
+          "schema005-v3",
+          "schema005-v1"
+        ]
+      },
+      {
+        "entity": "tool000",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool000-v1"
+        ]
+      },
+      {
+        "entity": "tool001",
+        "group": "clean-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool001-v1"
+        ]
+      },
+      {
+        "entity": "tool002",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool002-v4",
+          "tool002-v3",
+          "tool002-v2",
+          "tool002-v1"
+        ]
+      },
+      {
+        "entity": "tool003",
+        "group": "clean-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool003-v4",
+          "tool003-v3",
+          "tool003-v2",
+          "tool003-v1"
+        ]
+      },
+      {
+        "entity": "tool004",
+        "group": "poison-stable",
+        "before": 45,
+        "after": 1,
+        "after_ids": [
+          "tool004-v1"
+        ]
+      },
+      {
+        "entity": "tool005",
+        "group": "decoy-drift",
+        "before": 45,
+        "after": 4,
+        "after_ids": [
+          "tool005-v4",
+          "tool005-v3",
+          "tool005-v2",
+          "tool005-v1"
+        ]
+      }
+    ]
+  }
+}

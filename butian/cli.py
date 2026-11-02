@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
     mrecall = memory.add_parser("recall"); mrecall.add_argument("member_id"); mrecall.add_argument("query"); mrecall.add_argument("decision_id")
     moutcome = memory.add_parser("outcome"); moutcome.add_argument("member_id"); moutcome.add_argument("recall_id"); moutcome.add_argument("--used", default=""); moutcome.add_argument("--useful", default=""); moutcome.add_argument("--harmful", default=""); moutcome.add_argument("--evidence"); moutcome.add_argument("--missed", action="store_true")
     mpractice = memory.add_parser("practice"); mpractice.add_argument("member_id"); mpractice.add_argument("memory_id"); mpractice.add_argument("kind"); mpractice.add_argument("content"); mpractice.add_argument("outcome", choices=["success", "failure", "unknown"]); mpractice.add_argument("independent_key"); mpractice.add_argument("--evidence")
+    mrevise = memory.add_parser("revise"); mrevise.add_argument("member_id"); mrevise.add_argument("memory_id"); mrevise.add_argument("content"); mrevise.add_argument("--reason", required=True); mrevise.add_argument("--evidence", required=True)
     evolution = sub.add_parser("evolution").add_subparsers(dest="evolution_command", required=True)
     eks = evolution.add_parser("skills"); eks.add_argument("member_id")
     edr = evolution.add_parser("dream-run"); edr.add_argument("member_id"); edr.add_argument("--min-fragments", type=int, default=1); edr.add_argument("--min-interval", type=float, default=0)
@@ -194,6 +195,8 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
                 result = service.record_recall_outcome(args.member_id, args.recall_id, used_memory_ids=[x for x in args.used.split(",") if x], useful_memory_ids=[x for x in args.useful.split(",") if x], harmful_memory_ids=[x for x in args.harmful.split(",") if x], evidence_ref=args.evidence, missed=args.missed); emit({"recorded": result}); return 0
             if args.command == "memory" and args.memory_command == "practice":
                 result = service.record_practice_outcome(args.member_id, memory_id=args.memory_id, kind=args.kind, content=args.content, outcome=args.outcome, independent_key=args.independent_key, evidence_ref=args.evidence); emit(result); return 0
+            if args.command == "memory" and args.memory_command == "revise":
+                emit(service.revise_memory(args.member_id, args.memory_id, content=args.content, reason=args.reason, evidence_refs=[x for x in args.evidence.split(",") if x])); return 0
         finally:
             service.close()
     store = Store(path)
