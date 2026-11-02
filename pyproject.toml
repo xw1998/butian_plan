@@ -5,9 +5,36 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "butian-plan"
 version = "0.1.9"
-description = "Platform-independent AI team orchestration and memory runtime"
+description = "MCP server (Model Context Protocol) for AI team orchestration and durable practice memory"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+# 这些关键词是 MCP 目录站与包索引识别“这是一个 MCP server”的主要信号，不只是 SEO
+keywords = [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "ai-agents",
+    "multi-agent",
+    "agent-orchestration",
+    "agent-memory",
+    "llm-tools",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+[project.urls]
+Homepage = "https://gitee.com/xw19981010/butian_plan"
+Repository = "https://gitee.com/xw19981010/butian_plan"
+Documentation = "https://gitee.com/xw19981010/butian_plan/blob/master/README.md"
 
 [project.optional-dependencies]
 # 全量回归用 xdist 并行：本机 8 核从 14 分钟压到 4 分半；不装也能跑，只是慢（串行约 11～25 分钟）

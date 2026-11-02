@@ -2,6 +2,8 @@
 
 **简体中文** | [English](README.en.md)
 
+`MCP Server` · Model Context Protocol · 本地 stdio · Python 3.11+ · 零第三方依赖 · 124 个工具
+
 > **实践是检验真理的唯一标准**
 
 AI 已经能回答很多问题，但长期合作还需要更多：记住你的要求，接续中断的任务，复用做对的方法，在出错后修正经验，并把复杂工作推进到可以验收的结果。
@@ -15,10 +17,26 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 **三步上手（约 3 分钟）**
 
 1. 装一次：`python -m pip install -e .`（Python 3.11+，只用标准库，不需要 Ollama 或任何模型 API Key）
-2. 连一次：在 MCP 里调 `butian_connect`（本机回环免口令；成员多于一个时必须显式给 `member_id`），紧接着调 `butian_context` 拿到当前成员、模式、可见任务与下一步动作。
+2. 接一次：这是一个 **MCP Server**，通过 **stdio** 接入，不需要端口、不需要联网、不需要 API Key。客户端配置（Claude Desktop / Cursor / Cline / 其它 MCP 客户端同理）：
+
+   ```json
+   {
+     "mcpServers": {
+       "butian": {
+         "command": "python",
+         "args": ["-m", "butian.cli", "mcp"]
+       }
+     }
+   }
+   ```
+
+   装好后验证一次：`butian mcp` 直接起 stdio 服务（没有参数会一直等 JSON-RPC 输入）；工具清单不用记，客户端连上后 `tools/list` 一次返回全部 124 个。
+3. 连一次：在 MCP 里调 `butian_connect`（本机回环免口令；成员多于一个时必须显式给 `member_id`），紧接着调 `butian_context` 拿到当前成员、模式、可见任务与下一步动作。
 3. 交一次活：`butian_goal_submit` 写目标与验收条件 → 照抄 `butian_context` 返回的 `next_actions` 一步步执行 → `butian_evidence_record` 登记真实证据 → `butian_task_handoff`（或 `butian_execution_submit`）交付。
 
 要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数 124 个，但不必先背表——`tools/list` 默认一次返回全部工具（含 `task_claim`、`task_transition`、`task_review`、`execution_submit`、`context_compose`、`evidence_record`、`task_handoff` 这些推进与收口的入口），`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数；找不到工具时用 `butian_tools_catalog`（`query` 子串过滤）加 `butian_tool_schema` 查单个参数。
+
+仓库根目录的 `server.json` 是按 MCP 官方 registry schema（2025-09-29）写的服务清单，目录站与注册表直接读它；`tools/list` 里的每个工具都带 `inputSchema`，可以先用 `butian_tool_schema` 查单个工具的参数再调用。
 
 最容易踩的只有一件事：**`butian_goal_submit` 只是登记目标，不等于执行完成**。任务要真做过、留下可核验的证据，才能交付与审核。
 

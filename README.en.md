@@ -2,6 +2,8 @@
 
 [简体中文](README.md) | **English**
 
+`MCP server` · Model Context Protocol · local stdio · Python 3.11+ · zero dependencies · 124 tools
+
 > **Practice is the sole criterion for testing truth.**
 
 AI can answer questions. Working with it over time asks for more: remembering your requirements, resuming unfinished work, reusing methods that worked, learning from failures, and carrying complex tasks through to a result you can review.
@@ -15,10 +17,26 @@ The sections after this one explain mechanisms; you do not need to read them bef
 **Three steps, about three minutes**
 
 1. Install once: `python -m pip install -e .` (Python 3.11+, standard library only, no Ollama and no model API key).
-2. Connect once: call `butian_connect` over MCP (loopback has no token; with more than one member you must pass `member_id` explicitly), then `butian_context` for the current member, mode, visible tasks and next legal action.
+2. Attach once: this is an **MCP server** over **stdio** — no port, no network, no API key. Client config (same shape for Claude Desktop, Cursor, Cline and other MCP clients):
+
+   ```json
+   {
+     "mcpServers": {
+       "butian": {
+         "command": "python",
+         "args": ["-m", "butian.cli", "mcp"]
+       }
+     }
+   }
+   ```
+
+   Sanity check right after install: `butian mcp` starts the stdio server directly (with no arguments it waits for JSON-RPC input); you do not need the tool list by heart — once a client connects, `tools/list` returns all 124 in one page.
+3. Connect once: call `butian_connect` over MCP (loopback has no token; with more than one member you must pass `member_id` explicitly), then `butian_context` for the current member, mode, visible tasks and next legal action.
 3. Deliver once: `butian_goal_submit` records the goal and acceptance criteria → copy the `next_actions` returned by `butian_context` → `butian_evidence_record` registers real evidence → `butian_task_handoff` (or `butian_execution_submit`) delivers.
 
 Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are 124 tools, but you do not need the list up front: `tools/list` returns all of them in one page — including the ones that move a task forward and close it out (`task_claim`, `task_transition`, `task_review`, `execution_submit`, `context_compose`, `evidence_record`, `task_handoff`) — `butian_context` returns ready-to-copy arguments for the current state, and `butian_tools_catalog` (`query` substring filter) plus `butian_tool_schema` answer “which tool, which parameters”.
+
+`server.json` in the repository root is a service manifest written against the official MCP registry schema (2025-09-29), so directories and registries can read it directly; every tool in `tools/list` carries an `inputSchema`, and `butian_tool_schema` returns one tool's parameters before you call it.
 
 The one thing that trips people up: **`butian_goal_submit` only registers a goal, it does not mean the work is done.** A task counts only after it was actually performed and left verifiable evidence.
 
