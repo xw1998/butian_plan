@@ -1,0 +1,265 @@
+{
+  "round": 1,
+  "results": [
+    {
+      "round": 1,
+      "entity": "calibration000",
+      "family": "calibration",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 3.1385,
+        "basis": "source"
+      },
+      "truth": 3.1385,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration001",
+      "family": "calibration",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 3.424,
+        "basis": "source"
+      },
+      "truth": 3.424,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration002",
+      "family": "calibration",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 1.622,
+        "basis": "source"
+      },
+      "truth": 1.622,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration003",
+      "family": "calibration",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 1.677,
+        "basis": "source"
+      },
+      "truth": 1.677,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema000",
+      "family": "schema",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 120.8,
+        "level": 6.3,
+        "basis": "source"
+      },
+      "truth": {
+        "flow": 120.8,
+        "level": 6.3
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema001",
+      "family": "schema",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 8.548,
+        "level": 2.038,
+        "basis": "source"
+      },
+      "truth": {
+        "flow": 8.548,
+        "level": 2.038
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema002",
+      "family": "schema",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 663.3,
+        "level": 724.0,
+        "basis": "source"
+      },
+      "truth": {
+        "flow": 663.3,
+        "level": 724.0
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema003",
+      "family": "schema",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 150.6,
+        "level": 227.9,
+        "basis": "source"
+      },
+      "truth": {
+        "flow": 150.6,
+        "level": 227.9
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool000",
+      "family": "tool",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v1/tool000",
+        "parameter": "limit_v1",
+        "value": 6100,
+        "basis": "source"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool000",
+        "kwargs": {
+          "limit_v1": 6100
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool001",
+      "family": "tool",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 4500,
+        "basis": "source"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 4500
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool002",
+      "family": "tool",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v1/tool002",
+        "parameter": "limit_v1",
+        "value": 63000,
+        "basis": "source"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool002",
+        "kwargs": {
+          "limit_v1": 63000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool003",
+      "family": "tool",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v1/tool003",
+        "parameter": "limit_v1",
+        "value": 7000,
+        "basis": "source"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool003",
+        "kwargs": {
+          "limit_v1": 7000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    }
+  ]
+}

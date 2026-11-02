@@ -64,3 +64,29 @@ _tmp_*.py
 !/docs/论文/experiment_results/e2e-gate-20261102/replication-check.json
 !/docs/论文/experiment_results/e2e-gate-20261102/lifecycle-probe.json
 !/docs/论文/experiment_results/e2e-gate-20261102/summary.json
+
+# Real-host multiround study (2026-11-02): pre-registered protocol, the runner, the
+# result document, the host's own decisions/answers and the memory terminal state are
+# public; the SQLite production home and the per-read source dumps stay private.
+!/docs/论文/run_host_multiround_study.py
+!/docs/论文/实验协议-真实宿主多轮.md
+!/docs/论文/真实宿主多轮验证结果-20261102.md
+!/docs/论文/experiment_results/host-loop-20261102/
+!/docs/论文/experiment_results/host-loop-20261102/summary.json
+!/docs/论文/experiment_results/host-loop-20261102/memories.json
+!/docs/论文/experiment_results/host-loop-20261102/state.json
+!/docs/论文/experiment_results/host-loop-20261102/mcp-trace.jsonl
+!/docs/论文/experiment_results/host-loop-20261102/fixtures/
+!/docs/论文/experiment_results/host-loop-20261102/fixtures/contract-manual-v1-v3.txt
+!/docs/论文/experiment_results/host-loop-20261102/fixtures/tasks.json
+!/docs/论文/experiment_results/host-loop-20261102/fixtures/rules.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/
+!/docs/论文/experiment_results/host-loop-20261102/stages/r1-answers.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r2-answers.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r3-answers.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r1-recall-decision.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r2-recall-decision.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r3-recall-decision.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r1-result.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r2-result.json
+!/docs/论文/experiment_results/host-loop-20261102/stages/r3-result.json

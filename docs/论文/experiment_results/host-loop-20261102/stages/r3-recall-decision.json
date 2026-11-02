@@ -1,0 +1,62 @@
+{
+  "calibration000": {
+    "use_experience": true,
+    "need_source": false,
+    "reason": "memory calibration000-v1 status=warm matches entity and version v1"
+  },
+  "calibration001": {
+    "use_experience": true,
+    "need_source": false,
+    "reason": "memory calibration001-v1 status=warm matches entity and version v1"
+  },
+  "calibration002": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "no memory for v3 (recalled versions: [2, 1]); must re-read source"
+  },
+  "calibration003": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "no memory for v3 (recalled versions: [2, 1]); must re-read source"
+  },
+  "schema000": {
+    "use_experience": true,
+    "need_source": false,
+    "reason": "memory schema000-v1 status=warm matches entity and version v1"
+  },
+  "schema001": {
+    "use_experience": true,
+    "need_source": false,
+    "reason": "memory schema001-v1 status=warm matches entity and version v1"
+  },
+  "schema002": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "no memory for v3 (recalled versions: [2, 1]); must re-read source"
+  },
+  "schema003": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "no memory for v3 (recalled versions: [2, 1]); must re-read source"
+  },
+  "tool000": {
+    "use_experience": true,
+    "need_source": false,
+    "reason": "memory tool000-v1 status=warm matches entity and version v1"
+  },
+  "tool001": {
+    "use_experience": true,
+    "need_source": false,
+    "reason": "memory tool001-v1 status=warm matches entity and version v1"
+  },
+  "tool002": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "no memory for v3 (recalled versions: [2, 1]); must re-read source"
+  },
+  "tool003": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "no memory for v3 (recalled versions: [2, 1]); must re-read source"
+  }
+}

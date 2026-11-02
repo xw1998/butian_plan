@@ -1,0 +1,271 @@
+{
+  "round": 2,
+  "results": [
+    {
+      "round": 2,
+      "entity": "calibration000",
+      "family": "calibration",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 1.3545,
+        "basis": "experience",
+        "from_memory": "calibration000-v1"
+      },
+      "truth": 1.3545,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "calibration001",
+      "family": "calibration",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 6.738,
+        "basis": "experience",
+        "from_memory": "calibration001-v1"
+      },
+      "truth": 6.738,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "calibration002",
+      "family": "calibration",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 4.6285,
+        "basis": "source"
+      },
+      "truth": 4.6285,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "calibration003",
+      "family": "calibration",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "value": 4.144,
+        "basis": "source"
+      },
+      "truth": 4.144,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "schema000",
+      "family": "schema",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 588.8,
+        "level": 114.4,
+        "basis": "experience",
+        "from_memory": "schema000-v1"
+      },
+      "truth": {
+        "flow": 588.8,
+        "level": 114.4
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "schema001",
+      "family": "schema",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 2.593,
+        "level": 1.956,
+        "basis": "experience",
+        "from_memory": "schema001-v1"
+      },
+      "truth": {
+        "flow": 2.593,
+        "level": 1.956
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "schema002",
+      "family": "schema",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 43.9,
+        "level": 26.72,
+        "basis": "source"
+      },
+      "truth": {
+        "flow": 43.9,
+        "level": 26.72
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "schema003",
+      "family": "schema",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "flow": 304.3,
+        "level": 625.4,
+        "basis": "source"
+      },
+      "truth": {
+        "flow": 304.3,
+        "level": 625.4
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "tool000",
+      "family": "tool",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v1/tool000",
+        "parameter": "limit_v1",
+        "value": 7900,
+        "basis": "experience",
+        "from_memory": "tool000-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool000",
+        "kwargs": {
+          "limit_v1": 7900
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "tool001",
+      "family": "tool",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 9000,
+        "basis": "experience",
+        "from_memory": "tool001-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 9000
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "tool002",
+      "family": "tool",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v2/tool002",
+        "parameter": "limit_v2",
+        "value": 5900,
+        "basis": "source"
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool002",
+        "kwargs": {
+          "limit_v2": 5900
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "tool003",
+      "family": "tool",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "answer": {
+        "endpoint": "/api/v2/tool003",
+        "parameter": "limit_v2",
+        "value": 5200,
+        "basis": "source"
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool003",
+        "kwargs": {
+          "limit_v2": 5200
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "calibration000": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "calibration001": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "calibration002": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "calibration003": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "schema000": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "schema001": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "schema002": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "schema003": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "tool000": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "tool001": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "tool002": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  },
+  "tool003": {
+    "use_experience": false,
+    "need_source": true,
+    "reason": "recall returned no memories; no evidence to reuse"
+  }
+}

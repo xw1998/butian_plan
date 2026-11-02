@@ -1,0 +1,68 @@
+{
+  "calibration000": {
+    "value": 1.045,
+    "basis": "experience",
+    "from_memory": "calibration000-v1"
+  },
+  "calibration001": {
+    "value": 8.551,
+    "basis": "experience",
+    "from_memory": "calibration001-v1"
+  },
+  "calibration002": {
+    "value": 7.331,
+    "basis": "source"
+  },
+  "calibration003": {
+    "value": 11.952,
+    "basis": "source"
+  },
+  "schema000": {
+    "flow": 195.7,
+    "level": 977.1,
+    "basis": "experience",
+    "from_memory": "schema000-v1"
+  },
+  "schema001": {
+    "flow": 8.063,
+    "level": 5.618,
+    "basis": "experience",
+    "from_memory": "schema001-v1"
+  },
+  "schema002": {
+    "flow": 7.512,
+    "level": 8.149,
+    "basis": "source"
+  },
+  "schema003": {
+    "flow": 48.28,
+    "level": 86.71,
+    "basis": "source"
+  },
+  "tool000": {
+    "endpoint": "/api/v1/tool000",
+    "parameter": "limit_v1",
+    "value": 8500,
+    "basis": "experience",
+    "from_memory": "tool000-v1"
+  },
+  "tool001": {
+    "endpoint": "/api/v1/tool001",
+    "parameter": "limit_v1",
+    "value": 5600,
+    "basis": "experience",
+    "from_memory": "tool001-v1"
+  },
+  "tool002": {
+    "endpoint": "/api/v3/tool002",
+    "parameter": "limit_v3",
+    "value": 930,
+    "basis": "source"
+  },
+  "tool003": {
+    "endpoint": "/api/v3/tool003",
+    "parameter": "limit_v3",
+    "value": 100,
+    "basis": "source"
+  }
+}

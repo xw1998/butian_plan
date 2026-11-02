@@ -1,0 +1,329 @@
+{
+  "exported_from": "production/members/host/memory.db",
+  "memories": [
+    {
+      "memory_id": "calibration000-v1",
+      "status": "warm",
+      "confidence": 0.30000000000000004,
+      "weight": 0.75,
+      "successes": 3,
+      "failures": 0,
+      "independent_keys": [
+        "r1-calibration000",
+        "r2-calibration000",
+        "r3-calibration000"
+      ],
+      "content_sha256": "07533fadbf95d1a1",
+      "content": "RULE {\"entity\": \"calibration000\", \"family\": \"calibration\", \"offset\": 2, \"scale\": 2000, \"version\": 1}"
+    },
+    {
+      "memory_id": "calibration001-v1",
+      "status": "warm",
+      "confidence": 0.30000000000000004,
+      "weight": 0.75,
+      "successes": 3,
+      "failures": 0,
+      "independent_keys": [
+        "r1-calibration001",
+        "r2-calibration001",
+        "r3-calibration001"
+      ],
+      "content_sha256": "49eb90891995d933",
+      "content": "RULE {\"entity\": \"calibration001\", \"family\": \"calibration\", \"offset\": 1, \"scale\": 1000, \"version\": 1}"
+    },
+    {
+      "memory_id": "calibration002-v1",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r1-calibration002"
+      ],
+      "content_sha256": "8c6d7d3368cc6653",
+      "content": "RULE {\"entity\": \"calibration002\", \"family\": \"calibration\", \"offset\": 14, \"scale\": 2000, \"version\": 1}"
+    },
+    {
+      "memory_id": "calibration002-v2",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r2-calibration002"
+      ],
+      "content_sha256": "1eba3a2f8a2910de",
+      "content": "RULE {\"entity\": \"calibration002\", \"family\": \"calibration\", \"offset\": 5, \"scale\": 2000, \"version\": 2}"
+    },
+    {
+      "memory_id": "calibration002-v3",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r3-calibration002"
+      ],
+      "content_sha256": "f48c242db683b0ea",
+      "content": "RULE {\"entity\": \"calibration002\", \"family\": \"calibration\", \"offset\": 18, \"scale\": 1000, \"version\": 3}"
+    },
+    {
+      "memory_id": "calibration003-v1",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r1-calibration003"
+      ],
+      "content_sha256": "28f0486bd5e8170b",
+      "content": "RULE {\"entity\": \"calibration003\", \"family\": \"calibration\", \"offset\": 10, \"scale\": 2000, \"version\": 1}"
+    },
+    {
+      "memory_id": "calibration003-v2",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r2-calibration003"
+      ],
+      "content_sha256": "f195c302124852e9",
+      "content": "RULE {\"entity\": \"calibration003\", \"family\": \"calibration\", \"offset\": 21, \"scale\": 2000, \"version\": 2}"
+    },
+    {
+      "memory_id": "calibration003-v3",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r3-calibration003"
+      ],
+      "content_sha256": "ae4c8d567a424c43",
+      "content": "RULE {\"entity\": \"calibration003\", \"family\": \"calibration\", \"offset\": 20, \"scale\": 125, \"version\": 3}"
+    },
+    {
+      "memory_id": "schema000-v1",
+      "status": "warm",
+      "confidence": 0.30000000000000004,
+      "weight": 0.75,
+      "successes": 3,
+      "failures": 0,
+      "independent_keys": [
+        "r1-schema000",
+        "r2-schema000",
+        "r3-schema000"
+      ],
+      "content_sha256": "f1589b84116cc068",
+      "content": "RULE {\"divisor\": 10, \"entity\": \"schema000\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "schema001-v1",
+      "status": "warm",
+      "confidence": 0.30000000000000004,
+      "weight": 0.75,
+      "successes": 3,
+      "failures": 0,
+      "independent_keys": [
+        "r1-schema001",
+        "r2-schema001",
+        "r3-schema001"
+      ],
+      "content_sha256": "58cc0d26231f58ed",
+      "content": "RULE {\"divisor\": 1000, \"entity\": \"schema001\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "schema002-v1",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r1-schema002"
+      ],
+      "content_sha256": "ecb31d4c01266e7b",
+      "content": "RULE {\"divisor\": 10, \"entity\": \"schema002\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "schema002-v2",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r2-schema002"
+      ],
+      "content_sha256": "b8108e8c698a097b",
+      "content": "RULE {\"divisor\": 100, \"entity\": \"schema002\", \"family\": \"schema\", \"flow_field\": \"f2\", \"level_field\": \"h2\", \"version\": 2}"
+    },
+    {
+      "memory_id": "schema002-v3",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r3-schema002"
+      ],
+      "content_sha256": "167f82800a99ecb8",
+      "content": "RULE {\"divisor\": 1000, \"entity\": \"schema002\", \"family\": \"schema\", \"flow_field\": \"f3\", \"level_field\": \"h3\", \"version\": 3}"
+    },
+    {
+      "memory_id": "schema003-v1",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r1-schema003"
+      ],
+      "content_sha256": "93aa7ca0c64289f8",
+      "content": "RULE {\"divisor\": 10, \"entity\": \"schema003\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "schema003-v2",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r2-schema003"
+      ],
+      "content_sha256": "77ebf8b3a7d531ed",
+      "content": "RULE {\"divisor\": 10, \"entity\": \"schema003\", \"family\": \"schema\", \"flow_field\": \"f2\", \"level_field\": \"h2\", \"version\": 2}"
+    },
+    {
+      "memory_id": "schema003-v3",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r3-schema003"
+      ],
+      "content_sha256": "14dbfd8697775cef",
+      "content": "RULE {\"divisor\": 100, \"entity\": \"schema003\", \"family\": \"schema\", \"flow_field\": \"f3\", \"level_field\": \"h3\", \"version\": 3}"
+    },
+    {
+      "memory_id": "tool000-v1",
+      "status": "warm",
+      "confidence": 0.30000000000000004,
+      "weight": 0.75,
+      "successes": 3,
+      "failures": 0,
+      "independent_keys": [
+        "r1-tool000",
+        "r2-tool000",
+        "r3-tool000"
+      ],
+      "content_sha256": "419b8733053c900f",
+      "content": "RULE {\"endpoint\": \"/api/v1/tool000\", \"entity\": \"tool000\", \"factor\": 100, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "tool001-v1",
+      "status": "warm",
+      "confidence": 0.30000000000000004,
+      "weight": 0.75,
+      "successes": 3,
+      "failures": 0,
+      "independent_keys": [
+        "r1-tool001",
+        "r2-tool001",
+        "r3-tool001"
+      ],
+      "content_sha256": "40aa56ee48bc6021",
+      "content": "RULE {\"endpoint\": \"/api/v1/tool001\", \"entity\": \"tool001\", \"factor\": 100, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "tool002-v1",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r1-tool002"
+      ],
+      "content_sha256": "f36c224cf75781f5",
+      "content": "RULE {\"endpoint\": \"/api/v1/tool002\", \"entity\": \"tool002\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "tool002-v2",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r2-tool002"
+      ],
+      "content_sha256": "7b3074ec6f351625",
+      "content": "RULE {\"endpoint\": \"/api/v2/tool002\", \"entity\": \"tool002\", \"factor\": 100, \"family\": \"tool\", \"parameter\": \"limit_v2\", \"version\": 2}"
+    },
+    {
+      "memory_id": "tool002-v3",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r3-tool002"
+      ],
+      "content_sha256": "c894187c9289f9c5",
+      "content": "RULE {\"endpoint\": \"/api/v3/tool002\", \"entity\": \"tool002\", \"factor\": 10, \"family\": \"tool\", \"parameter\": \"limit_v3\", \"version\": 3}"
+    },
+    {
+      "memory_id": "tool003-v1",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r1-tool003"
+      ],
+      "content_sha256": "4eadaf9f9b4e2807",
+      "content": "RULE {\"endpoint\": \"/api/v1/tool003\", \"entity\": \"tool003\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+    },
+    {
+      "memory_id": "tool003-v2",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r2-tool003"
+      ],
+      "content_sha256": "c19e74c4feee2ef4",
+      "content": "RULE {\"endpoint\": \"/api/v2/tool003\", \"entity\": \"tool003\", \"factor\": 100, \"family\": \"tool\", \"parameter\": \"limit_v2\", \"version\": 2}"
+    },
+    {
+      "memory_id": "tool003-v3",
+      "status": "candidate",
+      "confidence": 0.2,
+      "weight": 0.5,
+      "successes": 1,
+      "failures": 0,
+      "independent_keys": [
+        "r3-tool003"
+      ],
+      "content_sha256": "704916003e923953",
+      "content": "RULE {\"endpoint\": \"/api/v3/tool003\", \"entity\": \"tool003\", \"factor\": 10, \"family\": \"tool\", \"parameter\": \"limit_v3\", \"version\": 3}"
+    }
+  ]
+}
