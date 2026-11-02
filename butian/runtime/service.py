@@ -2303,17 +2303,17 @@ class ButianService:
         finally:
             memory.close()
 
-    def dream_distill(self, member_id, memory_ids, *, summary, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0):
+    def dream_distill(self, member_id, memory_ids, *, summary, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, preview_only=False, preview_token=None):
         memory = self.memory(member_id)
         try:
-            return DreamRunner(memory, team_store=self.store, actor_member_id=member_id).distill_memories(memory_ids, summary=summary, merged_items=merged_items, conflicts=conflicts, discarded_items=discarded_items, information_loss=information_loss)
+            return DreamRunner(memory, team_store=self.store, actor_member_id=member_id).distill_memories(memory_ids, summary=summary, merged_items=merged_items, conflicts=conflicts, discarded_items=discarded_items, information_loss=information_loss, preview_only=preview_only, preview_token=preview_token)
         finally:
             memory.close()
 
-    def dream_abstract(self, member_id, memory_ids, *, pattern, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1):
+    def dream_abstract(self, member_id, memory_ids, *, pattern, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1, preview_only=False, preview_token=None):
         memory = self.memory(member_id)
         try:
-            return DreamRunner(memory, team_store=self.store, actor_member_id=member_id).abstract_memories(memory_ids, pattern=pattern, supports=supports, counterexamples=counterexamples, applicability=applicability, failure_conditions=failure_conditions, abstraction_level=abstraction_level)
+            return DreamRunner(memory, team_store=self.store, actor_member_id=member_id).abstract_memories(memory_ids, pattern=pattern, supports=supports, counterexamples=counterexamples, applicability=applicability, failure_conditions=failure_conditions, abstraction_level=abstraction_level, preview_only=preview_only, preview_token=preview_token)
         finally:
             memory.close()
 

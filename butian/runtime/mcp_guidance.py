@@ -1,6 +1,11 @@
 """Content-free MCP validation and recovery hints; never relax authorization."""
 from __future__ import annotations
 import copy
+import difflib
+
+# 连接信封字段：身份由 butian_connect 建立后自动注入，任何工具都可能带上，
+# 不是“未知参数”，不能因此把一次合法调用判死。
+_ENVELOPE_FIELDS = ('member_id', 'actor_member_id', 'token')
 
 
 class ToolError(ValueError):
@@ -22,13 +27,29 @@ def describe_tool(name, tools):
     return result
 
 
-def validate_arguments(name, args, tools):
+def validate_arguments(name, args, tools, *, extra_accepted=()):
     tool = next((tool for tool in tools if tool['name'] == name), None)
     if tool is None:
         describe_tool(name, tools)
     if not isinstance(args, dict):
         raise ToolError('invalid_tool_arguments', {'code': 'invalid_tool_arguments', 'expected': 'object'})
     schema = tool['inputSchema']
+    # 拼错的参数名以前会被静默丢掉：宿主以为设置生效了，实际什么都没改。
+    # 这里在类型检查之前先拒收，并给出最近似的合法字段名。
+    accepted = set(schema.get('properties') or {}) | set(_ENVELOPE_FIELDS) | set(extra_accepted)
+    unexpected = sorted(key for key in args if key not in accepted)
+    if unexpected:
+        did_you_mean = {}
+        for key in unexpected:
+            match = difflib.get_close_matches(key, sorted(accepted), n=1, cutoff=0.6)
+            if match:
+                did_you_mean[key] = match[0]
+        raise ToolError('unknown_argument', {
+            'code': 'unknown_argument', 'tool': name, 'unexpected': unexpected,
+            'accepted': sorted(accepted), 'did_you_mean': did_you_mean,
+            'reason': '这些参数不会被使用；静默忽略会让你以为设置生效了。',
+            'next_actions': [{'tool': 'butian_tool_schema', 'arguments': {'name': name},
+                              'why': '按 details.accepted 里的名字重传；拼错的参数不会被静默忽略。'}]})
     issues = []
     for key in schema.get('required', []):
         if key not in args:
@@ -104,6 +125,14 @@ _EXISTENCE_HINTS = {
         {'tool': 'butian_context', 'why': '看当前会话是 solo 还是 team。'}]),
     'catalog_query_no_match': ('matching_catalog_entry', [
         {'tool': 'butian_tools_catalog', 'why': '不传 query 翻页看全部工具名。'}]),
+    'preview_required': ('preview_token_from_preview_only_call', [
+        {'tool': 'butian_dream_distill', 'arguments': {'preview_only': True},
+         'why': '这个环境强制两段式写入：先 preview_only 拿 preview_token，再把令牌和同样内容传回来提交。'},
+        {'tool': 'butian_dream_abstract', 'arguments': {'preview_only': True},
+         'why': '抽象同理：先预览，再带 preview_token 提交。'}]),
+    'preview_stale': ('preview_token_matches_current_state', [
+        {'tool': 'butian_dream_distill', 'arguments': {'preview_only': True},
+         'why': '预览之后源记忆或提交内容变了：重新预览拿新令牌，旧令牌不能用来写库。'}]),
     'unknown_argument': ('accepted_argument_names', [
         {'tool': 'butian_tool_schema', 'why': '按 details.accepted 里的名字重传；拼错的参数不会被静默忽略。'}]),
     'problem_field_conflict': ('one_source_per_problem_field', [

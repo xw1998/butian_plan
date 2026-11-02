@@ -3,6 +3,7 @@ import hashlib
 import json, time, uuid
 from pathlib import Path
 from .memory import MemoryStore
+from .preview_token import PreviewStale, require_fresh, required_by_env, token_for  # noqa: F401
 
 class DreamRunner:
     def __init__(self, memory: MemoryStore, *, team_store=None, actor_member_id: str | None = None):
@@ -104,18 +105,8 @@ class DreamRunner:
         db.execute('DELETE FROM dream_lock WHERE lock_id=1 AND owner=?', (run_id,))
         return dict(run_id=run_id, status='completed', candidate_id=candidate_id, source=source, gate=gate, recorded=True)
 
-    def distill_memories(self, memory_ids, *, summary: str, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True):
-        db = self.memory.db
-        db.execute("BEGIN IMMEDIATE")
-        try:
-            result = self._distill_memories_locked(memory_ids, summary=summary, merged_items=merged_items, conflicts=conflicts, discarded_items=discarded_items, information_loss=information_loss, reversible=reversible)
-            db.execute("COMMIT")
-            return result
-        except Exception:
-            db.execute("ROLLBACK")
-            raise
-
-    def _distill_memories_locked(self, memory_ids, *, summary: str, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True):
+    def _distill_plan(self, memory_ids, *, summary, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True):
+        """预览与提交共用同一份影响集计算：令牌就是它的指纹，中途改过就作废。"""
         ids = list(dict.fromkeys(memory_ids))
         if len(ids) < 2 or not summary.strip():
             raise ValueError("distillation_requires_multiple_memories_and_summary")
@@ -133,6 +124,41 @@ class DreamRunner:
             snapshots.append({"memory_id": source["memory_id"], "updated_at": source["updated_at"], "content_sha256": hashlib.sha256(source["content"].encode("utf-8")).hexdigest()})
         fingerprint_data = {"sources": snapshots, "summary": summary.strip(), "merged_items": list(merged_items or []), "conflicts": list(conflicts or []), "discarded_items": list(discarded_items or []), "information_loss": information_loss, "reversible": bool(reversible)}
         fingerprint = hashlib.sha256(json.dumps(fingerprint_data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        return ids, snapshots, fingerprint_data, fingerprint
+
+    def preview_distill(self, memory_ids, *, summary, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True):
+        """只读预览：先说清会写几行、影响哪几条记忆，不落库。"""
+        ids, snapshots, fingerprint_data, fingerprint = self._distill_plan(memory_ids, summary=summary, merged_items=merged_items, conflicts=conflicts, discarded_items=discarded_items, information_loss=information_loss, reversible=reversible)
+        existing = self.memory.db.execute("SELECT distillation_id, status FROM memory_distillations WHERE fingerprint=?", (fingerprint,)).fetchone()
+        return {"status": "preview", "operation": "distill", "preview_token": token_for(fingerprint), "fingerprint": fingerprint,
+                "affected": len(ids),
+                "source_states": [{"memory_id": item["memory_id"], "updated_at": item["updated_at"], "content_sha256": item["content_sha256"][:12]} for item in snapshots],
+                "declared_conflicts": len(fingerprint_data["conflicts"]),
+                "writes": [{"table": "memory_distillations", "rows": 0 if existing else 1}],
+                "existing": (dict(existing) if existing else None),
+                "requires_confirmation": True,
+                "note": "确认无误后把 preview_token 原样传回同一个工具才会写库；预览之后记忆或摘要变了，令牌立即失效。"}
+
+    def distill_memories(self, memory_ids, *, summary: str, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True, preview_only=False, preview_token=None):
+        if preview_only:
+            return self.preview_distill(memory_ids, summary=summary, merged_items=merged_items, conflicts=conflicts, discarded_items=discarded_items, information_loss=information_loss, reversible=reversible)
+        if required_by_env() and not preview_token:
+            raise ValueError("preview_required")
+        db = self.memory.db
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            result = self._distill_memories_locked(memory_ids, summary=summary, merged_items=merged_items, conflicts=conflicts, discarded_items=discarded_items, information_loss=information_loss, reversible=reversible, preview_token=preview_token)
+            db.execute("COMMIT")
+            return result
+        except Exception:
+            db.execute("ROLLBACK")
+            raise
+
+    def _distill_memories_locked(self, memory_ids, *, summary: str, merged_items=None, conflicts=None, discarded_items=None, information_loss=0.0, reversible=True, preview_token=None):
+        ids, snapshots, fingerprint_data, fingerprint = self._distill_plan(memory_ids, summary=summary, merged_items=merged_items, conflicts=conflicts, discarded_items=discarded_items, information_loss=information_loss, reversible=reversible)
+        if preview_token is not None:
+            require_fresh(preview_token, fingerprint, operation="distill", tool="butian_dream_distill",
+                          next_arguments={"memory_ids": ids, "summary": summary.strip()})
         distillation_id = f"distill_{uuid.uuid4().hex}"
         now = time.time()
         from contextlib import nullcontext
@@ -145,18 +171,8 @@ class DreamRunner:
                 raise
         return dict(self.memory.db.execute("SELECT * FROM memory_distillations WHERE distillation_id=?", (distillation_id,)).fetchone())
 
-    def abstract_memories(self, memory_ids, *, pattern: str, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1):
-        db = self.memory.db
-        db.execute("BEGIN IMMEDIATE")
-        try:
-            result = self._abstract_memories_locked(memory_ids, pattern=pattern, supports=supports, counterexamples=counterexamples, applicability=applicability, failure_conditions=failure_conditions, abstraction_level=abstraction_level)
-            db.execute("COMMIT")
-            return result
-        except Exception:
-            db.execute("ROLLBACK")
-            raise
-
-    def _abstract_memories_locked(self, memory_ids, *, pattern: str, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1):
+    def _abstract_plan(self, memory_ids, *, pattern, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1):
+        """预览与提交共用同一份影响集计算，避免两处口径漂移。"""
         ids = list(dict.fromkeys(memory_ids))
         if len(ids) < 2 or not pattern.strip() or abstraction_level < 1:
             raise ValueError("abstraction_requires_multiple_memories_and_pattern")
@@ -183,6 +199,41 @@ class DreamRunner:
                 snapshots.append({"memory_id": source_id, "content_sha256": hashlib.sha256(source["content"].encode("utf-8")).hexdigest(), "status": source["status"]})
         fingerprint_data = {"sources": snapshots, "pattern": pattern.strip(), "supports": sorted(supports), "counterexamples": sorted(counterexamples), "applicability": list(applicability or []), "failure_conditions": list(failure_conditions or []), "abstraction_level": abstraction_level}
         fingerprint = hashlib.sha256(json.dumps(fingerprint_data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        return ids, snapshots, supports, counterexamples, fingerprint_data, fingerprint
+
+    def preview_abstract(self, memory_ids, *, pattern, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1):
+        """只读预览：抽象是一条新记录，写零行还是写一行要说清楚。"""
+        ids, snapshots, supports, counterexamples, fingerprint_data, fingerprint = self._abstract_plan(memory_ids, pattern=pattern, supports=supports, counterexamples=counterexamples, applicability=applicability, failure_conditions=failure_conditions, abstraction_level=abstraction_level)
+        existing = self.memory.db.execute("SELECT abstraction_id, status FROM memory_abstractions WHERE fingerprint=?", (fingerprint,)).fetchone()
+        return {"status": "preview", "operation": "abstract", "preview_token": token_for(fingerprint), "fingerprint": fingerprint,
+                "affected": len(ids),
+                "source_states": [{"memory_id": item["memory_id"], "status": item["status"], "content_sha256": item["content_sha256"][:12]} for item in snapshots],
+                "supports": supports, "counterexamples": counterexamples,
+                "writes": [{"table": "memory_abstractions", "rows": 0 if existing else 1}],
+                "existing": (dict(existing) if existing else None),
+                "requires_confirmation": True,
+                "note": "确认无误后把 preview_token 原样传回同一个工具才会写库；预览之后源记忆或模式变了，令牌立即失效。"}
+
+    def abstract_memories(self, memory_ids, *, pattern: str, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1, preview_only=False, preview_token=None):
+        if preview_only:
+            return self.preview_abstract(memory_ids, pattern=pattern, supports=supports, counterexamples=counterexamples, applicability=applicability, failure_conditions=failure_conditions, abstraction_level=abstraction_level)
+        if required_by_env() and not preview_token:
+            raise ValueError("preview_required")
+        db = self.memory.db
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            result = self._abstract_memories_locked(memory_ids, pattern=pattern, supports=supports, counterexamples=counterexamples, applicability=applicability, failure_conditions=failure_conditions, abstraction_level=abstraction_level, preview_token=preview_token)
+            db.execute("COMMIT")
+            return result
+        except Exception:
+            db.execute("ROLLBACK")
+            raise
+
+    def _abstract_memories_locked(self, memory_ids, *, pattern: str, supports=None, counterexamples=None, applicability=None, failure_conditions=None, abstraction_level=1, preview_token=None):
+        ids, snapshots, supports, counterexamples, fingerprint_data, fingerprint = self._abstract_plan(memory_ids, pattern=pattern, supports=supports, counterexamples=counterexamples, applicability=applicability, failure_conditions=failure_conditions, abstraction_level=abstraction_level)
+        if preview_token is not None:
+            require_fresh(preview_token, fingerprint, operation="abstract", tool="butian_dream_abstract",
+                          next_arguments={"memory_ids": ids, "pattern": pattern.strip()})
         abstraction_id = f"abstract_{uuid.uuid4().hex}"
         now = time.time()
         from contextlib import nullcontext

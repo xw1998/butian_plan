@@ -14,9 +14,14 @@ def test_standard_queue_requires_owner_authentication(tmp_path):
         assert call_tool(service, 'butian_knowledge_source_enqueue', args) == first
         with pytest.raises(ValueError):
             call_tool(service, 'butian_knowledge_source_enqueue', dict(args, member_id='b'))
+        # queue 只吃 member_id/limit：把 enqueue 的参数整包传进来现在会如实报 unknown_argument，
+        # 不再静默忽略（url 对列表工具没有任何意义）。
+        queue_args = dict(member_id='a', actor_member_id='a', token='test-a')
         with pytest.raises(ValueError):
-            call_tool(service, 'butian_knowledge_source_queue', dict(args, member_id='b'))
-        rows = call_tool(service, 'butian_knowledge_source_queue', args)['queue']
+            call_tool(service, 'butian_knowledge_source_queue', dict(queue_args, member_id='b'))
+        with pytest.raises(ValueError):
+            call_tool(service, 'butian_knowledge_source_queue', dict(queue_args, url='https://example.org/source'))
+        rows = call_tool(service, 'butian_knowledge_source_queue', queue_args)['queue']
         assert len(rows) == 1 and rows[0]['owner_member_id'] == 'a'
     finally:
         service.close()

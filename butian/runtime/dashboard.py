@@ -79,12 +79,16 @@ def snapshot(service, actor):
     tasks = Counter(dict(service.store.db.execute(
         'SELECT t.status,COUNT(*) FROM tasks t JOIN sessions s ON s.session_id=t.session_id '
         'WHERE s.dispatcher_member_id=? OR t.assignee_id=? GROUP BY t.status', (actor, actor))))
+    # 停滞：不在任何人手上推进的任务。只给数量与状态分布，不带正文与 task_id。
+    stalled_states = ('todo', 'ready', 'waiting_user', 'blocked', 'failed', 'provider_lost', 'unknown')
+    stalled = {state: tasks.get(state, 0) for state in stalled_states}
     return {
         'generated_at': time.time(), 'scope': 'team_counts_only',
         'task_scope': 'authenticated_member', 'members': len(members),
         'coverage': dict(coverage), 'partial': bool(coverage['unavailable']),
         'member_stats': member_stats, 'totals': dict(totals), 'memory_kinds': dict(kinds), 'memory_states': dict(states),
         'practice_outcomes': dict(practice), 'task_states': dict(tasks),
+        'stalled': {**stalled, 'total': sum(stalled.values()), 'scope': 'authenticated_member'},
         'avoided_errors': {'count': None, 'supported': False,
                            'reason': '尚未记录独立避错证据；有用反馈和召回命中不等于避免错误。'},
         'definitions': {
@@ -96,5 +100,6 @@ def snapshot(service, actor):
             'dream_auto': '其中由后台自动自省产生的 completed 数；自动自省默认关闭（BUTIAN_AUTO_DREAM=1 才开启），因此默认为 0。',
             'members': '当前注册成员身份数，不等于在线人数。',
             'coverage': '未初始化的记忆库没有记录；不可读取的库不计入总量，总量可能不完整。',
+            'stalled': '当前身份可见任务中，状态为 todo/ready/waiting_user/blocked/failed/provider_lost/unknown 的条数：这些任务没有人正在推进，需要有人认领、回答或重排才会前进；running/review 等有明确接手方的不计入。',
         },
     }

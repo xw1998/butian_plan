@@ -38,6 +38,32 @@ def test_dashboard_counts_and_missing_libraries(tmp_path):
         service.close()
 
 
+def test_dashboard_stalled_counts_only_tasks_nobody_is_moving(tmp_path):
+    service = ButianService(tmp_path)
+    try:
+        service.add_member('a', 'A')
+        empty = snapshot(service, 'a')['stalled']
+        assert empty['total'] == 0
+        session = service.create_session('solo', current_member_id='a')
+        todo = service.store.create_task(session['session_id'], 'PRIVATE_TITLE', 'a')
+        ready = service.store.create_task(session['session_id'], 'PRIVATE_TITLE_2', 'a')
+        service.store.transition_task(ready, 1, 'ready', f'op_ready_{ready}')
+        result = snapshot(service, 'a')
+        assert result['stalled']['todo'] == empty['todo'] + 1
+        assert result['stalled']['ready'] == empty['ready'] + 1
+        assert result['stalled']['total'] == empty['total'] + 2
+        assert result['stalled']['scope'] == 'authenticated_member'
+        # 只数不露：任务 id / 标题都不许出现在返回里。
+        assert 'PRIVATE_TITLE' not in str(result) and todo not in str(result) and ready not in str(result)
+        assert 'stalled' in result['definitions']
+        # 有接手方的任务（running）不算停滞。
+        claimed = service.store.create_task(session['session_id'], 'PRIVATE_TITLE_3', 'a')
+        service.store.transition_task(claimed, 1, 'ready', f'op_ready_{claimed}')
+        service.store.transition_task(claimed, 2, 'claimed', f'op_claim_{claimed}')
+        assert snapshot(service, 'a')['stalled']['total'] == result['stalled']['total']
+    finally:
+        service.close()
+
 def test_dashboard_evidence_counts_are_not_avoidance(tmp_path):
     service = ButianService(tmp_path)
     try:

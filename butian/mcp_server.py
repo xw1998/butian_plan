@@ -82,8 +82,8 @@ TOOLS = [
     {"name": "butian_evolution_rewarm", "description": "Rewarm a cold memory after an evidenced success", "inputSchema": {"type": "object", "required": ["member_id", "memory_id", "success"], "properties": {"member_id": {"type": "string"}, "memory_id": {"type": "string"}, "success": {"type": "boolean"}, "evidence_ref": {"type": "string"}}}},
     {"name": "butian_evolution_versions", "description": "List a memory's version chain and verify its integrity", "inputSchema": {"type": "object", "required": ["member_id", "memory_id"], "properties": {"member_id": {"type": "string"}, "memory_id": {"type": "string"}}}},
     {"name": "butian_dream_run", "description": "Run a gated dream introspection cycle over a member's memories", "inputSchema": {"type": "object", "required": ["member_id"], "properties": {"member_id": {"type": "string"}, "min_fragments": {"type": "integer"}, "min_interval": {"type": "number"}, "budget": {"type": "integer"}, "lock_timeout": {"type": "number"}}}},
-    {"name": "butian_dream_distill", "description": "Distill multiple memories into a reversible summary", "inputSchema": {"type": "object", "required": ["member_id", "memory_ids", "summary"], "properties": {"member_id": {"type": "string"}, "memory_ids": {"type": "array", "items": {"type": "string"}}, "summary": {"type": "string"}, "merged_items": {"type": "array"}, "conflicts": {"type": "array"}, "discarded_items": {"type": "array"}, "information_loss": {"type": "number"}}}},
-    {"name": "butian_dream_abstract", "description": "Abstract a pattern from multiple memories with applicability and failure conditions", "inputSchema": {"type": "object", "required": ["member_id", "memory_ids", "pattern"], "properties": {"member_id": {"type": "string"}, "memory_ids": {"type": "array", "items": {"type": "string"}}, "pattern": {"type": "string"}, "supports": {"type": "array"}, "counterexamples": {"type": "array"}, "applicability": {"type": "array"}, "failure_conditions": {"type": "array"}, "abstraction_level": {"type": "integer"}}}},
+    {"name": "butian_dream_distill", "description": "Distill multiple memories into a reversible summary (preview_only first: it returns a preview_token that must be sent back to write)", "inputSchema": {"type": "object", "required": ["member_id", "memory_ids", "summary"], "properties": {"member_id": {"type": "string"}, "memory_ids": {"type": "array", "items": {"type": "string"}}, "summary": {"type": "string"}, "merged_items": {"type": "array"}, "conflicts": {"type": "array"}, "discarded_items": {"type": "array"}, "information_loss": {"type": "number"}, "preview_only": {"type": "boolean", "description": "true = read-only preview: returns preview_token, affected sources and rows that would be written; nothing is stored"}, "preview_token": {"type": "string", "description": "token from the matching preview; if the sources or inputs changed since then the write is refused with preview_stale"}}}},
+    {"name": "butian_dream_abstract", "description": "Abstract a pattern from multiple memories with applicability and failure conditions (preview_only first: it returns a preview_token that must be sent back to write)", "inputSchema": {"type": "object", "required": ["member_id", "memory_ids", "pattern"], "properties": {"member_id": {"type": "string"}, "memory_ids": {"type": "array", "items": {"type": "string"}}, "pattern": {"type": "string"}, "supports": {"type": "array"}, "counterexamples": {"type": "array"}, "applicability": {"type": "array"}, "failure_conditions": {"type": "array"}, "abstraction_level": {"type": "integer"}, "preview_only": {"type": "boolean", "description": "true = read-only preview: returns preview_token, affected sources and rows that would be written; nothing is stored"}, "preview_token": {"type": "string", "description": "token from the matching preview; if the sources or inputs changed since then the write is refused with preview_stale"}}}},
     {"name": "butian_dream_propose", "description": "Propose a hypothesis from a dream candidate with a prior reliability", "inputSchema": {"type": "object", "required": ["member_id", "candidate_id", "statement", "prior_reliability", "argument"], "properties": {"member_id": {"type": "string"}, "candidate_id": {"type": "string"}, "statement": {"type": "string"}, "prior_reliability": {"type": "number"}, "argument": {"type": "string"}, "evidence_refs": {"type": "array"}}}},
     {"name": "butian_dream_schedule", "description": "Schedule a verification action with cost, risk and information gain", "inputSchema": {"type": "object", "required": ["member_id", "hypothesis_id", "description", "cost", "risk", "expected_information_gain"], "properties": {"member_id": {"type": "string"}, "hypothesis_id": {"type": "string"}, "description": {"type": "string"}, "cost": {"type": "number"}, "risk": {"type": "number"}, "expected_information_gain": {"type": "number"}, "authorized": {"type": "boolean"}}}},
     {"name": "butian_dream_start", "description": "Start an explicitly authorized queued dream verification action", "inputSchema": {"type": "object", "required": ["member_id", "action_id"], "properties": {"member_id": {"type": "string"}, "action_id": {"type": "string"}}}},
@@ -408,7 +408,12 @@ def call_tool(service, name, args, state=None):
         return {"tools": [{"name": tool["name"], "description": tool["description"]} for tool in tools[offset:offset+limit]],
                 "total": len(tools), "next_offset": offset+limit if offset+limit < len(tools) else None}
     # Validate at the public boundary before dictionary indexing; never echo values.
-    validate_arguments(name, args, TOOLS)
+    _extra_accepted = ()
+    if name == 'butian_goal_submit':
+        # 问题模型字段允许写在顶层（AI 最自然的写法），不算未知参数。
+        from .runtime.problem import FIELDS as _PROBLEM_FIELDS
+        _extra_accepted = tuple(_PROBLEM_FIELDS)
+    validate_arguments(name, args, TOOLS, extra_accepted=_extra_accepted)
     try:
         return _call_tool(service, name, args, state)
     except OSError as exc:
@@ -424,6 +429,10 @@ def call_tool(service, name, args, state=None):
     except ValueError as exc:
         if isinstance(exc, ToolError):
             raise
+        from .runtime.preview_token import PreviewStale
+        if isinstance(exc, PreviewStale):
+            # 预览过期是可恢复的：带上当前令牌与重新预览的动作，别让调用方猜。
+            raise ToolError(exc.code, exc.details) from exc
         raise ToolError(str(exc), recovery_details(service, name, args, str(exc))) from exc
 
 
@@ -904,9 +913,9 @@ def _call_tool(service, name, args, state=None):
     if name == "butian_dream_run":
         return service.dream_run(args["member_id"], min_fragments=args.get("min_fragments", 3), min_interval=args.get("min_interval", 3600), budget=args.get("budget", 10), lock_timeout=args.get("lock_timeout", 7200))
     if name == "butian_dream_distill":
-        return service.dream_distill(args["member_id"], args["memory_ids"], summary=args["summary"], merged_items=args.get("merged_items"), conflicts=args.get("conflicts"), discarded_items=args.get("discarded_items"), information_loss=args.get("information_loss", 0.0))
+        return service.dream_distill(args["member_id"], args["memory_ids"], summary=args["summary"], merged_items=args.get("merged_items"), conflicts=args.get("conflicts"), discarded_items=args.get("discarded_items"), information_loss=args.get("information_loss", 0.0), preview_only=bool(args.get("preview_only")), preview_token=args.get("preview_token"))
     if name == "butian_dream_abstract":
-        return service.dream_abstract(args["member_id"], args["memory_ids"], pattern=args["pattern"], supports=args.get("supports"), counterexamples=args.get("counterexamples"), applicability=args.get("applicability"), failure_conditions=args.get("failure_conditions"), abstraction_level=args.get("abstraction_level", 1))
+        return service.dream_abstract(args["member_id"], args["memory_ids"], pattern=args["pattern"], supports=args.get("supports"), counterexamples=args.get("counterexamples"), applicability=args.get("applicability"), failure_conditions=args.get("failure_conditions"), abstraction_level=args.get("abstraction_level", 1), preview_only=bool(args.get("preview_only")), preview_token=args.get("preview_token"))
     if name == "butian_dream_propose":
         return service.dream_propose_hypothesis(args["member_id"], args["candidate_id"], args["statement"], prior_reliability=args["prior_reliability"], argument=args["argument"], evidence_refs=args.get("evidence_refs"))
     if name == "butian_dream_schedule":
@@ -928,7 +937,7 @@ TOOLS.extend([
     {"name": "butian_tools_catalog", "description": "Read a compact paginated tool catalog; filter with query or prefix; use butian_tool_schema for parameters", "inputSchema": {"type": "object", "properties": {"offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 30}, "prefix": {"type": "string"}, "query": {"type": "string", "description": "case-insensitive substring match on tool name or description"}}}},
 ])
 
-TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-only member permission, Provider configuration and task/reviewer readiness checks; never claims execution success", "inputSchema": {"type": "object", "properties": {key: {"type": "string"} for key in ("actor_member_id", "token", "member_id", "task_id")}}})
+TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-only member permission, Provider configuration and task/reviewer readiness checks; never claims execution success. Passing goal adds a local (evidence-ineligible) manual plan when no Provider is available", "inputSchema": {"type": "object", "properties": {**{key: {"type": "string"} for key in ("actor_member_id", "token", "member_id", "task_id", "goal")}, "acceptance_criteria": {"type": "array", "items": {"type": "string"}}}}})
 
 
 TOOLS_PAGE_SIZE = 8
@@ -963,8 +972,14 @@ def list_tools_page(cursor=None, limit=None):
         result["nextCursor"] = "tools:" + str(offset + size)
     return result
 
-TOOLS.append({"name": "butian_collaboration_start", "description": "Preflight then create, claim and start a Provider task for the authenticated member; blocked requests create no task; independent review remains required", "inputSchema": {"type": "object", "required": ["goal"], "properties": {"actor_member_id": {"type": "string", "description": "inherited from butian_connect when omitted"}, "token": {"type": "string", "description": "inherited from butian_connect; not required on local trust"}, "member_id": {"type": "string"}, "goal": {"type": "string"}, "problem": {"type": "object"}}}})
+TOOLS.append({"name": "butian_collaboration_start", "description": "Preflight then create, claim and start a Provider task for the authenticated member; blocked requests create no task; independent review remains required", "inputSchema": {"type": "object", "required": ["goal"], "properties": {"actor_member_id": {"type": "string", "description": "inherited from butian_connect when omitted"}, "token": {"type": "string", "description": "inherited from butian_connect; not required on local trust"}, "member_id": {"type": "string"}, "goal": {"type": "string"}, "acceptance_criteria": {"type": "array", "items": {"type": "string"}}, "problem": {"type": "object"}}}})
 
 TOOLS.append({"name": "butian_connect", "description": "Bind this connection to one member once; later calls inherit actor and, on local trust, need no token. Never guesses among multiple members", "inputSchema": {"type": "object", "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
 TOOLS.append({"name": "butian_context", "description": "One call returns current member, mode, visible tasks with revisions and the next legal action", "inputSchema": {"type": "object", "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
 TOOLS.append({"name": "butian_mode", "description": "Read or switch solo/team for upcoming goals without a session_id; running tasks are preserved", "inputSchema": {"type": "object", "properties": {"action": {"type": "string", "enum": ["get", "set"]}, "mode": {"type": "string", "enum": ["solo", "team"]}, "session_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
+
+# 对外契约收紧：未在 properties 里声明的顶层参数一律拒收。
+# 以前 schema 是开放对象，宿主机把 memberId 写成 member_id 之外的拼法时既不报错也不生效，
+# 于是“我设了”变成“状态没变”，看起来像系统坏了。
+for _tool in TOOLS:
+    _tool['inputSchema'].setdefault('additionalProperties', False)

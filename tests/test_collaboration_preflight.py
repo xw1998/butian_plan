@@ -77,3 +77,40 @@ def test_start_is_blocked_without_mutation(runtime):
     result = call_tool(service, 'butian_collaboration_start', dict(auth, member_id='analyst', goal='review', problem={'acceptance_criteria': ['review']}))
     assert result['status'] == 'blocked'
     assert service.store.list_tasks() == []
+
+def test_missing_provider_offers_local_plan_that_is_not_evidence(runtime):
+    service, auth = runtime
+    result = call_tool(service, 'butian_collaboration_preflight',
+                       dict(auth, goal='把回归跑通并修掉失败用例'))
+    assert 'provider_unavailable' in result['blockers']
+    plan = result['local_plan']
+    assert plan['mode'] == 'local' and plan['basis'] == 'keyword_rules'
+    # 降级计划绝不能进证据链，也不能被读成完成度。
+    assert plan['evidence_eligible'] is False
+    assert plan['not_a_substitute_for']
+    assert plan['warning']
+    assert {'defect_reproduction', 'verification'} <= set(plan['matched_rules'])
+    tools = [step.get('tool') for step in plan['steps'] if step.get('tool')]
+    assert tools[0] == 'butian_goal_submit'
+    assert tools[-2:] == ['butian_evidence_record', 'butian_task_handoff']
+    assert [step['step'] for step in plan['steps']] == list(range(1, len(plan['steps']) + 1))
+    # 只是脚本：不建任务、不动状态。
+    assert service.store.list_tasks() == []
+    assert 'local_plan' not in call_tool(service, 'butian_collaboration_preflight', auth)
+
+def test_local_plan_without_keywords_still_gives_the_generic_chain():
+    from butian.runtime.local_plan import plan
+    result = plan('整理一下', acceptance_criteria=['列出清单'])
+    assert result['matched_rules'] == []
+    assert len(result['steps']) == 4
+    assert result['steps'][0]['arguments']['acceptance_criteria'] == ['列出清单']
+
+def test_start_blocked_still_returns_a_local_plan(runtime):
+    service, auth = runtime
+    result = call_tool(service, 'butian_collaboration_start',
+                       dict(auth, goal='写一份接口文档',
+                            problem={'acceptance_criteria': ['文档能打开']}))
+    assert result['status'] == 'blocked' and not result['task_created']
+    assert result['local_plan']['basis'] == 'keyword_rules'
+    assert 'document_deliverable' in result['local_plan']['matched_rules']
+    assert service.store.list_tasks() == []

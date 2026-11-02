@@ -1,6 +1,7 @@
 """Read-only checks; configuration availability is not execution success."""
 from contextlib import closing
 import sqlite3
+from .local_plan import plan as local_plan
 
 
 def collaboration_preflight(service, args):
@@ -43,13 +44,19 @@ def collaboration_preflight(service, args):
         checks['task'] = {'status': 'unchecked', 'reason': 'task_id_required'}
         checks['independent_review'] = {'status': 'unchecked', 'reason': 'task_and_reviewer_execution_required'}
     blockers = [value.get('reason', key) for key, value in checks.items() if value['status'] == 'blocked']
-    return {'ready': False, 'configuration_ready': not blockers, 'execution_verified': False,
+    result = {'ready': False, 'configuration_ready': not blockers, 'execution_verified': False,
             'checks': checks, 'blockers': blockers,
             'next_actions': [{'action': 'configure_member_provider'}] if 'provider_unavailable' in blockers else
                             [{'tool': 'butian_tool_schema', 'arguments': {'name': 'butian_provider_start'}}],
             'remaining_verification': ['real_provider_execution', 'evidence_registration_and_hash_verification', 'independent_reviewer_execution'],
             'admin_only_operations': ['session_list', 'experiment_create'],
             'note': 'Read-only preflight does not create a task, start a Provider, grant access, or certify end-to-end readiness.'}
+    if 'provider_unavailable' in blockers and args.get('goal'):
+        # 没有执行后端时不再只回一句“不可用”：给一份可手动执行的本地步骤，
+        # 但它不是执行结果，也不进证据链（evidence_eligible=False）。
+        result['local_plan'] = local_plan(args['goal'], acceptance_criteria=args.get('acceptance_criteria'), member_id=actor)
+        result['local_plan_note'] = '本地降级只是人工执行脚本：任务能否完成仍取决于真的把事做完并登记证据。'
+    return result
 
 
 def collaboration_start(service, args):
@@ -61,7 +68,10 @@ def collaboration_start(service, args):
         return {'status': 'needs_clarification', 'task_created': False,
                 'clarification_questions': problem['clarification_questions'], 'preflight': report}
     if not report.get('configuration_ready'):
-        return {'status': 'blocked', 'task_created': False, 'preflight': report}
+        return {'status': 'blocked', 'task_created': False, 'preflight': report,
+                'local_plan': local_plan(args['goal'], acceptance_criteria=args.get('acceptance_criteria'),
+                                         member_id=args['actor_member_id']),
+                'local_plan_note': '执行后端不可用但事情仍可推进：按 local_plan 手动做完并登记证据，再交付；这份计划不算完成度。'}
     result = service.submit_goal(args['goal'], member_id=args['actor_member_id'],
                                  dispatcher_member_id=args['actor_member_id'], problem=args.get('problem'))
     return {'status': result.get('execution', {}).get('status', result.get('status', 'unknown')),
