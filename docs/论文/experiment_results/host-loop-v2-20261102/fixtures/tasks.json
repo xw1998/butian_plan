@@ -1,0 +1,1130 @@
+[
+  {
+    "round": 1,
+    "entity": "calibration000",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 6279,
+    "truth": 3.1385
+  },
+  {
+    "round": 2,
+    "entity": "calibration000",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 2711,
+    "truth": 1.3545
+  },
+  {
+    "round": 3,
+    "entity": "calibration000",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 2092,
+    "truth": 1.045
+  },
+  {
+    "round": 4,
+    "entity": "calibration000",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 6893,
+    "truth": 3.4455
+  },
+  {
+    "round": 1,
+    "entity": "calibration001",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 3425,
+    "truth": 27.208
+  },
+  {
+    "round": 2,
+    "entity": "calibration001",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 6739,
+    "truth": 53.72
+  },
+  {
+    "round": 3,
+    "entity": "calibration001",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 8552,
+    "truth": 68.224
+  },
+  {
+    "round": 4,
+    "entity": "calibration001",
+    "family": "calibration",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 7749,
+    "truth": 61.8
+  },
+  {
+    "round": 1,
+    "entity": "calibration002",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 1,
+    "stable": false,
+    "raw": 9904,
+    "truth": 39.516
+  },
+  {
+    "round": 2,
+    "entity": "calibration002",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 2,
+    "stable": false,
+    "raw": 9262,
+    "truth": 36.96
+  },
+  {
+    "round": 3,
+    "entity": "calibration002",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 3,
+    "stable": false,
+    "raw": 7349,
+    "truth": 7.331
+  },
+  {
+    "round": 4,
+    "entity": "calibration002",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 4,
+    "stable": false,
+    "raw": 3364,
+    "truth": 1.677
+  },
+  {
+    "round": 1,
+    "entity": "calibration003",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 1,
+    "stable": false,
+    "raw": 8309,
+    "truth": 4.144
+  },
+  {
+    "round": 2,
+    "entity": "calibration003",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 2,
+    "stable": false,
+    "raw": 1514,
+    "truth": 11.952
+  },
+  {
+    "round": 3,
+    "entity": "calibration003",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 3,
+    "stable": false,
+    "raw": 1307,
+    "truth": 10.232
+  },
+  {
+    "round": 4,
+    "entity": "calibration003",
+    "family": "calibration",
+    "group": "clean-drift",
+    "version": 4,
+    "stable": false,
+    "raw": 8988,
+    "truth": 4.482
+  },
+  {
+    "round": 1,
+    "entity": "calibration004",
+    "family": "calibration",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 7572,
+    "truth": 60.576
+  },
+  {
+    "round": 2,
+    "entity": "calibration004",
+    "family": "calibration",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 5987,
+    "truth": 47.896
+  },
+  {
+    "round": 3,
+    "entity": "calibration004",
+    "family": "calibration",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 9394,
+    "truth": 75.152
+  },
+  {
+    "round": 4,
+    "entity": "calibration004",
+    "family": "calibration",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 9028,
+    "truth": 72.224
+  },
+  {
+    "round": 1,
+    "entity": "calibration005",
+    "family": "calibration",
+    "group": "decoy-drift",
+    "version": 1,
+    "stable": false,
+    "raw": 9936,
+    "truth": 19.826
+  },
+  {
+    "round": 2,
+    "entity": "calibration005",
+    "family": "calibration",
+    "group": "decoy-drift",
+    "version": 2,
+    "stable": false,
+    "raw": 2056,
+    "truth": 4.06
+  },
+  {
+    "round": 3,
+    "entity": "calibration005",
+    "family": "calibration",
+    "group": "decoy-drift",
+    "version": 3,
+    "stable": false,
+    "raw": 3760,
+    "truth": 7.462
+  },
+  {
+    "round": 4,
+    "entity": "calibration005",
+    "family": "calibration",
+    "group": "decoy-drift",
+    "version": 4,
+    "stable": false,
+    "raw": 8330,
+    "truth": 16.596
+  },
+  {
+    "round": 1,
+    "entity": "schema000",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 1623,
+      "f2": 4815,
+      "f3": 9232,
+      "f4": 8548,
+      "h1": 8728,
+      "h2": 7149,
+      "h3": 2038,
+      "h4": 4693
+    },
+    "truth": {
+      "flow": 1.623,
+      "level": 8.728
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema000",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 9324,
+      "f2": 2593,
+      "f3": 4447,
+      "f4": 5280,
+      "h1": 1956,
+      "h2": 7844,
+      "h3": 378,
+      "h4": 8063
+    },
+    "truth": {
+      "flow": 9.324,
+      "level": 1.956
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema000",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 2667,
+      "f2": 5705,
+      "f3": 5618,
+      "f4": 8650,
+      "h1": 7126,
+      "h2": 2249,
+      "h3": 6633,
+      "h4": 1432
+    },
+    "truth": {
+      "flow": 2.667,
+      "level": 7.126
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema000",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 3762,
+      "f2": 7240,
+      "f3": 6864,
+      "f4": 4470,
+      "h1": 4342,
+      "h2": 59,
+      "h3": 4390,
+      "h4": 4926
+    },
+    "truth": {
+      "flow": 3.762,
+      "level": 4.342
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema001",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 2672,
+      "f2": 4298,
+      "f3": 2420,
+      "f4": 4204,
+      "h1": 7512,
+      "h2": 8157,
+      "h3": 8233,
+      "h4": 8149
+    },
+    "truth": {
+      "flow": 267.2,
+      "level": 751.2
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema001",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 1034,
+      "f2": 1506,
+      "f3": 1698,
+      "f4": 9965,
+      "h1": 2279,
+      "h2": 3665,
+      "h3": 2986,
+      "h4": 2892
+    },
+    "truth": {
+      "flow": 103.4,
+      "level": 227.9
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema001",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 5483,
+      "f2": 3043,
+      "f3": 2628,
+      "f4": 7236,
+      "h1": 6254,
+      "h2": 757,
+      "h3": 6096,
+      "h4": 5441
+    },
+    "truth": {
+      "flow": 548.3,
+      "level": 625.4
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema001",
+    "family": "schema",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 2137,
+      "f2": 4828,
+      "f3": 8903,
+      "f4": 6798,
+      "h1": 8671,
+      "h2": 4673,
+      "h3": 7706,
+      "h4": 7102
+    },
+    "truth": {
+      "flow": 213.7,
+      "level": 867.1
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema002",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 1,
+    "stable": false,
+    "payload": {
+      "f1": 7091,
+      "f2": 9020,
+      "f3": 7938,
+      "f4": 7182,
+      "h1": 7529,
+      "h2": 609,
+      "h3": 8288,
+      "h4": 785
+    },
+    "truth": {
+      "flow": 70.91,
+      "level": 75.29
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema002",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 2,
+    "stable": false,
+    "payload": {
+      "f1": 6562,
+      "f2": 1026,
+      "f3": 1259,
+      "f4": 9253,
+      "h1": 272,
+      "h2": 7747,
+      "h3": 3212,
+      "h4": 5062
+    },
+    "truth": {
+      "flow": 10.26,
+      "level": 77.47
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema002",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 3,
+    "stable": false,
+    "payload": {
+      "f1": 9696,
+      "f2": 6265,
+      "f3": 2039,
+      "f4": 6258,
+      "h1": 6207,
+      "h2": 3700,
+      "h3": 398,
+      "h4": 1353
+    },
+    "truth": {
+      "flow": 20.39,
+      "level": 3.98
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema002",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 4,
+    "stable": false,
+    "payload": {
+      "f1": 99,
+      "f2": 9221,
+      "f3": 5234,
+      "f4": 5715,
+      "h1": 9475,
+      "h2": 7338,
+      "h3": 5816,
+      "h4": 4403
+    },
+    "truth": {
+      "flow": 571.5,
+      "level": 440.3
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema003",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 1,
+    "stable": false,
+    "payload": {
+      "f1": 8404,
+      "f2": 3406,
+      "f3": 5549,
+      "f4": 8181,
+      "h1": 1601,
+      "h2": 7055,
+      "h3": 8348,
+      "h4": 5097
+    },
+    "truth": {
+      "flow": 84.04,
+      "level": 16.01
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema003",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 2,
+    "stable": false,
+    "payload": {
+      "f1": 3402,
+      "f2": 3294,
+      "f3": 9588,
+      "f4": 6620,
+      "h1": 8480,
+      "h2": 4515,
+      "h3": 6115,
+      "h4": 5101
+    },
+    "truth": {
+      "flow": 3.294,
+      "level": 4.515
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema003",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 3,
+    "stable": false,
+    "payload": {
+      "f1": 1785,
+      "f2": 4652,
+      "f3": 2492,
+      "f4": 5414,
+      "h1": 3726,
+      "h2": 3275,
+      "h3": 1608,
+      "h4": 7653
+    },
+    "truth": {
+      "flow": 24.92,
+      "level": 16.08
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema003",
+    "family": "schema",
+    "group": "clean-drift",
+    "version": 4,
+    "stable": false,
+    "payload": {
+      "f1": 952,
+      "f2": 7176,
+      "f3": 5674,
+      "f4": 862,
+      "h1": 5982,
+      "h2": 7590,
+      "h3": 5585,
+      "h4": 9816
+    },
+    "truth": {
+      "flow": 86.2,
+      "level": 981.6
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema004",
+    "family": "schema",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 8080,
+      "f2": 7097,
+      "f3": 544,
+      "f4": 1168,
+      "h1": 99,
+      "h2": 9116,
+      "h3": 4630,
+      "h4": 2730
+    },
+    "truth": {
+      "flow": 80.8,
+      "level": 0.99
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema004",
+    "family": "schema",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 8367,
+      "f2": 2597,
+      "f3": 2379,
+      "f4": 8709,
+      "h1": 5338,
+      "h2": 6142,
+      "h3": 7374,
+      "h4": 2369
+    },
+    "truth": {
+      "flow": 83.67,
+      "level": 53.38
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema004",
+    "family": "schema",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 5778,
+      "f2": 4691,
+      "f3": 8190,
+      "f4": 7290,
+      "h1": 9326,
+      "h2": 3525,
+      "h3": 6545,
+      "h4": 6546
+    },
+    "truth": {
+      "flow": 57.78,
+      "level": 93.26
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema004",
+    "family": "schema",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 6775,
+      "f2": 7107,
+      "f3": 1717,
+      "f4": 6930,
+      "h1": 1218,
+      "h2": 4678,
+      "h3": 3152,
+      "h4": 7144
+    },
+    "truth": {
+      "flow": 67.75,
+      "level": 12.18
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema005",
+    "family": "schema",
+    "group": "decoy-drift",
+    "version": 1,
+    "stable": false,
+    "payload": {
+      "f1": 8283,
+      "f2": 7018,
+      "f3": 2133,
+      "f4": 2936,
+      "h1": 601,
+      "h2": 6687,
+      "h3": 5435,
+      "h4": 2279
+    },
+    "truth": {
+      "flow": 82.83,
+      "level": 6.01
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema005",
+    "family": "schema",
+    "group": "decoy-drift",
+    "version": 2,
+    "stable": false,
+    "payload": {
+      "f1": 46,
+      "f2": 5946,
+      "f3": 4283,
+      "f4": 4424,
+      "h1": 9423,
+      "h2": 6527,
+      "h3": 6659,
+      "h4": 3100
+    },
+    "truth": {
+      "flow": 0.44660194174757284,
+      "level": 91.48543689320388
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema005",
+    "family": "schema",
+    "group": "decoy-drift",
+    "version": 3,
+    "stable": false,
+    "payload": {
+      "f1": 5458,
+      "f2": 5017,
+      "f3": 8327,
+      "f4": 3203,
+      "h1": 3861,
+      "h2": 8288,
+      "h3": 5533,
+      "h4": 9443
+    },
+    "truth": {
+      "flow": 51.490566037735846,
+      "level": 36.424528301886795
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema005",
+    "family": "schema",
+    "group": "decoy-drift",
+    "version": 4,
+    "stable": false,
+    "payload": {
+      "f1": 5404,
+      "f2": 3862,
+      "f3": 819,
+      "f4": 3540,
+      "h1": 6038,
+      "h2": 1534,
+      "h3": 3929,
+      "h4": 38
+    },
+    "truth": {
+      "flow": 49.57798165137615,
+      "level": 55.39449541284404
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool000",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 88,
+    "truth": {
+      "endpoint": "/api/v1/tool000",
+      "kwargs": {
+        "limit_v1": 8800
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool000",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 85,
+    "truth": {
+      "endpoint": "/api/v1/tool000",
+      "kwargs": {
+        "limit_v1": 8500
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool000",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 29,
+    "truth": {
+      "endpoint": "/api/v1/tool000",
+      "kwargs": {
+        "limit_v1": 2900
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool000",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 57,
+    "truth": {
+      "endpoint": "/api/v1/tool000",
+      "kwargs": {
+        "limit_v1": 5700
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool001",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 88,
+    "truth": {
+      "endpoint": "/api/v1/tool001",
+      "kwargs": {
+        "limit_v1": 88000
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool001",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 92,
+    "truth": {
+      "endpoint": "/api/v1/tool001",
+      "kwargs": {
+        "limit_v1": 92000
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool001",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 45,
+    "truth": {
+      "endpoint": "/api/v1/tool001",
+      "kwargs": {
+        "limit_v1": 45000
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool001",
+    "family": "tool",
+    "group": "clean-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 89,
+    "truth": {
+      "endpoint": "/api/v1/tool001",
+      "kwargs": {
+        "limit_v1": 89000
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool002",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 1,
+    "stable": false,
+    "raw": 14,
+    "truth": {
+      "endpoint": "/api/v1/tool002",
+      "kwargs": {
+        "limit_v1": 14000
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool002",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 2,
+    "stable": false,
+    "raw": 17,
+    "truth": {
+      "endpoint": "/api/v2/tool002",
+      "kwargs": {
+        "limit_v2": 17000
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool002",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 3,
+    "stable": false,
+    "raw": 60,
+    "truth": {
+      "endpoint": "/api/v3/tool002",
+      "kwargs": {
+        "limit_v3": 600
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool002",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 4,
+    "stable": false,
+    "raw": 81,
+    "truth": {
+      "endpoint": "/api/v4/tool002",
+      "kwargs": {
+        "limit_v4": 81000
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool003",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 1,
+    "stable": false,
+    "raw": 53,
+    "truth": {
+      "endpoint": "/api/v1/tool003",
+      "kwargs": {
+        "limit_v1": 5300
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool003",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 2,
+    "stable": false,
+    "raw": 20,
+    "truth": {
+      "endpoint": "/api/v2/tool003",
+      "kwargs": {
+        "limit_v2": 200
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool003",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 3,
+    "stable": false,
+    "raw": 20,
+    "truth": {
+      "endpoint": "/api/v3/tool003",
+      "kwargs": {
+        "limit_v3": 20000
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool003",
+    "family": "tool",
+    "group": "clean-drift",
+    "version": 4,
+    "stable": false,
+    "raw": 16,
+    "truth": {
+      "endpoint": "/api/v4/tool003",
+      "kwargs": {
+        "limit_v4": 160
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool004",
+    "family": "tool",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 50,
+    "truth": {
+      "endpoint": "/api/v1/tool004",
+      "kwargs": {
+        "limit_v1": 500
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool004",
+    "family": "tool",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 83,
+    "truth": {
+      "endpoint": "/api/v1/tool004",
+      "kwargs": {
+        "limit_v1": 830
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool004",
+    "family": "tool",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 12,
+    "truth": {
+      "endpoint": "/api/v1/tool004",
+      "kwargs": {
+        "limit_v1": 120
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool004",
+    "family": "tool",
+    "group": "poison-stable",
+    "version": 1,
+    "stable": true,
+    "raw": 52,
+    "truth": {
+      "endpoint": "/api/v1/tool004",
+      "kwargs": {
+        "limit_v1": 520
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool005",
+    "family": "tool",
+    "group": "decoy-drift",
+    "version": 1,
+    "stable": false,
+    "raw": 92,
+    "truth": {
+      "endpoint": "/api/legacy/tool005",
+      "kwargs": {
+        "limit": 9200
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool005",
+    "family": "tool",
+    "group": "decoy-drift",
+    "version": 2,
+    "stable": false,
+    "raw": 96,
+    "truth": {
+      "endpoint": "/api/legacy/tool005",
+      "kwargs": {
+        "limit": 9888
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool005",
+    "family": "tool",
+    "group": "decoy-drift",
+    "version": 3,
+    "stable": false,
+    "raw": 31,
+    "truth": {
+      "endpoint": "/api/legacy/tool005",
+      "kwargs": {
+        "limit": 3286
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool005",
+    "family": "tool",
+    "group": "decoy-drift",
+    "version": 4,
+    "stable": false,
+    "raw": 64,
+    "truth": {
+      "endpoint": "/api/legacy/tool005",
+      "kwargs": {
+        "limit": 6976
+      }
+    }
+  }
+]

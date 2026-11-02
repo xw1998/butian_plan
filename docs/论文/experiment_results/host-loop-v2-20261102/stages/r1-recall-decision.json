@@ -1,0 +1,95 @@
+{
+  "calibration000": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "calibration001": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "calibration002": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "calibration003": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "calibration004": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "calibration004-v1",
+    "why": "warm memory matches entity and version"
+  },
+  "calibration005": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "schema000": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "schema001": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "schema002": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "schema003": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "schema004": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "schema004-v1",
+    "why": "warm memory matches entity and version"
+  },
+  "schema005": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "tool000": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "tool001": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "tool002": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "tool003": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  },
+  "tool004": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "tool004-v1",
+    "why": "warm memory matches entity and version"
+  },
+  "tool005": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no memory for this entity"
+  }
+}

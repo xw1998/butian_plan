@@ -1,0 +1,2504 @@
+{
+  "execution_kind": "real_host_multiround_loop_stress",
+  "protocol": "host-loop-v2",
+  "host_kind": "real_model_current_conversation",
+  "llm_inference_calls": "unmetered: host is the conversational model, calls not instrumented",
+  "model_weights_changed": false,
+  "rounds": 4,
+  "entities_per_family": 6,
+  "total_answers": 72,
+  "by_round": {
+    "r1-clean-stable": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 6,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r1-clean-drift": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 6,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r1-decoy-drift": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r1-poison-stable": {
+      "n": 3,
+      "correct": 0,
+      "wrong": 3,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 3,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 3
+    },
+    "r2-clean-stable": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 6,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r2-clean-drift": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 6,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r2-decoy-drift": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r2-poison-stable": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r3-clean-stable": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 6,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r3-clean-drift": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 6,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r3-decoy-drift": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r3-poison-stable": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r4-clean-stable": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 0,
+      "experience_basis": 6,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r4-clean-drift": {
+      "n": 6,
+      "correct": 6,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 6,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r4-decoy-drift": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    },
+    "r4-poison-stable": {
+      "n": 3,
+      "correct": 3,
+      "wrong": 0,
+      "unknown": 0,
+      "reads": 3,
+      "experience_basis": 0,
+      "stale_version_errors": 0,
+      "poisoned_reuse": 0
+    }
+  },
+  "criteria": {
+    "N1_clean_reuse_holds": true,
+    "N2_version_gate_under_decoy": true,
+    "N3_poison_recovery_fast": true,
+    "N4_degradation_visible_and_used": true,
+    "N5_behaviour_auditable": true
+  },
+  "all_criteria_met": true,
+  "poison_recovery": {
+    "calibration004": {
+      "first_wrong_round": 1,
+      "recovered_round": 2,
+      "read_rounds": [
+        2,
+        3,
+        4
+      ],
+      "all_after_ok": true
+    },
+    "schema004": {
+      "first_wrong_round": 1,
+      "recovered_round": 2,
+      "read_rounds": [
+        2,
+        3,
+        4
+      ],
+      "all_after_ok": true
+    },
+    "tool004": {
+      "first_wrong_round": 1,
+      "recovered_round": 2,
+      "read_rounds": [
+        2,
+        3,
+        4
+      ],
+      "all_after_ok": true
+    }
+  },
+  "n5_violations": [],
+  "recall_limit": 100,
+  "channel_notes": [
+    "butian_memory_recall 只做子串模糊匹配（查询按二字组命中，再按状态/权重/更新时间排序），没有按实体或标签的结构化过滤；宿主用 limit=100 取回全部记忆后自行按内容里的 entity/version 过滤。",
+    "记忆内容只在创建时写入：record_practice_outcome 不会修改已有记忆的 content，因此被写坏的内容无法通过后续成功实践纠正（只能降级 status），这一点在 poison-stable 上被直接观测到。"
+  ],
+  "limitations": [
+    "宿主同时是实验设计者，非盲；v2 更重，因为宿主知道有坏经验组",
+    "单宿主、单次运行，不能跨模型外推，不报告 p 值",
+    "坏经验是 harness 直接注入的（带两份伪造证据），不是真实历史事故",
+    "任务仍是契约化合成任务，真值来自 solve()",
+    "不测量 token 成本与延迟，不声称模型参数变化"
+  ],
+  "rows": [
+    {
+      "round": 1,
+      "entity": "calibration000",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 3.1385,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration000",
+          "version": 1,
+          "offset": 2,
+          "scale": 2000
+        }
+      },
+      "truth": 3.1385,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration001",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 27.208,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration001",
+          "version": 1,
+          "offset": 24,
+          "scale": 125
+        }
+      },
+      "truth": 27.208,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration002",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 39.516,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration002",
+          "version": 1,
+          "offset": 25,
+          "scale": 250
+        }
+      },
+      "truth": 39.516,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration003",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 4.144,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration003",
+          "version": 1,
+          "offset": 21,
+          "scale": 2000
+        }
+      },
+      "truth": 4.144,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration004",
+      "family": "calibration",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "stale_version_error": false,
+      "poisoned_reuse": true,
+      "status_before": "warm",
+      "answer": {
+        "value": 60.28,
+        "basis": "experience",
+        "from_memory": "calibration004-v1",
+        "rule_used": {
+          "entity": "calibration004",
+          "version": 1,
+          "offset": 37,
+          "scale": 125
+        }
+      },
+      "truth": 60.576,
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "calibration005",
+      "family": "calibration",
+      "group": "decoy-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 19.826,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration005",
+          "version": 1,
+          "offset": 23,
+          "scale": 500
+        }
+      },
+      "truth": 19.826,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema000",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 1.623,
+        "level": 8.728,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema000",
+          "version": 1,
+          "divisor": 1000,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 1.623,
+        "level": 8.728
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema001",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 267.2,
+        "level": 751.2,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema001",
+          "version": 1,
+          "divisor": 10,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 267.2,
+        "level": 751.2
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema002",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 70.91,
+        "level": 75.29,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema002",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 70.91,
+        "level": 75.29
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema003",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 84.04,
+        "level": 16.01,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema003",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 84.04,
+        "level": 16.01
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema004",
+      "family": "schema",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "stale_version_error": false,
+      "poisoned_reuse": true,
+      "status_before": "warm",
+      "answer": {
+        "flow": 75.51401869158879,
+        "level": 0.9252336448598131,
+        "basis": "experience",
+        "from_memory": "schema004-v1",
+        "rule_used": {
+          "entity": "schema004",
+          "version": 1,
+          "divisor": 107,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 80.8,
+        "level": 0.99
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "schema005",
+      "family": "schema",
+      "group": "decoy-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 82.83,
+        "level": 6.01,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema005",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 82.83,
+        "level": 6.01
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool000",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool000",
+        "parameter": "limit_v1",
+        "value": 8800,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool000",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/v1/tool000",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool000",
+        "kwargs": {
+          "limit_v1": 8800
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool001",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 88000,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool001",
+          "version": 1,
+          "factor": 1000,
+          "endpoint": "/api/v1/tool001",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 88000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool002",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool002",
+        "parameter": "limit_v1",
+        "value": 14000,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool002",
+          "version": 1,
+          "factor": 1000,
+          "endpoint": "/api/v1/tool002",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool002",
+        "kwargs": {
+          "limit_v1": 14000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool003",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool003",
+        "parameter": "limit_v1",
+        "value": 5300,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool003",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/v1/tool003",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool003",
+        "kwargs": {
+          "limit_v1": 5300
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool004",
+      "family": "tool",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "stale_version_error": false,
+      "poisoned_reuse": true,
+      "status_before": "warm",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 850,
+        "basis": "experience",
+        "from_memory": "tool004-v1",
+        "rule_used": {
+          "entity": "tool004",
+          "version": 1,
+          "factor": 17,
+          "endpoint": "/api/v1/tool004",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 500
+        }
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "tool005",
+      "family": "tool",
+      "group": "decoy-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/legacy/tool005",
+        "parameter": "limit",
+        "value": 9200,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool005",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/legacy/tool005",
+          "parameter": "limit"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/legacy/tool005",
+        "kwargs": {
+          "limit": 9200
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "calibration000",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "candidate",
+      "answer": {
+        "value": 1.3545,
+        "basis": "experience",
+        "from_memory": "calibration000-v1",
+        "rule_used": {
+          "entity": "calibration000",
+          "version": 1,
+          "offset": 2,
+          "scale": 2000
+        }
+      },
+      "truth": 1.3545,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "calibration001",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "candidate",
+      "answer": {
+        "value": 53.72,
+        "basis": "experience",
+        "from_memory": "calibration001-v1",
+        "rule_used": {
+          "entity": "calibration001",
+          "version": 1,
+          "offset": 24,
+          "scale": 125
+        }
+      },
+      "truth": 53.72,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "calibration002",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 36.96,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration002",
+          "version": 2,
+          "offset": 22,
+          "scale": 250
+        }
+      },
+      "truth": 36.96,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "calibration003",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 11.952,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration003",
+          "version": 2,
+          "offset": 20,
+          "scale": 125
+        }
+      },
+      "truth": 11.952,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "calibration004",
+      "family": "calibration",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "value": 47.896,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration004",
+          "version": 1,
+          "offset": 0,
+          "scale": 125
+        }
+      },
+      "truth": 47.896,
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "calibration005",
+      "family": "calibration",
+      "group": "decoy-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 4.06,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration005",
+          "version": 2,
+          "offset": 26,
+          "scale": 500
+        }
+      },
+      "truth": 4.06,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "schema000",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "candidate",
+      "answer": {
+        "flow": 9.324,
+        "level": 1.956,
+        "basis": "experience",
+        "from_memory": "schema000-v1",
+        "rule_used": {
+          "entity": "schema000",
+          "version": 1,
+          "divisor": 1000,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 9.324,
+        "level": 1.956
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "schema001",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "candidate",
+      "answer": {
+        "flow": 103.4,
+        "level": 227.9,
+        "basis": "experience",
+        "from_memory": "schema001-v1",
+        "rule_used": {
+          "entity": "schema001",
+          "version": 1,
+          "divisor": 10,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 103.4,
+        "level": 227.9
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "schema002",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 10.26,
+        "level": 77.47,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema002",
+          "version": 2,
+          "divisor": 100,
+          "flow_field": "f2",
+          "level_field": "h2"
+        }
+      },
+      "truth": {
+        "flow": 10.26,
+        "level": 77.47
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "schema003",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 3.294,
+        "level": 4.515,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema003",
+          "version": 2,
+          "divisor": 1000,
+          "flow_field": "f2",
+          "level_field": "h2"
+        }
+      },
+      "truth": {
+        "flow": 3.294,
+        "level": 4.515
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "schema004",
+      "family": "schema",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "flow": 83.67,
+        "level": 53.38,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema004",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 83.67,
+        "level": 53.38
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "schema005",
+      "family": "schema",
+      "group": "decoy-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 0.44660194174757284,
+        "level": 91.48543689320388,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema005",
+          "version": 2,
+          "divisor": 103,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 0.44660194174757284,
+        "level": 91.48543689320388
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "tool000",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "candidate",
+      "answer": {
+        "endpoint": "/api/v1/tool000",
+        "parameter": "limit_v1",
+        "value": 8500,
+        "basis": "experience",
+        "from_memory": "tool000-v1",
+        "rule_used": {
+          "entity": "tool000",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/v1/tool000",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool000",
+        "kwargs": {
+          "limit_v1": 8500
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "tool001",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "candidate",
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 92000,
+        "basis": "experience",
+        "from_memory": "tool001-v1",
+        "rule_used": {
+          "entity": "tool001",
+          "version": 1,
+          "factor": 1000,
+          "endpoint": "/api/v1/tool001",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 92000
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 2,
+      "entity": "tool002",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v2/tool002",
+        "parameter": "limit_v2",
+        "value": 17000,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool002",
+          "version": 2,
+          "factor": 1000,
+          "endpoint": "/api/v2/tool002",
+          "parameter": "limit_v2"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool002",
+        "kwargs": {
+          "limit_v2": 17000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "tool003",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v2/tool003",
+        "parameter": "limit_v2",
+        "value": 200,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool003",
+          "version": 2,
+          "factor": 10,
+          "endpoint": "/api/v2/tool003",
+          "parameter": "limit_v2"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool003",
+        "kwargs": {
+          "limit_v2": 200
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 2,
+      "entity": "tool004",
+      "family": "tool",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 830,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool004",
+          "version": 1,
+          "factor": 10,
+          "endpoint": "/api/v1/tool004",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 830
+        }
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 2,
+      "entity": "tool005",
+      "family": "tool",
+      "group": "decoy-drift",
+      "version": 2,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/legacy/tool005",
+        "parameter": "limit",
+        "value": 9888,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool005",
+          "version": 2,
+          "factor": 103,
+          "endpoint": "/api/legacy/tool005",
+          "parameter": "limit"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/legacy/tool005",
+        "kwargs": {
+          "limit": 9888
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "calibration000",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "value": 1.045,
+        "basis": "experience",
+        "from_memory": "calibration000-v1",
+        "rule_used": {
+          "entity": "calibration000",
+          "version": 1,
+          "offset": 2,
+          "scale": 2000
+        }
+      },
+      "truth": 1.045,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "calibration001",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "value": 68.224,
+        "basis": "experience",
+        "from_memory": "calibration001-v1",
+        "rule_used": {
+          "entity": "calibration001",
+          "version": 1,
+          "offset": 24,
+          "scale": 125
+        }
+      },
+      "truth": 68.224,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "calibration002",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 7.331,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration002",
+          "version": 3,
+          "offset": 18,
+          "scale": 1000
+        }
+      },
+      "truth": 7.331,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "calibration003",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 10.232,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration003",
+          "version": 3,
+          "offset": 28,
+          "scale": 125
+        }
+      },
+      "truth": 10.232,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "calibration004",
+      "family": "calibration",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "value": 75.152,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration004",
+          "version": 1,
+          "offset": 0,
+          "scale": 125
+        }
+      },
+      "truth": 75.152,
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 3,
+      "entity": "calibration005",
+      "family": "calibration",
+      "group": "decoy-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 7.462,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration005",
+          "version": 3,
+          "offset": 29,
+          "scale": 500
+        }
+      },
+      "truth": 7.462,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "schema000",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "flow": 2.667,
+        "level": 7.126,
+        "basis": "experience",
+        "from_memory": "schema000-v1",
+        "rule_used": {
+          "entity": "schema000",
+          "version": 1,
+          "divisor": 1000,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 2.667,
+        "level": 7.126
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "schema001",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "flow": 548.3,
+        "level": 625.4,
+        "basis": "experience",
+        "from_memory": "schema001-v1",
+        "rule_used": {
+          "entity": "schema001",
+          "version": 1,
+          "divisor": 10,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 548.3,
+        "level": 625.4
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "schema002",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 20.39,
+        "level": 3.98,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema002",
+          "version": 3,
+          "divisor": 100,
+          "flow_field": "f3",
+          "level_field": "h3"
+        }
+      },
+      "truth": {
+        "flow": 20.39,
+        "level": 3.98
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "schema003",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 24.92,
+        "level": 16.08,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema003",
+          "version": 3,
+          "divisor": 100,
+          "flow_field": "f3",
+          "level_field": "h3"
+        }
+      },
+      "truth": {
+        "flow": 24.92,
+        "level": 16.08
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "schema004",
+      "family": "schema",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "flow": 57.78,
+        "level": 93.26,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema004",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 57.78,
+        "level": 93.26
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 3,
+      "entity": "schema005",
+      "family": "schema",
+      "group": "decoy-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 51.490566037735846,
+        "level": 36.424528301886795,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema005",
+          "version": 3,
+          "divisor": 106,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 51.490566037735846,
+        "level": 36.424528301886795
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "tool000",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "endpoint": "/api/v1/tool000",
+        "parameter": "limit_v1",
+        "value": 2900,
+        "basis": "experience",
+        "from_memory": "tool000-v1",
+        "rule_used": {
+          "entity": "tool000",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/v1/tool000",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool000",
+        "kwargs": {
+          "limit_v1": 2900
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "tool001",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 45000,
+        "basis": "experience",
+        "from_memory": "tool001-v1",
+        "rule_used": {
+          "entity": "tool001",
+          "version": 1,
+          "factor": 1000,
+          "endpoint": "/api/v1/tool001",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 45000
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 3,
+      "entity": "tool002",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v3/tool002",
+        "parameter": "limit_v3",
+        "value": 600,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool002",
+          "version": 3,
+          "factor": 10,
+          "endpoint": "/api/v3/tool002",
+          "parameter": "limit_v3"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v3/tool002",
+        "kwargs": {
+          "limit_v3": 600
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "tool003",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v3/tool003",
+        "parameter": "limit_v3",
+        "value": 20000,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool003",
+          "version": 3,
+          "factor": 1000,
+          "endpoint": "/api/v3/tool003",
+          "parameter": "limit_v3"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v3/tool003",
+        "kwargs": {
+          "limit_v3": 20000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 3,
+      "entity": "tool004",
+      "family": "tool",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 120,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool004",
+          "version": 1,
+          "factor": 10,
+          "endpoint": "/api/v1/tool004",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 120
+        }
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 3,
+      "entity": "tool005",
+      "family": "tool",
+      "group": "decoy-drift",
+      "version": 3,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/legacy/tool005",
+        "parameter": "limit",
+        "value": 3286,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool005",
+          "version": 3,
+          "factor": 106,
+          "endpoint": "/api/legacy/tool005",
+          "parameter": "limit"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/legacy/tool005",
+        "kwargs": {
+          "limit": 3286
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "calibration000",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "value": 3.4455,
+        "basis": "experience",
+        "from_memory": "calibration000-v1",
+        "rule_used": {
+          "entity": "calibration000",
+          "version": 1,
+          "offset": 2,
+          "scale": 2000
+        }
+      },
+      "truth": 3.4455,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "calibration001",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "value": 61.8,
+        "basis": "experience",
+        "from_memory": "calibration001-v1",
+        "rule_used": {
+          "entity": "calibration001",
+          "version": 1,
+          "offset": 24,
+          "scale": 125
+        }
+      },
+      "truth": 61.8,
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "calibration002",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 1.677,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration002",
+          "version": 4,
+          "offset": 10,
+          "scale": 2000
+        }
+      },
+      "truth": 1.677,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "calibration003",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 4.482,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration003",
+          "version": 4,
+          "offset": 24,
+          "scale": 2000
+        }
+      },
+      "truth": 4.482,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "calibration004",
+      "family": "calibration",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "value": 72.224,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration004",
+          "version": 1,
+          "offset": 0,
+          "scale": 125
+        }
+      },
+      "truth": 72.224,
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "calibration005",
+      "family": "calibration",
+      "group": "decoy-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 16.596,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration005",
+          "version": 4,
+          "offset": 32,
+          "scale": 500
+        }
+      },
+      "truth": 16.596,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "schema000",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "flow": 3.762,
+        "level": 4.342,
+        "basis": "experience",
+        "from_memory": "schema000-v1",
+        "rule_used": {
+          "entity": "schema000",
+          "version": 1,
+          "divisor": 1000,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 3.762,
+        "level": 4.342
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "schema001",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "flow": 213.7,
+        "level": 867.1,
+        "basis": "experience",
+        "from_memory": "schema001-v1",
+        "rule_used": {
+          "entity": "schema001",
+          "version": 1,
+          "divisor": 10,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 213.7,
+        "level": 867.1
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "schema002",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 571.5,
+        "level": 440.3,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema002",
+          "version": 4,
+          "divisor": 10,
+          "flow_field": "f4",
+          "level_field": "h4"
+        }
+      },
+      "truth": {
+        "flow": 571.5,
+        "level": 440.3
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "schema003",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 86.2,
+        "level": 981.6,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema003",
+          "version": 4,
+          "divisor": 10,
+          "flow_field": "f4",
+          "level_field": "h4"
+        }
+      },
+      "truth": {
+        "flow": 86.2,
+        "level": 981.6
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "schema004",
+      "family": "schema",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "flow": 67.75,
+        "level": 12.18,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema004",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 67.75,
+        "level": 12.18
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "schema005",
+      "family": "schema",
+      "group": "decoy-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 49.57798165137615,
+        "level": 55.39449541284404,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema005",
+          "version": 4,
+          "divisor": 109,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 49.57798165137615,
+        "level": 55.39449541284404
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "tool000",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "endpoint": "/api/v1/tool000",
+        "parameter": "limit_v1",
+        "value": 5700,
+        "basis": "experience",
+        "from_memory": "tool000-v1",
+        "rule_used": {
+          "entity": "tool000",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/v1/tool000",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool000",
+        "kwargs": {
+          "limit_v1": 5700
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "tool001",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "warm",
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 89000,
+        "basis": "experience",
+        "from_memory": "tool001-v1",
+        "rule_used": {
+          "entity": "tool001",
+          "version": 1,
+          "factor": 1000,
+          "endpoint": "/api/v1/tool001",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 89000
+        }
+      },
+      "memory_status": "warm",
+      "status_after": "warm"
+    },
+    {
+      "round": 4,
+      "entity": "tool002",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v4/tool002",
+        "parameter": "limit_v4",
+        "value": 81000,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool002",
+          "version": 4,
+          "factor": 1000,
+          "endpoint": "/api/v4/tool002",
+          "parameter": "limit_v4"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v4/tool002",
+        "kwargs": {
+          "limit_v4": 81000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "tool003",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v4/tool003",
+        "parameter": "limit_v4",
+        "value": 160,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool003",
+          "version": 4,
+          "factor": 10,
+          "endpoint": "/api/v4/tool003",
+          "parameter": "limit_v4"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v4/tool003",
+        "kwargs": {
+          "limit_v4": 160
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 4,
+      "entity": "tool004",
+      "family": "tool",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": "disputed",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 520,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool004",
+          "version": 1,
+          "factor": 10,
+          "endpoint": "/api/v1/tool004",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 520
+        }
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 4,
+      "entity": "tool005",
+      "family": "tool",
+      "group": "decoy-drift",
+      "version": 4,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/legacy/tool005",
+        "parameter": "limit",
+        "value": 6976,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool005",
+          "version": 4,
+          "factor": 109,
+          "endpoint": "/api/legacy/tool005",
+          "parameter": "limit"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/legacy/tool005",
+        "kwargs": {
+          "limit": 6976
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    }
+  ]
+}

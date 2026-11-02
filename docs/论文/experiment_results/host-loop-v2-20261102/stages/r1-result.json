@@ -1,0 +1,572 @@
+{
+  "round": 1,
+  "results": [
+    {
+      "round": 1,
+      "entity": "calibration000",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 3.1385,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration000",
+          "version": 1,
+          "offset": 2,
+          "scale": 2000
+        }
+      },
+      "truth": 3.1385,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration001",
+      "family": "calibration",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 27.208,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration001",
+          "version": 1,
+          "offset": 24,
+          "scale": 125
+        }
+      },
+      "truth": 27.208,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration002",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 39.516,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration002",
+          "version": 1,
+          "offset": 25,
+          "scale": 250
+        }
+      },
+      "truth": 39.516,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration003",
+      "family": "calibration",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 4.144,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration003",
+          "version": 1,
+          "offset": 21,
+          "scale": 2000
+        }
+      },
+      "truth": 4.144,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "calibration004",
+      "family": "calibration",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "stale_version_error": false,
+      "poisoned_reuse": true,
+      "status_before": "warm",
+      "answer": {
+        "value": 60.28,
+        "basis": "experience",
+        "from_memory": "calibration004-v1",
+        "rule_used": {
+          "entity": "calibration004",
+          "version": 1,
+          "offset": 37,
+          "scale": 125
+        }
+      },
+      "truth": 60.576,
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "calibration005",
+      "family": "calibration",
+      "group": "decoy-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "value": 19.826,
+        "basis": "source",
+        "rule_used": {
+          "entity": "calibration005",
+          "version": 1,
+          "offset": 23,
+          "scale": 500
+        }
+      },
+      "truth": 19.826,
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema000",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 1.623,
+        "level": 8.728,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema000",
+          "version": 1,
+          "divisor": 1000,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 1.623,
+        "level": 8.728
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema001",
+      "family": "schema",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 267.2,
+        "level": 751.2,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema001",
+          "version": 1,
+          "divisor": 10,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 267.2,
+        "level": 751.2
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema002",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 70.91,
+        "level": 75.29,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema002",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 70.91,
+        "level": 75.29
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema003",
+      "family": "schema",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 84.04,
+        "level": 16.01,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema003",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 84.04,
+        "level": 16.01
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "schema004",
+      "family": "schema",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "stale_version_error": false,
+      "poisoned_reuse": true,
+      "status_before": "warm",
+      "answer": {
+        "flow": 75.51401869158879,
+        "level": 0.9252336448598131,
+        "basis": "experience",
+        "from_memory": "schema004-v1",
+        "rule_used": {
+          "entity": "schema004",
+          "version": 1,
+          "divisor": 107,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 80.8,
+        "level": 0.99
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "schema005",
+      "family": "schema",
+      "group": "decoy-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "flow": 82.83,
+        "level": 6.01,
+        "basis": "source",
+        "rule_used": {
+          "entity": "schema005",
+          "version": 1,
+          "divisor": 100,
+          "flow_field": "f1",
+          "level_field": "h1"
+        }
+      },
+      "truth": {
+        "flow": 82.83,
+        "level": 6.01
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool000",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool000",
+        "parameter": "limit_v1",
+        "value": 8800,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool000",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/v1/tool000",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool000",
+        "kwargs": {
+          "limit_v1": 8800
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool001",
+      "family": "tool",
+      "group": "clean-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 88000,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool001",
+          "version": 1,
+          "factor": 1000,
+          "endpoint": "/api/v1/tool001",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 88000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool002",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool002",
+        "parameter": "limit_v1",
+        "value": 14000,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool002",
+          "version": 1,
+          "factor": 1000,
+          "endpoint": "/api/v1/tool002",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool002",
+        "kwargs": {
+          "limit_v1": 14000
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool003",
+      "family": "tool",
+      "group": "clean-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/v1/tool003",
+        "parameter": "limit_v1",
+        "value": 5300,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool003",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/v1/tool003",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool003",
+        "kwargs": {
+          "limit_v1": 5300
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    },
+    {
+      "round": 1,
+      "entity": "tool004",
+      "family": "tool",
+      "group": "poison-stable",
+      "version": 1,
+      "stable": true,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "wrong",
+      "stale_version_error": false,
+      "poisoned_reuse": true,
+      "status_before": "warm",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 850,
+        "basis": "experience",
+        "from_memory": "tool004-v1",
+        "rule_used": {
+          "entity": "tool004",
+          "version": 1,
+          "factor": 17,
+          "endpoint": "/api/v1/tool004",
+          "parameter": "limit_v1"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 500
+        }
+      },
+      "memory_status": "disputed",
+      "status_after": "disputed"
+    },
+    {
+      "round": 1,
+      "entity": "tool005",
+      "family": "tool",
+      "group": "decoy-drift",
+      "version": 1,
+      "stable": false,
+      "need_source": true,
+      "basis": "source",
+      "verdict": "correct",
+      "stale_version_error": false,
+      "poisoned_reuse": false,
+      "status_before": null,
+      "answer": {
+        "endpoint": "/api/legacy/tool005",
+        "parameter": "limit",
+        "value": 9200,
+        "basis": "source",
+        "rule_used": {
+          "entity": "tool005",
+          "version": 1,
+          "factor": 100,
+          "endpoint": "/api/legacy/tool005",
+          "parameter": "limit"
+        }
+      },
+      "truth": {
+        "endpoint": "/api/legacy/tool005",
+        "kwargs": {
+          "limit": 9200
+        }
+      },
+      "memory_status": "candidate",
+      "status_after": "candidate"
+    }
+  ]
+}

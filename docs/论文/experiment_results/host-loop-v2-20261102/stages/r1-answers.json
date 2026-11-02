@@ -1,0 +1,215 @@
+{
+  "calibration000": {
+    "value": 3.1385,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration000",
+      "version": 1,
+      "offset": 2,
+      "scale": 2000
+    }
+  },
+  "calibration001": {
+    "value": 27.208,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration001",
+      "version": 1,
+      "offset": 24,
+      "scale": 125
+    }
+  },
+  "calibration002": {
+    "value": 39.516,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration002",
+      "version": 1,
+      "offset": 25,
+      "scale": 250
+    }
+  },
+  "calibration003": {
+    "value": 4.144,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration003",
+      "version": 1,
+      "offset": 21,
+      "scale": 2000
+    }
+  },
+  "calibration004": {
+    "value": 60.28,
+    "basis": "experience",
+    "from_memory": "calibration004-v1",
+    "rule_used": {
+      "entity": "calibration004",
+      "version": 1,
+      "offset": 37,
+      "scale": 125
+    }
+  },
+  "calibration005": {
+    "value": 19.826,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration005",
+      "version": 1,
+      "offset": 23,
+      "scale": 500
+    }
+  },
+  "schema000": {
+    "flow": 1.623,
+    "level": 8.728,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema000",
+      "version": 1,
+      "divisor": 1000,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema001": {
+    "flow": 267.2,
+    "level": 751.2,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema001",
+      "version": 1,
+      "divisor": 10,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema002": {
+    "flow": 70.91,
+    "level": 75.29,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema002",
+      "version": 1,
+      "divisor": 100,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema003": {
+    "flow": 84.04,
+    "level": 16.01,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema003",
+      "version": 1,
+      "divisor": 100,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema004": {
+    "flow": 75.51401869158879,
+    "level": 0.9252336448598131,
+    "basis": "experience",
+    "from_memory": "schema004-v1",
+    "rule_used": {
+      "entity": "schema004",
+      "version": 1,
+      "divisor": 107,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema005": {
+    "flow": 82.83,
+    "level": 6.01,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema005",
+      "version": 1,
+      "divisor": 100,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "tool000": {
+    "endpoint": "/api/v1/tool000",
+    "parameter": "limit_v1",
+    "value": 8800,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool000",
+      "version": 1,
+      "factor": 100,
+      "endpoint": "/api/v1/tool000",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool001": {
+    "endpoint": "/api/v1/tool001",
+    "parameter": "limit_v1",
+    "value": 88000,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool001",
+      "version": 1,
+      "factor": 1000,
+      "endpoint": "/api/v1/tool001",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool002": {
+    "endpoint": "/api/v1/tool002",
+    "parameter": "limit_v1",
+    "value": 14000,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool002",
+      "version": 1,
+      "factor": 1000,
+      "endpoint": "/api/v1/tool002",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool003": {
+    "endpoint": "/api/v1/tool003",
+    "parameter": "limit_v1",
+    "value": 5300,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool003",
+      "version": 1,
+      "factor": 100,
+      "endpoint": "/api/v1/tool003",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool004": {
+    "endpoint": "/api/v1/tool004",
+    "parameter": "limit_v1",
+    "value": 850,
+    "basis": "experience",
+    "from_memory": "tool004-v1",
+    "rule_used": {
+      "entity": "tool004",
+      "version": 1,
+      "factor": 17,
+      "endpoint": "/api/v1/tool004",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool005": {
+    "endpoint": "/api/legacy/tool005",
+    "parameter": "limit",
+    "value": 9200,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool005",
+      "version": 1,
+      "factor": 100,
+      "endpoint": "/api/legacy/tool005",
+      "parameter": "limit"
+    }
+  }
+}

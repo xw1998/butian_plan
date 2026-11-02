@@ -1,0 +1,218 @@
+{
+  "calibration000": {
+    "value": 1.045,
+    "basis": "experience",
+    "from_memory": "calibration000-v1",
+    "rule_used": {
+      "entity": "calibration000",
+      "version": 1,
+      "offset": 2,
+      "scale": 2000
+    }
+  },
+  "calibration001": {
+    "value": 68.224,
+    "basis": "experience",
+    "from_memory": "calibration001-v1",
+    "rule_used": {
+      "entity": "calibration001",
+      "version": 1,
+      "offset": 24,
+      "scale": 125
+    }
+  },
+  "calibration002": {
+    "value": 7.331,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration002",
+      "version": 3,
+      "offset": 18,
+      "scale": 1000
+    }
+  },
+  "calibration003": {
+    "value": 10.232,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration003",
+      "version": 3,
+      "offset": 28,
+      "scale": 125
+    }
+  },
+  "calibration004": {
+    "value": 75.152,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration004",
+      "version": 1,
+      "offset": 0,
+      "scale": 125
+    }
+  },
+  "calibration005": {
+    "value": 7.462,
+    "basis": "source",
+    "rule_used": {
+      "entity": "calibration005",
+      "version": 3,
+      "offset": 29,
+      "scale": 500
+    }
+  },
+  "schema000": {
+    "flow": 2.667,
+    "level": 7.126,
+    "basis": "experience",
+    "from_memory": "schema000-v1",
+    "rule_used": {
+      "entity": "schema000",
+      "version": 1,
+      "divisor": 1000,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema001": {
+    "flow": 548.3,
+    "level": 625.4,
+    "basis": "experience",
+    "from_memory": "schema001-v1",
+    "rule_used": {
+      "entity": "schema001",
+      "version": 1,
+      "divisor": 10,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema002": {
+    "flow": 20.39,
+    "level": 3.98,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema002",
+      "version": 3,
+      "divisor": 100,
+      "flow_field": "f3",
+      "level_field": "h3"
+    }
+  },
+  "schema003": {
+    "flow": 24.92,
+    "level": 16.08,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema003",
+      "version": 3,
+      "divisor": 100,
+      "flow_field": "f3",
+      "level_field": "h3"
+    }
+  },
+  "schema004": {
+    "flow": 57.78,
+    "level": 93.26,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema004",
+      "version": 1,
+      "divisor": 100,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "schema005": {
+    "flow": 51.490566037735846,
+    "level": 36.424528301886795,
+    "basis": "source",
+    "rule_used": {
+      "entity": "schema005",
+      "version": 3,
+      "divisor": 106,
+      "flow_field": "f1",
+      "level_field": "h1"
+    }
+  },
+  "tool000": {
+    "endpoint": "/api/v1/tool000",
+    "parameter": "limit_v1",
+    "value": 2900,
+    "basis": "experience",
+    "from_memory": "tool000-v1",
+    "rule_used": {
+      "entity": "tool000",
+      "version": 1,
+      "factor": 100,
+      "endpoint": "/api/v1/tool000",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool001": {
+    "endpoint": "/api/v1/tool001",
+    "parameter": "limit_v1",
+    "value": 45000,
+    "basis": "experience",
+    "from_memory": "tool001-v1",
+    "rule_used": {
+      "entity": "tool001",
+      "version": 1,
+      "factor": 1000,
+      "endpoint": "/api/v1/tool001",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool002": {
+    "endpoint": "/api/v3/tool002",
+    "parameter": "limit_v3",
+    "value": 600,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool002",
+      "version": 3,
+      "factor": 10,
+      "endpoint": "/api/v3/tool002",
+      "parameter": "limit_v3"
+    }
+  },
+  "tool003": {
+    "endpoint": "/api/v3/tool003",
+    "parameter": "limit_v3",
+    "value": 20000,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool003",
+      "version": 3,
+      "factor": 1000,
+      "endpoint": "/api/v3/tool003",
+      "parameter": "limit_v3"
+    }
+  },
+  "tool004": {
+    "endpoint": "/api/v1/tool004",
+    "parameter": "limit_v1",
+    "value": 120,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool004",
+      "version": 1,
+      "factor": 10,
+      "endpoint": "/api/v1/tool004",
+      "parameter": "limit_v1"
+    }
+  },
+  "tool005": {
+    "endpoint": "/api/legacy/tool005",
+    "parameter": "limit",
+    "value": 3286,
+    "basis": "source",
+    "rule_used": {
+      "entity": "tool005",
+      "version": 3,
+      "factor": 106,
+      "endpoint": "/api/legacy/tool005",
+      "parameter": "limit"
+    }
+  }
+}

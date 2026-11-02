@@ -1,0 +1,13 @@
+{
+  "protocol": "host-loop-v2",
+  "source_id": "src_6e1bb935363543b7a52d7cf34956e053",
+  "source_sha256": "f2bf9b76c3106521506da110d7cad5aa3b620d0aa21199522ae25d91bfd9a9f9",
+  "archive": "D:\\工作\\git_project\\butian_plan\\docs\\论文\\experiment_results\\host-loop-v2-20261102\\fixtures\\contract-manual-v1-v4.txt",
+  "created_at": 1793624158.1641188,
+  "round": 0,
+  "poison_entities": [
+    "calibration004",
+    "schema004",
+    "tool004"
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "calibration000": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "calibration000-v1",
+    "why": "memory matches entity+version and is not disputed"
+  },
+  "calibration001": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "calibration001-v1",
+    "why": "memory matches entity+version and is not disputed"
+  },
+  "calibration002": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "calibration003": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "calibration004": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "calibration005": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "schema000": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "schema000-v1",
+    "why": "memory matches entity+version and is not disputed"
+  },
+  "schema001": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "schema001-v1",
+    "why": "memory matches entity+version and is not disputed"
+  },
+  "schema002": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "schema003": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "schema004": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "schema005": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "tool000": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "tool000-v1",
+    "why": "memory matches entity+version and is not disputed"
+  },
+  "tool001": {
+    "use_experience": true,
+    "need_source": false,
+    "from_memory": "tool001-v1",
+    "why": "memory matches entity+version and is not disputed"
+  },
+  "tool002": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "tool003": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "tool004": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  },
+  "tool005": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "no usable memory for this entity+version (absent, version mismatch, or disputed)"
+  }
+}

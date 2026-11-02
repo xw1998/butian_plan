@@ -1,0 +1,57 @@
+{
+  "calibration004": {
+    "true": {
+      "family": "calibration",
+      "entity": "calibration004",
+      "version": 1,
+      "scale": 125,
+      "offset": 0
+    },
+    "memory": {
+      "family": "calibration",
+      "entity": "calibration004",
+      "version": 1,
+      "scale": 125,
+      "offset": 37
+    },
+    "memory_id": "calibration004-v1"
+  },
+  "schema004": {
+    "true": {
+      "family": "schema",
+      "entity": "schema004",
+      "version": 1,
+      "flow_field": "f1",
+      "level_field": "h1",
+      "divisor": 100
+    },
+    "memory": {
+      "family": "schema",
+      "entity": "schema004",
+      "version": 1,
+      "flow_field": "f1",
+      "level_field": "h1",
+      "divisor": 107
+    },
+    "memory_id": "schema004-v1"
+  },
+  "tool004": {
+    "true": {
+      "family": "tool",
+      "entity": "tool004",
+      "version": 1,
+      "endpoint": "/api/v1/tool004",
+      "parameter": "limit_v1",
+      "factor": 10
+    },
+    "memory": {
+      "family": "tool",
+      "entity": "tool004",
+      "version": 1,
+      "endpoint": "/api/v1/tool004",
+      "parameter": "limit_v1",
+      "factor": 17
+    },
+    "memory_id": "tool004-v1"
+  }
+}
