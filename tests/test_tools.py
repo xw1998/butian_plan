@@ -41,8 +41,8 @@ def registered_tool_proofs(service, actor, labels):
             evidence_ids.append(service.record_evidence(path, owner_member_id=actor, actor_member_id=actor))
     return evidence_ids
 
-def verify_execution(service, owner, tool_id, version, key, input_data=None):
-    execution = execute_in_task(service, owner, tool_id, version, input_data or {}, verification_only=True)
+def verify_execution(service, owner, tool_id, version, key, input_data=None, **execution_kwargs):
+    execution = execute_in_task(service, owner, tool_id, version, input_data or {}, verification_only=True, **execution_kwargs)
     assert execution['status'] == 'success', {
         'stage': 'verification_prerequisite',
         'execution_id': execution['execution_id'],
@@ -462,8 +462,10 @@ def test_execution_timeout_is_audited(tmp_path):
         manifest = {**MANIFEST, "input_contract": {"type": "object"}, "output_contract": {"type": "text"}, "permissions": ["execute"], "entrypoint": ["python", "tool.py"]}
         tool_id = service.propose_tool("m1", "超时工具", "超时必须终止并审计", reuse_lower=3, manual_cost_upper=10, call_cost_lower=1, build_cost_upper=5, maintenance_cost_upper=2, risk_cost_upper=1)["tool_id"]
         service.add_tool_version("m1", tool_id, "import time; time.sleep(2); print('late')", manifest)
+        # 前置验证跑的是正常脚本：并行回归时机器很忙，默认 10 秒会被真实睡满 2 秒的子进程撞上
+        # （超时后清理不确认就变成 unknown），这里给它留足余量，别把负载当成工具坏了。
         for key in ("timeout-a", "timeout-b"):
-            verify_execution(service, "m1", tool_id, 1, key)
+            verify_execution(service, "m1", tool_id, 1, key, timeout_seconds=60)
         result = execute_in_task(service, "m1", tool_id, 1, {}, verification_only=True, timeout_seconds=0.1)
         assert result["status"] == "failed"
         assert result["termination_reason"] == "timeout"

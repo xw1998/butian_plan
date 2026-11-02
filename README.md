@@ -473,6 +473,23 @@ python -m butian.assets.export /absolute/new/runtime
 
 自动扫查里“没新材料 / 时间没到”这类没有实际动作的结果不写库：一名成员每小时一条、十人一年约 8.8 万条，会把真正的 `completed` 从看板和“最近 20 条”里挤出去，也让 `dream_skipped` 凭空线性增长。手动触发的跳过仍然照常记录，返回里 `recorded` 字段标明这次结果是否入账。
 
+## v0.1.10 更新
+
+- 未知参数不再静默忽略：124 个工具的入参 schema 全部闭合（`additionalProperties: false`），未声明的顶层参数返回 `unknown_argument`，附 `accepted`、`unexpected` 与 `did_you_mean`；连接信封字段与 `butian_goal_submit` 的顶层问题字段仍可直接写。
+- 批量写改成两段式：`butian_dream_distill` / `butian_dream_abstract` 支持 `preview_only` 取 `preview_token`，只读回受影响记忆、将写行数与是否已有等价记录；带令牌提交时在事务内重算指纹，源记忆变了就回 `preview_stale` 并给重新预览动作。`BUTIAN_REQUIRE_DREAM_PREVIEW=1` 可强制两段式，默认关闭时行为不变。
+- 总看板新增 **停滞任务** 计数：`todo`/`ready`/`waiting_user`/`blocked`/`failed`/`provider_lost`/`unknown` 的数量与状态分布，只给数不给任务 id 与标题。
+- 执行收尾竞态不再被记成 `unknown`：真实子进程一退出，执行方就释放作业，续约回来会被拒（`execution_lease_not_running`）；续约现在只当租约续期，真实终态一律从持久账本读回，成功不会被写成 `unknown`。
+- 没有 Provider 时不再只回一句不可用：`butian_collaboration_preflight` / `butian_collaboration_start` 额外返回 `local_plan`（按目标关键词给出的可手动执行步骤），固定 `mode: local`、`basis: keyword_rules`、`evidence_eligible: false`，不计入证据与完成度。
+- 项目及 MCP 共享版本更新为 **0.1.10**。源码安装后重启 HTTP 后台、重新连接 MCP，分别加载新代码；两者为独立进程。
+
+[v0.1.10 源码](https://gitee.com/xw19981010/butian_plan/tree/v0.1.10)
+
+## v0.1.9 更新
+
+- MCP 传输层全程 UTF-8：中文提交不再报 `surrogates not allowed`；`token` 为可选字段，本机回环免口令。
+- 目标提交支持顶层与 `problem` 内两处写同一字段（合并回显 `problem_fields_merged`），同名未结束目标幂等返回已有任务。
+- MCP 标识补齐：`server.json` registry 清单、包元数据与 README 首屏。
+
 ## v0.1.8 更新
 
 - 修正做梦计数：只有 `completed` 计为自省完成，`skipped` 单列为门控跳过；逐成员与团队总量使用同一口径，近期记录不冒充累计数量。

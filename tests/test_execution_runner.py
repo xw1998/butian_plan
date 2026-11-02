@@ -87,3 +87,53 @@ def test_unknown_without_valid_persisted_exit_remains_blocker(payload):
         assert runner.unresolved() == ['e1']
     finally:
         db.close()
+
+def test_lease_renewal_racing_job_completion_is_not_a_failed_execution(tmp_path, monkeypatch):
+    """执行方一确认进程退出就释放作业，续约可能刚好落在收尾之后而被拒（lease_not_running）。
+    续约只是租约续期，不是退出证据：真实终态必须从持久账本读回，不能把收尾竞态记成 unknown。
+    并行全量回归里真实子进程跑到 20 秒边界时踩到过这条竞态（test_problem_definition 的
+    provider 会话被判 provider_executor_unconfirmed，而 dispatch 账本同一秒记的是 success）。"""
+    import butian.runtime.execution_runner as runner_module
+    from butian.runtime.execution_contract import ExecutionObservation
+    from test_execution_dispatch import Adapter
+    from test_execution_permit import fixture
+    request, caps, _ = fixture(tmp_path)
+    calls = {'renew': 0, 'inspect': 0}
+
+    class Clock:
+        def __init__(self):
+            self.now = 0.0
+
+        def monotonic(self):
+            self.now += 0.5
+            return self.now
+
+    adapter = Adapter()
+    adapter.capabilities = lambda: caps
+    adapter.authorize = lambda *args: None
+
+    def renew(execution_id, seconds):
+        calls['renew'] += 1
+        raise ValueError('execution_lease_not_running')
+
+    adapter.renew = renew
+
+    def inspect(execution_id):
+        calls['inspect'] += 1
+        if calls['inspect'] == 1:
+            return ExecutionObservation(execution_id, caps.executor_id, caps.instance_id, 0, 'accepted')
+        if calls['renew']:
+            return ExecutionObservation(execution_id, caps.executor_id, caps.instance_id, 2, 'success', exit_code=0, tree_exit_confirmed=True)
+        return ExecutionObservation(execution_id, caps.executor_id, caps.instance_id, 1, 'running')
+
+    adapter.inspect = inspect
+    clock = Clock()
+    monkeypatch.setattr(runner_module, 'time', SimpleNamespace(monotonic=clock.monotonic, time=__import__('time').time))
+    db = sqlite3.connect(':memory:', isolation_level=None)
+    try:
+        observation = ExecutionRunner(ExecutionDispatch(db, adapter)).run(request, authorization_valid=lambda: True)
+        assert calls['renew'] >= 1, 'the renewal attempt must actually happen for the race to be covered'
+        assert observation.state == 'success'
+        assert observation.tree_exit_confirmed is True
+    finally:
+        db.close()

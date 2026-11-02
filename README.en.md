@@ -473,6 +473,23 @@ The dashboard also reports a content-free `stalled` count for the authenticated 
 
 Dreams belong to the member who triggered them: one member running a dream only changes that member's counters and records. The scheduled maintenance loop (`BUTIAN_MAINTENANCE_ENABLED`, on by default) performs memory maintenance, queue dispatch and due checks, and by default does **not** run dreams for any member, so one member's dream no longer raises everyone else's count. Set `BUTIAN_AUTO_DREAM=1` to restore automatic dreaming; such runs carry `source="auto"`, manual runs carry `source="manual"`, and legacy rows show an unrecorded source. Dashboards report `dream_auto` separately.
 
+## v0.1.10 update
+
+- Undeclared top-level arguments are no longer ignored: all 124 tool schemas are closed objects (`additionalProperties: false`) and such calls return `unknown_argument` with `accepted`, `unexpected` and `did_you_mean`. Connection-envelope fields and the top-level problem fields of `butian_goal_submit` remain accepted.
+- Bulk writes are two-step: `butian_dream_distill` / `butian_dream_abstract` take `preview_only` to return a `preview_token` plus affected memories, rows to be written and whether an equivalent record already exists; sending the token back re-computes the fingerprint inside the transaction and returns `preview_stale` (with the re-preview action) if any source changed. `BUTIAN_REQUIRE_DREAM_PREVIEW=1` forces the flow; off by default with unchanged behaviour.
+- The dashboard reports a content-free **stalled** count (`todo`/`ready`/`waiting_user`/`blocked`/`failed`/`provider_lost`/`unknown`) with state buckets only, never task ids or titles.
+- A completion race no longer turns into `unknown`: the executor releases a job as soon as its process exits, so a lease renewal can be refused (`execution_lease_not_running`). Renewal is now treated as advisory only and the terminal state is always read back from the durable ledger, so a finished success is never reported as `unknown`.
+- With no Provider, `butian_collaboration_preflight` / `butian_collaboration_start` now also return a `local_plan`: manual steps derived from goal keywords, always marked `mode: local`, `basis: keyword_rules`, `evidence_eligible: false`, so it can never count as evidence or progress.
+- Package and shared MCP version: **0.1.10**. Restart the HTTP backend and reconnect MCP after updating a source installation; these are separate processes.
+
+[v0.1.10 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.10)
+
+## v0.1.9 update
+
+- MCP transport is UTF-8 end to end: Chinese submissions no longer fail with `surrogates not allowed`, and `token` is optional (loopback needs none).
+- Goal submission accepts the same field at the top level and inside `problem` (merged and echoed as `problem_fields_merged`), and resubmitting an unfinished identical goal returns the existing task.
+- MCP identity metadata: `server.json` registry manifest, package metadata and README first screen.
+
 ## v0.1.8 update
 
 - Dream counts now include only `completed` runs. Gated `skipped` checks are reported separately in both member and team totals; recent history is explicitly not a lifetime total.

@@ -50,7 +50,16 @@ class ExecutionRunner:
                     # is checked, never from a transport reconnect alone.
                     if authorization_valid():
                         self.adapter.authorize(permit['authorization_id'], permit['authorization_generation'], time.time() + 30)
-                        self.adapter.renew(request.execution_id, 10)
+                        try:
+                            self.adapter.renew(request.execution_id, 10)
+                        except ValueError:
+                            # Renewal is advisory, not exit evidence: the owner
+                            # releases the job as soon as the process exits, so a
+                            # renewal can lose a race against completion (or
+                            # against the stop it already started). The durable
+                            # ledger stays authoritative and the next reconcile
+                            # below reads the real terminal state.
+                            pass
                         lease_due = now + 2
                 if now >= reconciliation_deadline:
                     raise RuntimeError('execution_owner_exit_unconfirmed')
