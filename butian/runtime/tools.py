@@ -432,6 +432,8 @@ class ToolStore:
         self.tools_root = self.home / "members"
 
         self.execution_runner = None
+        # 懒挂载钩子：只在真正有执行请求时才构建本地执行器（含真子进程自检）。
+        self.execution_runner_factory = None
         self.recovery_events: list[dict[str, Any]] = []
         self._active_executions: dict[str, dict[str, Any]] = {}
         self._execution_recovery_snapshots: dict[str, dict[str, Any]] = {}
@@ -699,6 +701,10 @@ class ToolStore:
     def execute(self, actor_member_id: str, tool_id: str, version: int, input_data: Any = None, *, dry_run: bool = False, verification_only: bool = False, task_id: str | None = None, timeout_seconds: float = 10.0, max_output_bytes: int = 65536, share_id: str | None = None, security_review_issue_id: str | None = None, execution_guard=None) -> dict[str, Any]:
 
         runner = self.execution_runner
+        if runner is None and not dry_run and self.execution_runner_factory is not None:
+            if self.store.db.in_transaction:
+                raise ValueError("execution_dispatch_requires_committed_transaction")
+            runner = self.execution_runner_factory()
         if runner is None and not dry_run:
             raise ValueError("execution_backend_required")
         if runner is not None and not dry_run:

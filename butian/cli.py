@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None, *, home_dir=None) -> int:
         from .mcp_server import run
         run(runtime_home); return 0
     if args.command in {"exploration-budget", "hypothesis", "source", "claim", "evidence", "memory", "experiment", "evolution", "migrate", "session", "task", "dispatcher", "tool-issue"}:
-        service = ButianService(runtime_home)
+        service = ButianService(runtime_home, local_executor=True)
         try:
             if args.command == "exploration-budget":
                 from .runtime.exploration_budget import ExplorationBudget

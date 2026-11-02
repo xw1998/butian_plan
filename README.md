@@ -70,6 +70,17 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 
 如果连宿主执行都不方便，`butian_collaboration_preflight` / `butian_collaboration_start` 在 Provider 不可用时会额外返回 `local_plan`：按目标关键词（验证/修缺陷/写文档/查资料）给出可手动执行的步骤序列，从登记目标到登记证据、交付。这份计划固定标着 `mode: local`、`basis: keyword_rules`、`evidence_eligible: false`，**不代表任务已被执行，也不能计入证据或完成度**——它只是让“没有执行后端”不再等于停工。
 
+### 本机执行：默认就跑在这个进程里
+
+工具与本地 Provider 要在本机跑一次子进程时，**不需要**连接文件（`connection.json`）、配对密钥（`pairing.bin`）或回环端口：补天会在本进程内挂一个本地执行器（`butian/runtime/local_executor.py`），直接托管子进程并写持久账本。
+
+保留的东西正好是“事后能核验”的那部分：执行账本与终态（`list_tool_executions` 能查）、超时、输出字节上限、取消与纠正、退出确认。消失的是**只为跨机执行才存在**的传输层：回环 HTTP 端点、请求签名、配对密钥与授权代次租约。
+
+- **开关默认关，入口默认开**：`ButianService(..., local_executor=True)`（`butian mcp` / `butian serve` / CLI 业务命令都这么传）；作为库直接构造 `ButianService(home)` 时不挂执行器，行为与以前完全一致，需要时再传 `local_executor=True` 或设 `BUTIAN_LOCAL_EXECUTOR=1`。
+- **懒挂载**：执行器只在真正有执行请求时才构建。自检要真起三个子进程（目标进程 + 后代进程）确认能杀干净，没有执行请求的进程不该付这笔启动成本。
+- **自检失败就报错，不降级**：`local_executor_self_test_failed` 表示这台机器上无法确认进程控制，此时宁可拒绝执行，也不给出“跑了但杀不掉”的假答案。
+- **跨机执行仍然可用**：设 `BUTIAN_EXECUTOR_CONNECTION` 时优先走配对执行器，回环传输、配对密钥与授权代次全部生效；那条链路现在是可选组件，不是本机默认路径。
+
 ## 接入补天，你的 AI 能增强什么？
 
 - **更能记住你：减少重复交代。** 将你的要求、纠正、项目背景和已确认结论保存为可检索的长期记忆，在后续任务中按需带回上下文。持续合作时，已经说清楚的事情有据可查。
@@ -392,7 +403,7 @@ BUTIAN_MAINTENANCE_ENABLED=0 BUTIAN_OPERATOR_ACCEPTANCE=1 \
 python tests/acceptance/web_ui.py
 ```
 
-并行回归用 `pytest-xdist`（`pip install -e ".[dev]"`）。这里用 `--dist loadfile` 而不是默认的按用例分发：同一个测试文件留在同一个 worker 里，文件内部的模块级夹具与临时目录不会被拆开，用例数与串行完全一致（当前 1102 条）。两条命令都必须是零 skip、零失败才算通过；并行只改变执行位置，不放宽任何断言。
+并行回归用 `pytest-xdist`（`pip install -e ".[dev]"`）。这里用 `--dist loadfile` 而不是默认的按用例分发：同一个测试文件留在同一个 worker 里，文件内部的模块级夹具与临时目录不会被拆开，用例数与串行完全一致（当前 1116 条）。两条命令都必须是零 skip、零失败才算通过；并行只改变执行位置，不放宽任何断言。
 
 全量回归的闸门是“零 skip”：本机没有符号链接权限时，重定向点用目录联接代替（`tests/fs_redirect.py`），不会因环境跳过用例。
 

@@ -70,6 +70,17 @@ Without a Provider, team subtasks do not run by themselves — but that is not a
 
 A team parent cannot be exported before all children are `done` (`team_children_not_reviewed`), so the context only offers export for subtasks — never a call that is guaranteed to be rejected.
 
+### Local execution runs in this process by default
+
+When a tool or a local Provider needs to run a child process on this machine, it needs **no** connection file (`connection.json`), no pairing key (`pairing.bin`) and no loopback port: Butian attaches an in-process local executor (`butian/runtime/local_executor.py`) that owns the child process and writes the durable ledger directly.
+
+What stays is exactly the part that makes the answer checkable afterwards: the execution ledger and its final state (queryable via `list_tool_executions`), timeouts, output byte limits, cancellation and correction, and exit confirmation. What disappears is the transport that only exists for a **remote** executor: the loopback HTTP endpoint, request signing, the pairing key and authorization-generation leases.
+
+- **Off by default, on at the entry points**: `ButianService(..., local_executor=True)` is what `butian mcp`, `butian serve` and the CLI business commands pass; constructing `ButianService(home)` as a library attaches nothing and behaves exactly as before. Pass `local_executor=True` or set `BUTIAN_LOCAL_EXECUTOR=1` to opt in.
+- **Lazy attach**: the executor is built only when something actually asks to run. Its self-test really spawns three processes (the target plus a descendant) to confirm it can terminate the whole job; a process that never executes should not pay that startup cost.
+- **A failed self-test refuses to execute instead of degrading**: `local_executor_self_test_failed` means process control could not be confirmed on this machine. Refusing is better than handing back "it ran, but nothing can kill it".
+- **Remote execution still works**: with `BUTIAN_EXECUTOR_CONNECTION` set, the pairing executor takes priority and the loopback transport, pairing key and authorization generations all apply. That path is now an optional component rather than the local default.
+
 ## What can Butian improve?
 
 - **Remember more of what matters to you.** Store requirements, corrections, project background, and confirmed findings as searchable long-term memory. Bring relevant information back into later tasks and spend less time repeating yourself.
@@ -385,7 +396,7 @@ python tests/acceptance/web_ui.py
 
 Parallel regression uses `pytest-xdist` (`pip install -e ".[dev]"`). It runs with `--dist loadfile`,
 not the default per-test distribution: a test file stays on one worker, so module-level fixtures and
-temporary directories are never split, and the test count matches the serial run exactly (1102 today).
+temporary directories are never split, and the test count matches the serial run exactly (1116 today).
 Both commands must pass with zero skips and zero failures; parallelism only changes where a test runs.
 
 The regression gate is “zero skips”: when the machine cannot create symlinks, the

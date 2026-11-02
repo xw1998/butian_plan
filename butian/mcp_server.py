@@ -132,7 +132,7 @@ for _name, _description, _fields, _required in [
 
 def run(home=None):
     from .runtime.stdio_encoding import InputEncodingError, read_request_line, repair_surrogates, write_frame
-    service = ButianService(home)
+    service = ButianService(home, local_executor=True)
     state = {"actor": None, "token": None}
     try:
         while True:

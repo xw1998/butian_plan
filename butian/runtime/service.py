@@ -20,7 +20,7 @@ from .tools import ToolStore
 from .backup import create_backup, verify_backup, restore_backup
 
 class ButianService:
-    def __init__(self, home: str | Path | None = None):
+    def __init__(self, home: str | Path | None = None, *, local_executor: bool | None = None):
         self.home = Path(home or os.environ.get("BUTIAN_HOME", Path.home() / ".butian"))
         self.home.mkdir(parents=True, exist_ok=True)
         self._claim_practice_lock = threading.RLock()
@@ -57,6 +57,8 @@ class ButianService:
         self.tools = ToolStore(self.store, self.home)
         self.executor = None
         self.execution_runner = None
+        # 显式配置的配对执行器优先；否则按开关在首次需要执行时于本进程内挂载。
+        # 本机默认不再需要连接文件、配对密钥与回环端点。
         executor_connection = os.environ.get("BUTIAN_EXECUTOR_CONNECTION")
         if executor_connection:
             from .execution_client_config import configured_executor
@@ -64,6 +66,10 @@ class ButianService:
             from .execution_dispatch import ExecutionDispatch
             from .execution_runner import ExecutionRunner
             self.execution_runner = ExecutionRunner(ExecutionDispatch(self.store.db, self.executor, write_lock=self.store._write_lock))
+        if local_executor is None:
+            local_executor = os.environ.get("BUTIAN_LOCAL_EXECUTOR", "0").lower() in {"1", "true", "yes", "on"}
+        # 懒挂载：自检要真起子进程，没有执行请求的进程不该付这笔启动成本。
+        self.tools.execution_runner_factory = (lambda: self._ensure_local_executor()) if local_executor and not executor_connection else None
         self.tools.execution_runner = self.execution_runner
         self.startup_recovery['host_revocations'] = self.tools.retry_host_revocations()
         from .tool_workflows import ToolWorkflows
@@ -74,14 +80,7 @@ class ButianService:
         # Provider 从 BUTIAN_PROVIDERS_FILE 或 <home>/providers.json 加载；无效条目记录错误、不静默丢弃
         self.providers, self.provider_config_errors, self.provider_config_path = load_registry_from_env(self.home)
         if self.execution_runner is not None:
-            from ..adapters.local import LocalCommandProvider
-            from .provider_execution import provider_request_factory
-            factory = provider_request_factory(self.store, self.home, self.execution_runner)
-            for provider_id in self.providers.list():
-                provider = self.providers.get(provider_id)
-                if isinstance(provider, LocalCommandProvider):
-                    provider.execution_runner = self.execution_runner
-                    provider.execution_request_factory = factory
+            self._attach_runner(self.execution_runner)
         self.provider_runtime = ProviderRuntime(self.store, self.providers)
         self.startup_recovery["peer_verifications"] = self.recover_peer_verifications()
         self.startup_recovery["review_learning"] = self.recover_review_learning()
@@ -94,6 +93,28 @@ class ButianService:
         if self._maintenance_enabled:
             self._maintenance_thread = threading.Thread(target=self._maintenance_loop, name="butian-maintenance", daemon=True)
             self._maintenance_thread.start()
+
+    def _attach_runner(self, runner):
+        from ..adapters.local import LocalCommandProvider
+        from .provider_execution import provider_request_factory
+        self.execution_runner = runner
+        self.tools.execution_runner = runner
+        factory = provider_request_factory(self.store, self.home, runner)
+        for provider_id in self.providers.list():
+            provider = self.providers.get(provider_id)
+            if isinstance(provider, LocalCommandProvider):
+                provider.execution_runner = runner
+                provider.execution_request_factory = factory
+
+    def _ensure_local_executor(self):
+        if self.execution_runner is not None:
+            return self.execution_runner
+        from .execution_dispatch import ExecutionDispatch
+        from .execution_runner import ExecutionRunner
+        from .local_executor import build
+        self.executor = build(self.store, self.home)
+        self._attach_runner(ExecutionRunner(ExecutionDispatch(self.store.db, self.executor, write_lock=self.store._write_lock)))
+        return self.execution_runner
 
     def create_backup(self, destination: str | Path):
         return create_backup(self.home, destination)

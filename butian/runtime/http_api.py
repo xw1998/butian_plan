@@ -540,7 +540,7 @@ def serve(home=None, host="127.0.0.1", port=8765):
         server = ThreadingHTTPServer((host, port), ApiHandler)
     except OSError as exc:
         raise RuntimeError(f"Cannot start Butian {VERSION} at {host}:{port}: port unavailable. Close the previous console process, then run the same command again; updating files does not reload a running server.") from exc
-    service = ButianService(home); ApiHandler.service = service
+    service = ButianService(home, local_executor=True); ApiHandler.service = service
     ApiHandler.experiments = ExperimentStore(Path(home or service.home) / "experiments.db")
     ApiHandler.web_root = Path(__file__).resolve().parents[1] / "web"
     try:

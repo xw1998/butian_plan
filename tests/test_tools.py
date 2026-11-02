@@ -464,8 +464,11 @@ def test_execution_timeout_is_audited(tmp_path):
         service.add_tool_version("m1", tool_id, "import time; time.sleep(2); print('late')", manifest)
         # 前置验证跑的是正常脚本：并行回归时机器很忙，默认 10 秒会被真实睡满 2 秒的子进程撞上
         # （超时后清理不确认就变成 unknown），这里给它留足余量，别把负载当成工具坏了。
+        # 宿主负载极端时，一个 2 秒脚本从拉起到退出确认可以拖到分钟级（实测单机 140 秒），
+        # 而 runner 的兜底期限是 timeout + 15 秒；留 300 秒上限才能让「机器忙」不冒充「工具坏了」。
+        # 正常情况仍在 2 秒内返回，这个数只是天花板。
         for key in ("timeout-a", "timeout-b"):
-            verify_execution(service, "m1", tool_id, 1, key, timeout_seconds=60)
+            verify_execution(service, "m1", tool_id, 1, key, timeout_seconds=300)
         result = execute_in_task(service, "m1", tool_id, 1, {}, verification_only=True, timeout_seconds=0.1)
         assert result["status"] == "failed"
         assert result["termination_reason"] == "timeout"
