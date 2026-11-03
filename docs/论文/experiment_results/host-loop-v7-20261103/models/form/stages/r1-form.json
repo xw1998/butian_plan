@@ -1,0 +1,773 @@
+{
+  "rows": [
+    {
+      "round": 1,
+      "entity": "calibration001",
+      "family": "calibration",
+      "k": 0,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 59.6
+      },
+      "truth": 59.6
+    },
+    {
+      "round": 1,
+      "entity": "calibration002",
+      "family": "calibration",
+      "k": 1,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 25.588
+      },
+      "truth": 25.588
+    },
+    {
+      "round": 1,
+      "entity": "calibration003",
+      "family": "calibration",
+      "k": 2,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 12.864
+      },
+      "truth": 12.864
+    },
+    {
+      "round": 1,
+      "entity": "calibration004",
+      "family": "calibration",
+      "k": 3,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 3.89
+      },
+      "truth": 3.89
+    },
+    {
+      "round": 1,
+      "entity": "calibration005",
+      "family": "calibration",
+      "k": 4,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 38.168
+      },
+      "truth": 38.168
+    },
+    {
+      "round": 1,
+      "entity": "calibration006",
+      "family": "calibration",
+      "k": 5,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 3.021
+      },
+      "truth": 3.021
+    },
+    {
+      "round": 1,
+      "entity": "calibration007",
+      "family": "calibration",
+      "k": 6,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 2.488
+      },
+      "truth": 2.488
+    },
+    {
+      "round": 1,
+      "entity": "calibration008",
+      "family": "calibration",
+      "k": 7,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 14.712
+      },
+      "truth": 14.712
+    },
+    {
+      "round": 1,
+      "entity": "schema001",
+      "family": "schema",
+      "k": 8,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 82.72,
+        "level": 55.84
+      },
+      "truth": {
+        "flow": 82.72,
+        "level": 55.84
+      }
+    },
+    {
+      "round": 1,
+      "entity": "schema002",
+      "family": "schema",
+      "k": 9,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 4.656,
+        "level": 8.963
+      },
+      "truth": {
+        "flow": 4.656,
+        "level": 8.963
+      }
+    },
+    {
+      "round": 1,
+      "entity": "schema003",
+      "family": "schema",
+      "k": 10,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 71.81,
+        "level": 52.55
+      },
+      "truth": {
+        "flow": 71.81,
+        "level": 52.55
+      }
+    },
+    {
+      "round": 1,
+      "entity": "schema004",
+      "family": "schema",
+      "k": 11,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 7.612,
+        "level": 3.646
+      },
+      "truth": {
+        "flow": 7.612,
+        "level": 3.646
+      }
+    },
+    {
+      "round": 1,
+      "entity": "schema005",
+      "family": "schema",
+      "k": 12,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 0.839,
+        "level": 6.355
+      },
+      "truth": {
+        "flow": 0.839,
+        "level": 6.355
+      }
+    },
+    {
+      "round": 1,
+      "entity": "schema006",
+      "family": "schema",
+      "k": 13,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 2.491,
+        "level": 8.316
+      },
+      "truth": {
+        "flow": 2.491,
+        "level": 8.316
+      }
+    },
+    {
+      "round": 1,
+      "entity": "schema007",
+      "family": "schema",
+      "k": 14,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 26.46,
+        "level": 63.75
+      },
+      "truth": {
+        "flow": 26.46,
+        "level": 63.75
+      }
+    },
+    {
+      "round": 1,
+      "entity": "schema008",
+      "family": "schema",
+      "k": 15,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 54.05,
+        "level": 10.76
+      },
+      "truth": {
+        "flow": 54.05,
+        "level": 10.76
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool001",
+      "family": "tool",
+      "k": 16,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 11000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 11000
+        }
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool002",
+      "family": "tool",
+      "k": 17,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool002",
+        "parameter": "limit_v1",
+        "value": 900
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool002",
+        "kwargs": {
+          "limit_v1": 900
+        }
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool003",
+      "family": "tool",
+      "k": 18,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool003",
+        "parameter": "limit_v1",
+        "value": 49000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool003",
+        "kwargs": {
+          "limit_v1": 49000
+        }
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool004",
+      "family": "tool",
+      "k": 19,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 19000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 19000
+        }
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool005",
+      "family": "tool",
+      "k": 20,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool005",
+        "parameter": "limit_v1",
+        "value": 100
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool005",
+        "kwargs": {
+          "limit_v1": 100
+        }
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool006",
+      "family": "tool",
+      "k": 21,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool006",
+        "parameter": "limit_v1",
+        "value": 9100
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool006",
+        "kwargs": {
+          "limit_v1": 9100
+        }
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool007",
+      "family": "tool",
+      "k": 22,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool007",
+        "parameter": "limit_v1",
+        "value": 600
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool007",
+        "kwargs": {
+          "limit_v1": 600
+        }
+      }
+    },
+    {
+      "round": 1,
+      "entity": "tool008",
+      "family": "tool",
+      "k": 23,
+      "arm": "form",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "memory_before": {
+        "status": null,
+        "version": null,
+        "content": null
+      },
+      "stale_reuse": false,
+      "reads_this": 1,
+      "write": {
+        "action": "practice",
+        "status": "candidate",
+        "successes": 1
+      },
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool008",
+        "parameter": "limit_v1",
+        "value": 520
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool008",
+        "kwargs": {
+          "limit_v1": 520
+        }
+      }
+    }
+  ],
+  "reads": 24,
+  "usage": {
+    "prompt_tokens": 384986,
+    "completion_tokens": 6929,
+    "calls": 48
+  },
+  "served_models": [
+    "deepseek-flash"
+  ]
+}

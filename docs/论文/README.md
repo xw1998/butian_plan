@@ -104,6 +104,18 @@
 - 限制：合成手册无歧义；`needs_revalidation` 由补天自算，未注入「标记本身出错」的情形；每题独立上下文使 `noref` 成本被高估；每档 24 题，50 pp 差距稳健但绝对值不可外推；只测消费不测写回；两宿主同属 DeepSeek 家族（同族 + 跨族各一点）。密钥只从环境变量读取，不写入任何产物。
 
 复现：`DEEPSEEK_API_KEY=<key> python docs/论文/run_host_v6_effectiveness_study.py --out <绝对目录> --stage {bootstrap,run,report} [--model <model>]`；`--stage run` 按 `stages/*.json` 断点续跑。
+## 真实宿主「自己攒经验」形成侧验证（2026-11-03，host-loop-v7）
+
+前六档里经验库都是实验者预置的，模型只负责消费，所以能证明「有库比没库强」，证明不了**库是自己长出来的还有没有用**。这一档把库清空：`form` 臂（召回 + 读源 + 建档 + 改档）从空库起步边干边攒，`noref` 臂只有读源。语料复用 v6（327 行合成手册、120 实体、24 任务实体 × 3 轮 = 72 题），漂移逐轮推进，单宿主 `deepseek-flash`，`temperature=0`。
+
+- [预注册协议](实验协议-真实宿主多轮-v7.md) · [结果文档](真实宿主多轮验证结果-v7-20261103.md) · [运行脚本](run_host_v7_formation_study.py) · [原始结果](experiment_results/host-loop-v7-20261103/summary.json) · [断点续跑说明](实验进度-v7-断点续跑.md)
+- 判词 `v7_formation_effective`（F1–F5 全真）。
+- 读数：两臂均为 **72/72 正确**；读源 **36 对 72（省 50%）**，只看库建起来之后的 R2+R3 为 **12 对 48（省 75%）**；prompt token 604,974 对 1,021,179（降到 59.2%）。
+- 形成过程：`practice` 建档 **24** 次、`revise` 改档 **12** 次（与手册实际改版一一对应），`unchanged`/`skipped`/`error` 全为 **0**。
+- 复用与污染：R2+R3 共 48 题中 **36 题（75%）** 靠自建记忆答对且与真值逐字相等；污染 **0**、陈旧复用 **0**、误读漏读 **0**。
+- 限制：单宿主单种子、24 实体 3 轮；R1 是净投入轮（48 次调用对 24 次），「省 50%」是三轮平均不可读成立刻见效；「自抄 candidate 可复用」是协议 §7.7 的建模设定而非补天默认行为；证据身份由装置按源行登记，不构成模型能力。
+
+复现：`DEEPSEEK_API_KEY=<key> python docs/论文/run_host_v7_formation_study.py --out <绝对目录> --stage bootstrap`，然后 `--stage auto --arm {form,noref}`，最后 `--stage report`；逐题断点续跑，重复执行幂等。
 
 ## 做梦候选验证与后续复用
 

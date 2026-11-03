@@ -1,6 +1,144 @@
 {
   "calibration001": {
-    "content": "RULE {\"entity\": \"calibration001\", \"family\": \"calibration\", \"offset\": 4, \"scale\": 125, \"version\": 1}",
+    "content": "RULE {\"entity\": \"calibration001\", \"family\": \"calibration\", \"offset\": 5, \"scale\": 250, \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "calibration002": {
+    "content": "RULE {\"entity\": \"calibration002\", \"family\": \"calibration\", \"offset\": 8, \"scale\": 2000, \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "calibration003": {
+    "content": "RULE {\"entity\": \"calibration003\", \"family\": \"calibration\", \"offset\": 14, \"scale\": 250, \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "calibration004": {
+    "content": "RULE {\"entity\": \"calibration004\", \"family\": \"calibration\", \"offset\": 14, \"scale\": 500, \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "calibration005": {
+    "content": "RULE {\"entity\": \"calibration005\", \"family\": \"calibration\", \"offset\": 6, \"scale\": 500, \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "calibration006": {
+    "content": "RULE {\"entity\": \"calibration006\", \"family\": \"calibration\", \"offset\": 11, \"scale\": 1000, \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "calibration007": {
+    "content": "RULE {\"entity\": \"calibration007\", \"family\": \"calibration\", \"offset\": 18, \"scale\": 125, \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "calibration008": {
+    "content": "RULE {\"entity\": \"calibration008\", \"family\": \"calibration\", \"offset\": 0, \"scale\": 1000, \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "schema001": {
+    "content": "RULE {\"divisor\": 100, \"entity\": \"schema001\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "schema002": {
+    "content": "RULE {\"divisor\": 10, \"entity\": \"schema002\", \"family\": \"schema\", \"flow_field\": \"f2\", \"level_field\": \"h2\", \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "schema003": {
+    "content": "RULE {\"divisor\": 100, \"entity\": \"schema003\", \"family\": \"schema\", \"flow_field\": \"f2\", \"level_field\": \"h2\", \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "schema004": {
+    "content": "RULE {\"divisor\": 1000, \"entity\": \"schema004\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "schema005": {
+    "content": "RULE {\"divisor\": 10, \"entity\": \"schema005\", \"family\": \"schema\", \"flow_field\": \"f2\", \"level_field\": \"h2\", \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "schema006": {
+    "content": "RULE {\"divisor\": 1000, \"entity\": \"schema006\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "schema007": {
+    "content": "RULE {\"divisor\": 100, \"entity\": \"schema007\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "schema008": {
+    "content": "RULE {\"divisor\": 1000, \"entity\": \"schema008\", \"family\": \"schema\", \"flow_field\": \"f2\", \"level_field\": \"h2\", \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "tool001": {
+    "content": "RULE {\"endpoint\": \"/api/v1/tool001\", \"entity\": \"tool001\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "tool002": {
+    "content": "RULE {\"endpoint\": \"/api/v1/tool002\", \"entity\": \"tool002\", \"factor\": 10, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "tool003": {
+    "content": "RULE {\"endpoint\": \"/api/v2/tool003\", \"entity\": \"tool003\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v2\", \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "tool004": {
+    "content": "RULE {\"endpoint\": \"/api/v1/tool004\", \"entity\": \"tool004\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "tool005": {
+    "content": "RULE {\"endpoint\": \"/api/v1/tool005\", \"entity\": \"tool005\", \"factor\": 100, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "tool006": {
+    "content": "RULE {\"endpoint\": \"/api/v2/tool006\", \"entity\": \"tool006\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v2\", \"version\": 2}",
+    "version": 2,
+    "status": "candidate",
+    "writes": 2
+  },
+  "tool007": {
+    "content": "RULE {\"endpoint\": \"/api/v1/tool007\", \"entity\": \"tool007\", \"factor\": 100, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  },
+  "tool008": {
+    "content": "RULE {\"endpoint\": \"/api/v1/tool008\", \"entity\": \"tool008\", \"factor\": 10, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}",
     "version": 1,
     "status": "candidate",
     "writes": 1

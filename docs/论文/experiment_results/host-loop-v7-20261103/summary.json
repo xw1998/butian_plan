@@ -1,0 +1,129 @@
+{
+  "protocol": "host-loop-v7",
+  "execution_kind": "external_model_formation_v7",
+  "task_seed": 20261103,
+  "model": "deepseek-flash",
+  "arms": {
+    "form": {
+      "n": 72,
+      "correct": 72,
+      "wrong": 0,
+      "unknown": 0,
+      "acc": 1.0,
+      "by_round": {
+        "R1": {
+          "n": 24,
+          "correct": 24,
+          "wrong": 0,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 24
+        },
+        "R2": {
+          "n": 24,
+          "correct": 24,
+          "wrong": 0,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 8
+        },
+        "R3": {
+          "n": 24,
+          "correct": 24,
+          "wrong": 0,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 4
+        }
+      },
+      "usage": {
+        "prompt_tokens": 604974,
+        "completion_tokens": 17500,
+        "calls": 108
+      },
+      "reads": 36,
+      "writes": {
+        "practice": 24,
+        "revise": 12,
+        "unchanged": 0,
+        "skipped": 0,
+        "error": 0,
+        "errors": []
+      }
+    },
+    "noref": {
+      "n": 72,
+      "correct": 72,
+      "wrong": 0,
+      "unknown": 0,
+      "acc": 1.0,
+      "by_round": {
+        "R1": {
+          "n": 24,
+          "correct": 24,
+          "wrong": 0,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 24
+        },
+        "R2": {
+          "n": 24,
+          "correct": 24,
+          "wrong": 0,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 24
+        },
+        "R3": {
+          "n": 24,
+          "correct": 24,
+          "wrong": 0,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 24
+        }
+      },
+      "usage": {
+        "prompt_tokens": 1021179,
+        "completion_tokens": 12435,
+        "calls": 72
+      },
+      "reads": 72,
+      "writes": {
+        "practice": 0,
+        "revise": 0,
+        "unchanged": 0,
+        "skipped": 0,
+        "error": 0,
+        "errors": []
+      }
+    }
+  },
+  "criteria": {
+    "F1_accuracy_not_worse": true,
+    "F2_reads_r23_at_most_half": true,
+    "F3_baseline_above_95": true,
+    "F4_reuse_rate_above_half": true,
+    "F5_zero_contamination": true
+  },
+  "reads_r23": {
+    "form": 12,
+    "noref": 48,
+    "form_threshold": 24.0,
+    "saving_pct": 75.0
+  },
+  "reuse": {
+    "n": 48,
+    "reused": 36,
+    "rate": 0.75
+  },
+  "contamination": {
+    "n": 0,
+    "rows": []
+  },
+  "stale_reuse": {
+    "n": 0,
+    "rows": []
+  },
+  "verdict": "v7_formation_effective"
+}

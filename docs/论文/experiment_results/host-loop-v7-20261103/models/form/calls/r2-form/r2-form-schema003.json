@@ -1,0 +1,31 @@
+{
+  "tag": "r2-form-schema003",
+  "requested_model": "deepseek-flash",
+  "served_model": "deepseek-flash",
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是一个工程助手，靠自己的经验库和源文档答题。经验库从空开始，你要边干边攒。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n读源机制：你看不到源文档，但可以申请。decision=\"source\" 就是「申请读源」——装置收到后会把\n手册全文（120 个实体、每个版本一行 RULE）一次发给你，你在第二轮给出最终作答，decision 仍写\n\"source\"。所以「本轮没有附手册」不代表读不到，不要因为这个就答 unknown。\n\n消费规则（按顺序判，命中即止，严格照做）：\n1. 召回里有**本实体**（memory_id 与题面实体名完全相同）的条目，其内容版本与本轮文档版本一致，\n   状态为 warm / hot / candidate -> decision=\"experience\"，rule 抄那一条，直接作答。\n   candidate 是你自己上一轮从源文档抄下来的，证据就是源行本身，允许直接用；\n   needs_revalidation 只是提示，不是禁令。\n2. 召回里没有本实体的条目 -> decision=\"source\"。别的实体、别的族的条目都不算依据，不许套用。\n3. 有本实体条目但版本不一致，或状态为 disputed -> decision=\"source\"。\n4. 拿到手册之后：找出该实体**本轮版本**那一行 RULE，原样抄进 rule 和 memorize（两者必须完全一致，\n   一个字都不要改），并给出你自己算的 answer；decision 仍写 \"source\"。\n   memorize 是你下一轮不用再翻手册的唯一依据。\n5. 只有拿到手册之后、源里确实找不到该实体本轮版本那一行时，才 decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"rule\": {...} | null,          // 你采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案\n  \"memorize\": \"RULE {...}\" | null,   // 仅当你读了源文档：把该实体本轮版本那条 RULE 原样抄成一行\n  \"reason\": \"一句话说明依据\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。只有在拿到源文档之后仍然找不到依据时，才 decision=\"unknown\"，不得凭记忆猜。"
+    },
+    {
+      "role": "user",
+      "content": "实体 schema003（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 917, \"f2\": 9622, \"f3\": 1214, \"f4\": 4177, \"h1\": 1768, \"h2\": 9708, \"h3\": 4990, \"h4\": 9516}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（共 1 条，列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"schema003\",\n    \"status\": \"candidate\",\n    \"content\": \"RULE {\\\"divisor\\\": 100, \\\"entity\\\": \\\"schema003\\\", \\\"family\\\": \\\"schema\\\", \\\"flow_field\\\": \\\"f1\\\", \\\"level_field\\\": \\\"h1\\\", \\\"version\\\": 1}\",\n    \"needs_revalidation\": true\n  }\n]\n\n注意：本轮没有附源文档。若你需要查手册（比如召回里没有本实体可用的条目），直接输出 decision=\"source\"，装置会立刻把手册全文发给你；不要因为看不到手册就答 unknown。"
+    }
+  ],
+  "reply": "{\"decision\": \"experience\", \"rule\": {\"divisor\": 100, \"entity\": \"schema003\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}, \"answer\": {\"flow\": 9.17, \"level\": 17.68}, \"memorize\": null, \"reason\": \"召回中有本实体 schema003 的 candidate 条目，版本 v1 与本轮文档版本一致，直接采用其 RULE：f1/100 与 h1/100。\"}",
+  "usage": {
+    "prompt_tokens": 941,
+    "completion_tokens": 174,
+    "total_tokens": 1115,
+    "prompt_tokens_details": {
+      "cached_tokens": 512
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 52
+    },
+    "prompt_cache_hit_tokens": 512,
+    "prompt_cache_miss_tokens": 429
+  },
+  "finish_reason": "stop",
+  "parse": "ok"
+}
