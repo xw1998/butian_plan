@@ -1,0 +1,31 @@
+{
+  "tag": "lib-r3-tool002",
+  "requested_model": "deepseek-flash",
+  "served_model": "deepseek-flash",
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是一个工程助手，通过经验库和源文档答题。你会收到一道题，以及一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"rule\": {...} | null,          // 你采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案\n  \"reason\": \"一句话说明依据\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+    },
+    {
+      "role": "user",
+      "content": "实体 tool002（tool 族），当前文档版本 v1。\n调用参数 raw = 51，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本轮不限读源次数。\n\n本次经验召回返回（共 1 条，列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"tool002-v1\",\n    \"status\": \"warm\",\n    \"content\": \"RULE {\\\"endpoint\\\": \\\"/api/v1/tool002\\\", \\\"entity\\\": \\\"tool002\\\", \\\"factor\\\": 10, \\\"family\\\": \\\"tool\\\", \\\"parameter\\\": \\\"limit_v1\\\", \\\"version\\\": 1}\",\n    \"needs_revalidation\": false\n  }\n]"
+    }
+  ],
+  "reply": "{\"decision\":\"experience\",\"rule\":{\"endpoint\":\"/api/v1/tool002\",\"entity\":\"tool002\",\"factor\":10,\"family\":\"tool\",\"parameter\":\"limit_v1\",\"version\":1},\"answer\":{\"endpoint\":\"/api/v1/tool002\",\"parameter\":\"limit_v1\",\"value\":510},\"reason\":\"召回经验状态为 warm 且版本 v1 与当前文档一致，按公式 value = raw * factor = 51 * 10 = 510。\"}",
+  "usage": {
+    "prompt_tokens": 573,
+    "completion_tokens": 149,
+    "total_tokens": 722,
+    "prompt_tokens_details": {
+      "cached_tokens": 256
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 46
+    },
+    "prompt_cache_hit_tokens": 256,
+    "prompt_cache_miss_tokens": 317
+  },
+  "finish_reason": "stop",
+  "parse": "ok"
+}

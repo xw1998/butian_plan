@@ -1,0 +1,248 @@
+{
+  "protocol": "host-loop-v6",
+  "execution_kind": "external_model_effectiveness_v6",
+  "task_seed": 20261103,
+  "models": {
+    "deepseek-v4-pro": {
+      "axis_a": {
+        "lib": {
+          "n": 72,
+          "correct": 71,
+          "unknown": 1,
+          "acc": 0.9861,
+          "reads": 20,
+          "usage": {
+            "prompt_tokens": 335918,
+            "completion_tokens": 47346,
+            "calls": 92
+          },
+          "by_round": {
+            "R1": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R2": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R3": {
+              "n": 24,
+              "correct": 23,
+              "unknown": 1,
+              "acc": 0.9583
+            }
+          }
+        },
+        "noref": {
+          "n": 72,
+          "correct": 72,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 72,
+          "usage": {
+            "prompt_tokens": 1054132,
+            "completion_tokens": 36963,
+            "calls": 74
+          },
+          "by_round": {
+            "R1": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R2": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R3": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            }
+          }
+        }
+      },
+      "axis_b": {
+        "L6": {
+          "lib": {
+            "n": 24,
+            "correct": 18,
+            "unknown": 6,
+            "acc": 0.75,
+            "reads": 6,
+            "budget_used": 6
+          },
+          "noref": {
+            "n": 24,
+            "correct": 6,
+            "unknown": 18,
+            "acc": 0.25,
+            "reads": 6,
+            "budget_used": 6
+          }
+        },
+        "L12": {
+          "lib": {
+            "n": 24,
+            "correct": 24,
+            "unknown": 0,
+            "acc": 1.0,
+            "reads": 12,
+            "budget_used": 12
+          },
+          "noref": {
+            "n": 24,
+            "correct": 12,
+            "unknown": 12,
+            "acc": 0.5,
+            "reads": 12,
+            "budget_used": 12
+          }
+        }
+      },
+      "criteria": {
+        "Z1_accuracy_not_worse": true,
+        "Z2_reads_at_most_half": true,
+        "Z3_baseline_above_95": true,
+        "Z4_budget_gap_ge_15pp": true
+      },
+      "budget_gaps_pp": {
+        "L6": 50.0,
+        "L12": 50.0
+      },
+      "reads_saving_pct": 72.2,
+      "verdict": "v6_library_effective_both_axes"
+    },
+    "deepseek-flash": {
+      "axis_a": {
+        "lib": {
+          "n": 72,
+          "correct": 72,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 20,
+          "usage": {
+            "prompt_tokens": 331183,
+            "completion_tokens": 14761,
+            "calls": 92
+          },
+          "by_round": {
+            "R1": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R2": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R3": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            }
+          }
+        },
+        "noref": {
+          "n": 72,
+          "correct": 72,
+          "unknown": 0,
+          "acc": 1.0,
+          "reads": 72,
+          "usage": {
+            "prompt_tokens": 1021611,
+            "completion_tokens": 11900,
+            "calls": 72
+          },
+          "by_round": {
+            "R1": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R2": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            },
+            "R3": {
+              "n": 24,
+              "correct": 24,
+              "unknown": 0,
+              "acc": 1.0
+            }
+          }
+        }
+      },
+      "axis_b": {
+        "L6": {
+          "lib": {
+            "n": 24,
+            "correct": 18,
+            "unknown": 6,
+            "acc": 0.75,
+            "reads": 6,
+            "budget_used": 6
+          },
+          "noref": {
+            "n": 24,
+            "correct": 6,
+            "unknown": 18,
+            "acc": 0.25,
+            "reads": 6,
+            "budget_used": 6
+          }
+        },
+        "L12": {
+          "lib": {
+            "n": 24,
+            "correct": 24,
+            "unknown": 0,
+            "acc": 1.0,
+            "reads": 12,
+            "budget_used": 12
+          },
+          "noref": {
+            "n": 24,
+            "correct": 12,
+            "unknown": 12,
+            "acc": 0.5,
+            "reads": 12,
+            "budget_used": 12
+          }
+        }
+      },
+      "criteria": {
+        "Z1_accuracy_not_worse": true,
+        "Z2_reads_at_most_half": true,
+        "Z3_baseline_above_95": true,
+        "Z4_budget_gap_ge_15pp": true
+      },
+      "budget_gaps_pp": {
+        "L6": 50.0,
+        "L12": 50.0
+      },
+      "reads_saving_pct": 72.2,
+      "verdict": "v6_library_effective_both_axes"
+    }
+  },
+  "verdict": "v6_cross_model_replicated",
+  "per_model_verdict": {
+    "deepseek-v4-pro": "v6_library_effective_both_axes",
+    "deepseek-flash": "v6_library_effective_both_axes"
+  }
+}

@@ -1,0 +1,602 @@
+[
+  {
+    "entity": "calibration001",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration002",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration003",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration004",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration005",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration006",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration007",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration008",
+    "family": "calibration",
+    "task": true
+  },
+  {
+    "entity": "calibration009",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration010",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration011",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration012",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration013",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration014",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration015",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration016",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration017",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration018",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration019",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration020",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration021",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration022",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration023",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration024",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration025",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration026",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration027",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration028",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration029",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration030",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration031",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration032",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration033",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration034",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration035",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration036",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration037",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration038",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration039",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "calibration040",
+    "family": "calibration",
+    "task": false
+  },
+  {
+    "entity": "schema001",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema002",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema003",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema004",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema005",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema006",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema007",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema008",
+    "family": "schema",
+    "task": true
+  },
+  {
+    "entity": "schema009",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema010",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema011",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema012",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema013",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema014",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema015",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema016",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema017",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema018",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema019",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema020",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema021",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema022",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema023",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema024",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema025",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema026",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema027",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema028",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema029",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema030",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema031",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema032",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema033",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema034",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema035",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema036",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema037",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema038",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema039",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "schema040",
+    "family": "schema",
+    "task": false
+  },
+  {
+    "entity": "tool001",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool002",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool003",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool004",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool005",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool006",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool007",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool008",
+    "family": "tool",
+    "task": true
+  },
+  {
+    "entity": "tool009",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool010",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool011",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool012",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool013",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool014",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool015",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool016",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool017",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool018",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool019",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool020",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool021",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool022",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool023",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool024",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool025",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool026",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool027",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool028",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool029",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool030",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool031",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool032",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool033",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool034",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool035",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool036",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool037",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool038",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool039",
+    "family": "tool",
+    "task": false
+  },
+  {
+    "entity": "tool040",
+    "family": "tool",
+    "task": false
+  }
+]

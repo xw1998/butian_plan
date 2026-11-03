@@ -1,0 +1,558 @@
+{
+  "rows": [
+    {
+      "round": 3,
+      "entity": "calibration001",
+      "family": "calibration",
+      "k": 0,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 11,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 20.316
+      },
+      "truth": 20.316
+    },
+    {
+      "round": 3,
+      "entity": "calibration002",
+      "family": "calibration",
+      "k": 1,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 10,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 4.4225
+      },
+      "truth": 4.4225
+    },
+    {
+      "round": 3,
+      "entity": "calibration003",
+      "family": "calibration",
+      "k": 2,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 10,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 21.056
+      },
+      "truth": 21.056
+    },
+    {
+      "round": 3,
+      "entity": "calibration004",
+      "family": "calibration",
+      "k": 3,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 9,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 18.79
+      },
+      "truth": 18.79
+    },
+    {
+      "round": 3,
+      "entity": "calibration005",
+      "family": "calibration",
+      "k": 4,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 8,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 0.698
+      },
+      "truth": 0.698
+    },
+    {
+      "round": 3,
+      "entity": "calibration006",
+      "family": "calibration",
+      "k": 5,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 8,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 7.341
+      },
+      "truth": 7.341
+    },
+    {
+      "round": 3,
+      "entity": "calibration007",
+      "family": "calibration",
+      "k": 6,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 7,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 5.344
+      },
+      "truth": 5.344
+    },
+    {
+      "round": 3,
+      "entity": "calibration008",
+      "family": "calibration",
+      "k": 7,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 6,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 6.369
+      },
+      "truth": 6.369
+    },
+    {
+      "round": 3,
+      "entity": "schema001",
+      "family": "schema",
+      "k": 8,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 6,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 42.68,
+        "level": 48.59
+      },
+      "truth": {
+        "flow": 42.68,
+        "level": 48.59
+      }
+    },
+    {
+      "round": 3,
+      "entity": "schema002",
+      "family": "schema",
+      "k": 9,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 5,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 22,
+        "level": 19.7
+      },
+      "truth": {
+        "flow": 22.0,
+        "level": 19.7
+      }
+    },
+    {
+      "round": 3,
+      "entity": "schema003",
+      "family": "schema",
+      "k": 10,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 4,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 85.11,
+        "level": 66.92
+      },
+      "truth": {
+        "flow": 85.11,
+        "level": 66.92
+      }
+    },
+    {
+      "round": 3,
+      "entity": "schema004",
+      "family": "schema",
+      "k": 11,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 4,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 9.549,
+        "level": 2.55
+      },
+      "truth": {
+        "flow": 9.549,
+        "level": 2.55
+      }
+    },
+    {
+      "round": 3,
+      "entity": "schema005",
+      "family": "schema",
+      "k": 12,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 3,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 317.9,
+        "level": 509.4
+      },
+      "truth": {
+        "flow": 317.9,
+        "level": 509.4
+      }
+    },
+    {
+      "round": 3,
+      "entity": "schema006",
+      "family": "schema",
+      "k": 13,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 3,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 8.252,
+        "level": 4.758
+      },
+      "truth": {
+        "flow": 8.252,
+        "level": 4.758
+      }
+    },
+    {
+      "round": 3,
+      "entity": "schema007",
+      "family": "schema",
+      "k": 14,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 3,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 97.18,
+        "level": 37.61
+      },
+      "truth": {
+        "flow": 97.18,
+        "level": 37.61
+      }
+    },
+    {
+      "round": 3,
+      "entity": "schema008",
+      "family": "schema",
+      "k": 15,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 2,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 1.772,
+        "level": 1.873
+      },
+      "truth": {
+        "flow": 1.772,
+        "level": 1.873
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool001",
+      "family": "tool",
+      "k": 16,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 2,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 25000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 25000
+        }
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool002",
+      "family": "tool",
+      "k": 17,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 2,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool002",
+        "parameter": "limit_v1",
+        "value": 510
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool002",
+        "kwargs": {
+          "limit_v1": 510
+        }
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool003",
+      "family": "tool",
+      "k": 18,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 1,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v2/tool003",
+        "parameter": "limit_v2",
+        "value": 33000
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool003",
+        "kwargs": {
+          "limit_v2": 33000
+        }
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool004",
+      "family": "tool",
+      "k": 19,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 1,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 89000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 89000
+        }
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool005",
+      "family": "tool",
+      "k": 20,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 1,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool005",
+        "parameter": "limit_v1",
+        "value": 5300
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool005",
+        "kwargs": {
+          "limit_v1": 5300
+        }
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool006",
+      "family": "tool",
+      "k": 21,
+      "arm": "lib",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": 0,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v2/tool006",
+        "parameter": "limit_v2",
+        "value": 82000
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool006",
+        "kwargs": {
+          "limit_v2": 82000
+        }
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool007",
+      "family": "tool",
+      "k": 22,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 0,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool007",
+        "parameter": "limit_v1",
+        "value": 8000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool007",
+        "kwargs": {
+          "limit_v1": 8000
+        }
+      }
+    },
+    {
+      "round": 3,
+      "entity": "tool008",
+      "family": "tool",
+      "k": 23,
+      "arm": "lib",
+      "version": 1,
+      "stale": false,
+      "decision": "experience",
+      "basis": "experience",
+      "reads_this": 0,
+      "budget_left": 0,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool008",
+        "parameter": "limit_v1",
+        "value": 810
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool008",
+        "kwargs": {
+          "limit_v1": 810
+        }
+      }
+    }
+  ],
+  "reads": 12,
+  "usage": {
+    "prompt_tokens": 189280,
+    "completion_tokens": 17962,
+    "calls": 36
+  },
+  "served_models": [
+    "deepseek-v4-pro"
+  ],
+  "parse_errors": 0
+}

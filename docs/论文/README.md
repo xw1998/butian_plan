@@ -92,6 +92,19 @@
 
 复现：`DEEPSEEK_API_KEY=<key> python docs/论文/run_host_v5_multiround_study.py --out <绝对目录> --stage {bootstrap,run,report}`。已结算轮次自动跳过，可断点续跑；宿主可见文件仍只有按臂裁剪后的 `stages/rN-recall-request.json`。
 
+## 真实宿主「用 vs 不用」双轴验证（2026-11-03，host-loop-v6）
+
+前五档都在问「补天里的某个元件是否承重」，两臂都在用经验库，因此只能证明元件必要，证明不了整体比不用更好。这一档直接对比两个真实工作流：`lib`（召回 + 读源）与 `noref`（只有读源，完全没有记忆层），并在两个轴上同时测——**成本轴**（不限额度比读源次数与 token）与**预算轴**（同样只有 6 / 12 次读源额度比完成率）。语料是 327 行合成设备手册、120 个实体（24 个任务实体 + 96 个诱饵）、72 题，漂移逐轮推进到 12/24 陈旧；`temperature=0`、每题独立上下文、两个跨族外部宿主。
+
+- [预注册协议](实验协议-真实宿主多轮-v6.md) · [结果文档](真实宿主多轮验证结果-v6-20261103.md) · [运行脚本](run_host_v6_effectiveness_study.py) · [原始结果](experiment_results/host-loop-v6-20261103/summary.json)
+- 判词 `v6_cross_model_replicated`，两个宿主各自 `v6_library_effective_both_axes`（Z1–Z4 全真）。
+- **成本轴**：准确率 98.6% / 100%（`lib`，pro / flash）对 100% / 100%（`noref`）；读源次数 **20 对 72（省 72.2%）**，prompt token 335,918 对 1,054,132（降到 31.9%），flash 为 331,183 对 1,021,611（降到 32.4%）。
+- **预算轴**：每臂只有 6 / 12 次读源额度时，`lib` 完成 18/24 与 24/24，`noref` 只有 6/24 与 12/24 —— **差 50 个百分点**，两宿主逐格相同。`noref` 每翻一次手册只能答一题，额度用完即停工。
+- 闸门审计：R1/R2/R3 陈旧题 0/8/12 个，`lib` 读源 0/8/12 次，逐题零误花零漏读（24/24）；额度耗尽时返回 `unknown` 而不是猜。
+- 限制：合成手册无歧义；`needs_revalidation` 由补天自算，未注入「标记本身出错」的情形；每题独立上下文使 `noref` 成本被高估；每档 24 题，50 pp 差距稳健但绝对值不可外推；只测消费不测写回；两宿主同属 DeepSeek 家族（同族 + 跨族各一点）。密钥只从环境变量读取，不写入任何产物。
+
+复现：`DEEPSEEK_API_KEY=<key> python docs/论文/run_host_v6_effectiveness_study.py --out <绝对目录> --stage {bootstrap,run,report} [--model <model>]`；`--stage run` 按 `stages/*.json` 断点续跑。
+
 ## 做梦候选验证与后续复用
 
 [运行脚本](run_dream_effect_study.py) · [原始结果与逐题记录](experiment_results/dream-effect-20261015/results.json) · [图表](experiment_results/dream-effect-20261015/effects.png)。10种子、线性与饱和两任务族、每条件320个后续任务。关闭做梦与验证后复用均320/320正确；未经验证复用200/320正确。验证后复用有160次后续取源和40次验证访问，相对关闭条件320次减少37.5%；加入各条件共同的60次训练取源后减少31.58%。宿主预先提出归纳模板，脚本通过生产dream和实践反馈接口回放，未进行盲测模型推理；不据此声称模型能力提升。

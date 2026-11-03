@@ -1,0 +1,31 @@
+{
+  "tag": "B-L12-noref-r3-tool005",
+  "requested_model": "deepseek-v4-pro",
+  "served_model": "deepseek-v4-pro",
+  "messages": [
+    {
+      "role": "system",
+      "content": "你是一个工程助手，只能依据源文档答题。你没有经验库，没有任何历史记录。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n本题会附上源文档全文（若本轮读源额度已用尽则不附）。你必须从源文档中找出该实体在\n**本轮文档版本**下的那条 RULE，原样抄进 rule 字段，并给出你自己算出的 answer。\n若没有源文档可用，必须 decision=\"unknown\"，不得凭记忆或猜测作答。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"rule\": {...} | null,          // 你采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案\n  \"reason\": \"一句话说明依据\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+    },
+    {
+      "role": "user",
+      "content": "实体 tool005（tool 族），当前文档版本 v1。\n调用参数 raw = 53，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本轮读源额度已用尽，无法读取源文档。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+    }
+  ],
+  "reply": "{\"decision\":\"unknown\",\"rule\":null,\"answer\":null,\"reason\":\"本轮读源额度已用尽，无源文档可用，无法确认该实体在v1版本下的RULE与参数值\"}",
+  "usage": {
+    "prompt_tokens": 499,
+    "completion_tokens": 114,
+    "total_tokens": 613,
+    "prompt_tokens_details": {
+      "cached_tokens": 384
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 70
+    },
+    "prompt_cache_hit_tokens": 384,
+    "prompt_cache_miss_tokens": 115
+  },
+  "finish_reason": "stop",
+  "parse": "ok"
+}

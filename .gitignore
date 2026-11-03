@@ -194,3 +194,28 @@ _tmp_*.py
 !/docs/论文/experiment_results/host-loop-v5-20261103/models/*/calls/*.json
 !/docs/论文/experiment_results/host-loop-v5-20261103/models/*/seed-evidence/
 !/docs/论文/experiment_results/host-loop-v5-20261103/models/*/seed-evidence/*.txt
+
+# Real-host multiround arm 6 (2026-11-03, host-loop-v6): library-vs-no-library effectiveness
+# measured on two axes (cost and budget) with external API models. Protocol, runner, result
+# document, stage records, raw model transcripts and token usage are public; SQLite homes stay private.
+!/docs/论文/实验协议-真实宿主多轮-v6.md
+!/docs/论文/run_host_v6_effectiveness_study.py
+!/docs/论文/真实宿主多轮验证结果-v6-20261103.md
+!/docs/论文/experiment_results/host-loop-v6-20261103/
+!/docs/论文/experiment_results/host-loop-v6-20261103/summary.json
+!/docs/论文/experiment_results/host-loop-v6-20261103/state.json
+!/docs/论文/experiment_results/host-loop-v6-20261103/fixtures/
+!/docs/论文/experiment_results/host-loop-v6-20261103/fixtures/*.json
+!/docs/论文/experiment_results/host-loop-v6-20261103/fixtures/*.txt
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/state.json
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/mcp-trace.jsonl
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/fixtures/
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/fixtures/*.json
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/fixtures/*.txt
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/stages/
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/stages/*.json
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/calls/
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/calls/*/
+!/docs/论文/experiment_results/host-loop-v6-20261103/models/*/calls/*/*.json

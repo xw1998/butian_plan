@@ -1,0 +1,558 @@
+{
+  "rows": [
+    {
+      "round": 2,
+      "entity": "calibration001",
+      "family": "calibration",
+      "k": 0,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 7.576
+      },
+      "truth": 7.576
+    },
+    {
+      "round": 2,
+      "entity": "calibration002",
+      "family": "calibration",
+      "k": 1,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 6.16
+      },
+      "truth": 6.16
+    },
+    {
+      "round": 2,
+      "entity": "calibration003",
+      "family": "calibration",
+      "k": 2,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 33.724
+      },
+      "truth": 33.724
+    },
+    {
+      "round": 2,
+      "entity": "calibration004",
+      "family": "calibration",
+      "k": 3,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 19.286
+      },
+      "truth": 19.286
+    },
+    {
+      "round": 2,
+      "entity": "calibration005",
+      "family": "calibration",
+      "k": 4,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 33.808
+      },
+      "truth": 33.808
+    },
+    {
+      "round": 2,
+      "entity": "calibration006",
+      "family": "calibration",
+      "k": 5,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 9.118
+      },
+      "truth": 9.118
+    },
+    {
+      "round": 2,
+      "entity": "calibration007",
+      "family": "calibration",
+      "k": 6,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 76.336
+      },
+      "truth": 76.336
+    },
+    {
+      "round": 2,
+      "entity": "calibration008",
+      "family": "calibration",
+      "k": 7,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "value": 19.312
+      },
+      "truth": 19.312
+    },
+    {
+      "round": 2,
+      "entity": "schema001",
+      "family": "schema",
+      "k": 8,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 46.03,
+        "level": 60.35
+      },
+      "truth": {
+        "flow": 46.03,
+        "level": 60.35
+      }
+    },
+    {
+      "round": 2,
+      "entity": "schema002",
+      "family": "schema",
+      "k": 9,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 850.7,
+        "level": 173
+      },
+      "truth": {
+        "flow": 850.7,
+        "level": 173.0
+      }
+    },
+    {
+      "round": 2,
+      "entity": "schema003",
+      "family": "schema",
+      "k": 10,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 9.17,
+        "level": 17.68
+      },
+      "truth": {
+        "flow": 9.17,
+        "level": 17.68
+      }
+    },
+    {
+      "round": 2,
+      "entity": "schema004",
+      "family": "schema",
+      "k": 11,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 2.862,
+        "level": 2.821
+      },
+      "truth": {
+        "flow": 2.862,
+        "level": 2.821
+      }
+    },
+    {
+      "round": 2,
+      "entity": "schema005",
+      "family": "schema",
+      "k": 12,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 391.4,
+        "level": 471.0
+      },
+      "truth": {
+        "flow": 391.4,
+        "level": 471.0
+      }
+    },
+    {
+      "round": 2,
+      "entity": "schema006",
+      "family": "schema",
+      "k": 13,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 7.814,
+        "level": 9.181
+      },
+      "truth": {
+        "flow": 7.814,
+        "level": 9.181
+      }
+    },
+    {
+      "round": 2,
+      "entity": "schema007",
+      "family": "schema",
+      "k": 14,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 96.73,
+        "level": 65.67
+      },
+      "truth": {
+        "flow": 96.73,
+        "level": 65.67
+      }
+    },
+    {
+      "round": 2,
+      "entity": "schema008",
+      "family": "schema",
+      "k": 15,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "flow": 3.933,
+        "level": 1.54
+      },
+      "truth": {
+        "flow": 3.933,
+        "level": 1.54
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool001",
+      "family": "tool",
+      "k": 16,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool001",
+        "parameter": "limit_v1",
+        "value": 89000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool001",
+        "kwargs": {
+          "limit_v1": 89000
+        }
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool002",
+      "family": "tool",
+      "k": 17,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool002",
+        "parameter": "limit_v1",
+        "value": 880
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool002",
+        "kwargs": {
+          "limit_v1": 880
+        }
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool003",
+      "family": "tool",
+      "k": 18,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v2/tool003",
+        "parameter": "limit_v2",
+        "value": 81000
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool003",
+        "kwargs": {
+          "limit_v2": 81000
+        }
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool004",
+      "family": "tool",
+      "k": 19,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool004",
+        "parameter": "limit_v1",
+        "value": 51000
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool004",
+        "kwargs": {
+          "limit_v1": 51000
+        }
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool005",
+      "family": "tool",
+      "k": 20,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool005",
+        "parameter": "limit_v1",
+        "value": 1100
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool005",
+        "kwargs": {
+          "limit_v1": 1100
+        }
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool006",
+      "family": "tool",
+      "k": 21,
+      "arm": "noref",
+      "version": 2,
+      "stale": true,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v2/tool006",
+        "parameter": "limit_v2",
+        "value": 85000
+      },
+      "truth": {
+        "endpoint": "/api/v2/tool006",
+        "kwargs": {
+          "limit_v2": 85000
+        }
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool007",
+      "family": "tool",
+      "k": 22,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool007",
+        "parameter": "limit_v1",
+        "value": 8500
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool007",
+        "kwargs": {
+          "limit_v1": 8500
+        }
+      }
+    },
+    {
+      "round": 2,
+      "entity": "tool008",
+      "family": "tool",
+      "k": 23,
+      "arm": "noref",
+      "version": 1,
+      "stale": false,
+      "decision": "source",
+      "basis": "source",
+      "reads_this": 1,
+      "budget_left": null,
+      "script_verdict": "correct",
+      "model_verdict": "correct",
+      "answer": {
+        "endpoint": "/api/v1/tool008",
+        "parameter": "limit_v1",
+        "value": 30
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool008",
+        "kwargs": {
+          "limit_v1": 30
+        }
+      }
+    }
+  ],
+  "reads": 24,
+  "usage": {
+    "prompt_tokens": 341811,
+    "completion_tokens": 13466,
+    "calls": 24
+  },
+  "served_models": [
+    "deepseek-v4-pro"
+  ],
+  "parse_errors": 0
+}
