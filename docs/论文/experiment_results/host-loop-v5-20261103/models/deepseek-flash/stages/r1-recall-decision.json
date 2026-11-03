@@ -1,0 +1,74 @@
+{
+  "calibration101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按规则 1 直接采用该 RULE 计算 (2288-4)/125=18.272",
+    "memory_index": 0
+  },
+  "calibration201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2直接依据其内容作答：(8309-23)/2000=4.143",
+    "memory_index": 0
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 1 与当前文档 v1 一致，按规则 1 直接采用该 RULE 计算 (5667-23)/1000",
+    "memory_index": 0
+  },
+  "calibration401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按消费规则第 2 条直接按内容作答：(587-3)/2000=0.292",
+    "memory_index": 0
+  },
+  "schema101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按规则 1 采用该经验。",
+    "memory_index": 0
+  },
+  "schema201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按内容直接作答（规则2），且实体 schema201 与本轮一致。",
+    "memory_index": 0
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与本文档版本一致，按规则 1 直接采用该 RULE 计算。",
+    "memory_index": 0
+  },
+  "schema401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本或状态信息，按内容直接作答（规则2）",
+    "memory_index": 0
+  },
+  "tool101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按规则1直接采用该 RULE 作答。",
+    "memory_index": 0
+  },
+  "tool201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，参数值 = raw * factor = 3 * 1000 = 3000",
+    "memory_index": 0
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按规则 1 直接采用该 RULE 计算：73 × 100 = 7300。",
+    "memory_index": 0
+  },
+  "tool401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答：值 = raw * factor = 78 * 10 = 780",
+    "memory_index": 0
+  }
+}

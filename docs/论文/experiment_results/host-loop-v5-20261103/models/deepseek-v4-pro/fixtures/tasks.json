@@ -1,0 +1,802 @@
+[
+  {
+    "round": 1,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "gated",
+    "version": 1,
+    "stable": false,
+    "raw": 2288,
+    "truth": 18.272
+  },
+  {
+    "round": 2,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "gated",
+    "version": 2,
+    "stable": false,
+    "raw": 995,
+    "truth": 3.96
+  },
+  {
+    "round": 3,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "gated",
+    "version": 3,
+    "stable": false,
+    "raw": 8763,
+    "truth": 34.976
+  },
+  {
+    "round": 4,
+    "entity": "calibration101",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "gated",
+    "version": 4,
+    "stable": false,
+    "raw": 4260,
+    "truth": 2.117
+  },
+  {
+    "round": 1,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "naive",
+    "version": 1,
+    "stable": false,
+    "raw": 8309,
+    "truth": 4.143
+  },
+  {
+    "round": 2,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "naive",
+    "version": 2,
+    "stable": false,
+    "raw": 3035,
+    "truth": 1.516
+  },
+  {
+    "round": 3,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "naive",
+    "version": 3,
+    "stable": false,
+    "raw": 5220,
+    "truth": 20.824
+  },
+  {
+    "round": 4,
+    "entity": "calibration201",
+    "family": "calibration",
+    "group": "drift",
+    "arm": "naive",
+    "version": 4,
+    "stable": false,
+    "raw": 5357,
+    "truth": 21.388
+  },
+  {
+    "round": 1,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 5667,
+    "truth": 5.644
+  },
+  {
+    "round": 2,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 7530,
+    "truth": 7.507
+  },
+  {
+    "round": 3,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 3459,
+    "truth": 3.436
+  },
+  {
+    "round": 4,
+    "entity": "calibration301",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 4076,
+    "truth": 4.053
+  },
+  {
+    "round": 1,
+    "entity": "calibration401",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 587,
+    "truth": 0.292
+  },
+  {
+    "round": 2,
+    "entity": "calibration401",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 1310,
+    "truth": 0.6535
+  },
+  {
+    "round": 3,
+    "entity": "calibration401",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 5203,
+    "truth": 2.6
+  },
+  {
+    "round": 4,
+    "entity": "calibration401",
+    "family": "calibration",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 3670,
+    "truth": 1.8335
+  },
+  {
+    "round": 1,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "drift",
+    "arm": "gated",
+    "version": 1,
+    "stable": false,
+    "payload": {
+      "f1": 6525,
+      "f2": 5974,
+      "f3": 660,
+      "f4": 1393,
+      "h1": 7946,
+      "h2": 2120,
+      "h3": 3208,
+      "h4": 9632
+    },
+    "truth": {
+      "flow": 6.525,
+      "level": 7.946
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "drift",
+    "arm": "gated",
+    "version": 2,
+    "stable": false,
+    "payload": {
+      "f1": 4642,
+      "f2": 4299,
+      "f3": 760,
+      "f4": 9460,
+      "h1": 1782,
+      "h2": 5557,
+      "h3": 3449,
+      "h4": 7129
+    },
+    "truth": {
+      "flow": 42.99,
+      "level": 55.57
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "drift",
+    "arm": "gated",
+    "version": 3,
+    "stable": false,
+    "payload": {
+      "f1": 3786,
+      "f2": 7842,
+      "f3": 288,
+      "f4": 9707,
+      "h1": 8100,
+      "h2": 2720,
+      "h3": 650,
+      "h4": 2202
+    },
+    "truth": {
+      "flow": 28.8,
+      "level": 65.0
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema101",
+    "family": "schema",
+    "group": "drift",
+    "arm": "gated",
+    "version": 4,
+    "stable": false,
+    "payload": {
+      "f1": 8274,
+      "f2": 1768,
+      "f3": 6625,
+      "f4": 1788,
+      "h1": 8592,
+      "h2": 1703,
+      "h3": 9898,
+      "h4": 5738
+    },
+    "truth": {
+      "flow": 178.8,
+      "level": 573.8
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "drift",
+    "arm": "naive",
+    "version": 1,
+    "stable": false,
+    "payload": {
+      "f1": 5405,
+      "f2": 944,
+      "f3": 933,
+      "f4": 3535,
+      "h1": 2896,
+      "h2": 8405,
+      "h3": 6989,
+      "h4": 863
+    },
+    "truth": {
+      "flow": 5.405,
+      "level": 2.896
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "drift",
+    "arm": "naive",
+    "version": 2,
+    "stable": false,
+    "payload": {
+      "f1": 5821,
+      "f2": 4100,
+      "f3": 9674,
+      "f4": 3675,
+      "h1": 5280,
+      "h2": 9282,
+      "h3": 7325,
+      "h4": 8097
+    },
+    "truth": {
+      "flow": 410.0,
+      "level": 928.2
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "drift",
+    "arm": "naive",
+    "version": 3,
+    "stable": false,
+    "payload": {
+      "f1": 9492,
+      "f2": 5769,
+      "f3": 6797,
+      "f4": 4026,
+      "h1": 7852,
+      "h2": 1149,
+      "h3": 8794,
+      "h4": 1561
+    },
+    "truth": {
+      "flow": 679.7,
+      "level": 879.4
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema201",
+    "family": "schema",
+    "group": "drift",
+    "arm": "naive",
+    "version": 4,
+    "stable": false,
+    "payload": {
+      "f1": 1999,
+      "f2": 8778,
+      "f3": 9717,
+      "f4": 4927,
+      "h1": 6434,
+      "h2": 951,
+      "h3": 5287,
+      "h4": 5941
+    },
+    "truth": {
+      "flow": 4.927,
+      "level": 5.941
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 8832,
+      "f2": 9327,
+      "f3": 4620,
+      "f4": 9091,
+      "h1": 5441,
+      "h2": 8093,
+      "h3": 1952,
+      "h4": 4507
+    },
+    "truth": {
+      "flow": 88.32,
+      "level": 54.41
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 8544,
+      "f2": 4505,
+      "f3": 2199,
+      "f4": 1,
+      "h1": 5728,
+      "h2": 5757,
+      "h3": 8717,
+      "h4": 5672
+    },
+    "truth": {
+      "flow": 85.44,
+      "level": 57.28
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 3935,
+      "f2": 2807,
+      "f3": 4491,
+      "f4": 2830,
+      "h1": 5567,
+      "h2": 6677,
+      "h3": 7364,
+      "h4": 550
+    },
+    "truth": {
+      "flow": 39.35,
+      "level": 55.67
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema301",
+    "family": "schema",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 3143,
+      "f2": 32,
+      "f3": 6694,
+      "f4": 3212,
+      "h1": 8214,
+      "h2": 7256,
+      "h3": 2875,
+      "h4": 5949
+    },
+    "truth": {
+      "flow": 31.43,
+      "level": 82.14
+    }
+  },
+  {
+    "round": 1,
+    "entity": "schema401",
+    "family": "schema",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 753,
+      "f2": 7988,
+      "f3": 3748,
+      "f4": 7043,
+      "h1": 1261,
+      "h2": 9295,
+      "h3": 6629,
+      "h4": 3214
+    },
+    "truth": {
+      "flow": 0.753,
+      "level": 1.261
+    }
+  },
+  {
+    "round": 2,
+    "entity": "schema401",
+    "family": "schema",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 6388,
+      "f2": 6290,
+      "f3": 1536,
+      "f4": 9756,
+      "h1": 8956,
+      "h2": 6291,
+      "h3": 7149,
+      "h4": 2714
+    },
+    "truth": {
+      "flow": 6.388,
+      "level": 8.956
+    }
+  },
+  {
+    "round": 3,
+    "entity": "schema401",
+    "family": "schema",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 1832,
+      "f2": 9160,
+      "f3": 1070,
+      "f4": 8445,
+      "h1": 8159,
+      "h2": 1977,
+      "h3": 4798,
+      "h4": 8584
+    },
+    "truth": {
+      "flow": 1.832,
+      "level": 8.159
+    }
+  },
+  {
+    "round": 4,
+    "entity": "schema401",
+    "family": "schema",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "payload": {
+      "f1": 2583,
+      "f2": 6626,
+      "f3": 7973,
+      "f4": 7862,
+      "h1": 8354,
+      "h2": 998,
+      "h3": 4807,
+      "h4": 8210
+    },
+    "truth": {
+      "flow": 2.583,
+      "level": 8.354
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "drift",
+    "arm": "gated",
+    "version": 1,
+    "stable": false,
+    "raw": 57,
+    "truth": {
+      "endpoint": "/api/v1/tool101",
+      "kwargs": {
+        "limit_v1": 57000
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "drift",
+    "arm": "gated",
+    "version": 2,
+    "stable": false,
+    "raw": 37,
+    "truth": {
+      "endpoint": "/api/v2/tool101",
+      "kwargs": {
+        "limit_v2": 37000
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "drift",
+    "arm": "gated",
+    "version": 3,
+    "stable": false,
+    "raw": 39,
+    "truth": {
+      "endpoint": "/api/v3/tool101",
+      "kwargs": {
+        "limit_v3": 390
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool101",
+    "family": "tool",
+    "group": "drift",
+    "arm": "gated",
+    "version": 4,
+    "stable": false,
+    "raw": 55,
+    "truth": {
+      "endpoint": "/api/v4/tool101",
+      "kwargs": {
+        "limit_v4": 550
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "drift",
+    "arm": "naive",
+    "version": 1,
+    "stable": false,
+    "raw": 3,
+    "truth": {
+      "endpoint": "/api/v1/tool201",
+      "kwargs": {
+        "limit_v1": 3000
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "drift",
+    "arm": "naive",
+    "version": 2,
+    "stable": false,
+    "raw": 96,
+    "truth": {
+      "endpoint": "/api/v2/tool201",
+      "kwargs": {
+        "limit_v2": 960
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "drift",
+    "arm": "naive",
+    "version": 3,
+    "stable": false,
+    "raw": 8,
+    "truth": {
+      "endpoint": "/api/v3/tool201",
+      "kwargs": {
+        "limit_v3": 8000
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool201",
+    "family": "tool",
+    "group": "drift",
+    "arm": "naive",
+    "version": 4,
+    "stable": false,
+    "raw": 69,
+    "truth": {
+      "endpoint": "/api/v4/tool201",
+      "kwargs": {
+        "limit_v4": 690
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 73,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 7300
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 99,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 9900
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 24,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 2400
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool301",
+    "family": "tool",
+    "group": "stable",
+    "arm": "gated",
+    "version": 1,
+    "stable": true,
+    "raw": 86,
+    "truth": {
+      "endpoint": "/api/v1/tool301",
+      "kwargs": {
+        "limit_v1": 8600
+      }
+    }
+  },
+  {
+    "round": 1,
+    "entity": "tool401",
+    "family": "tool",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 78,
+    "truth": {
+      "endpoint": "/api/v1/tool401",
+      "kwargs": {
+        "limit_v1": 780
+      }
+    }
+  },
+  {
+    "round": 2,
+    "entity": "tool401",
+    "family": "tool",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 40,
+    "truth": {
+      "endpoint": "/api/v1/tool401",
+      "kwargs": {
+        "limit_v1": 400
+      }
+    }
+  },
+  {
+    "round": 3,
+    "entity": "tool401",
+    "family": "tool",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 19,
+    "truth": {
+      "endpoint": "/api/v1/tool401",
+      "kwargs": {
+        "limit_v1": 190
+      }
+    }
+  },
+  {
+    "round": 4,
+    "entity": "tool401",
+    "family": "tool",
+    "group": "stable",
+    "arm": "naive",
+    "version": 1,
+    "stable": true,
+    "raw": 46,
+    "truth": {
+      "endpoint": "/api/v1/tool401",
+      "kwargs": {
+        "limit_v1": 460
+      }
+    }
+  }
+]

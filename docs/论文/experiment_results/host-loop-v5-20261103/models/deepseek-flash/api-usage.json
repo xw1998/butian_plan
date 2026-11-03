@@ -1,0 +1,13 @@
+{
+  "requested_model": "deepseek-flash",
+  "served_models": [
+    "deepseek-flash"
+  ],
+  "usage": {
+    "prompt_tokens": 50268,
+    "completion_tokens": 10404,
+    "calls": 57
+  },
+  "parse_errors": 0,
+  "protocol_errors": []
+}

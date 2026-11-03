@@ -1,0 +1,74 @@
+{
+  "calibration101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项版本为 v1，与本轮文档版本 v2 不一致，按规则 3 需先读源，不能直接作答。",
+    "memory_index": null
+  },
+  "calibration201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，套用 calibration 公式 (raw - offset) / scale = (3035 - 23) / 2000 = 1.506",
+    "memory_index": 0
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本与当前文档 v1 一致，按规则 1 据此换算：(7530-23)/1000=7.507",
+    "memory_index": 0
+  },
+  "calibration401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，工程值=(1310-3)/2000=0.6535",
+    "memory_index": 0
+  },
+  "schema101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项 schema101-v1 的版本为 1，与本轮任务文档版本 v2 不一致，按规则 3 需读源确认。",
+    "memory_index": null
+  },
+  "schema201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项没有版本与状态信息，按第 2 条规则直接依据其内容作答。",
+    "memory_index": 0
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按规则 1 直接采用该 RULE：flow = f1/100 = 85.44，level = h1/100 = 57.28。",
+    "memory_index": 0
+  },
+  "schema401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依其内容直接作答：flow=f1/1000，level=h1/1000",
+    "memory_index": 0
+  },
+  "tool101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项 tool101-v1 的版本为 v1 与本轮文档版本 v2 不一致，依规则 3 需读源确认，不能直接作答。",
+    "memory_index": null
+  },
+  "tool201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，value = raw * factor = 96 * 1000",
+    "memory_index": 0
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 1 与当前文档版本 v1 一致，按规则 1 采用该经验：value = raw * factor = 99 * 100 = 9900",
+    "memory_index": 0
+  },
+  "tool401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，参数值 = raw * factor = 40 * 10 = 400",
+    "memory_index": 0
+  }
+}

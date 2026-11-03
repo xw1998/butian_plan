@@ -1,0 +1,74 @@
+{
+  "calibration101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项状态为 warm，但其版本 v1 与当前文档版本 v4 不一致，按规则 3 需要读源确认",
+    "memory_index": null
+  },
+  "calibration201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项既未标注版本，也未标注状态，因此按消费规则第 2 条，直接依据其内容作答：(5357-23)/2000=2.667",
+    "memory_index": 0
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 1 与当前文档版本 v1 一致，按规则 1 直接据此换算。",
+    "memory_index": 0
+  },
+  "calibration401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2直接依据其内容作答：(3670-3)/2000=1.8335",
+    "memory_index": 0
+  },
+  "schema101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项版本为 v1 与本轮文档版本 v4 不一致，按规则 3 需读源后再作答",
+    "memory_index": null
+  },
+  "schema201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答：flow=1999/1000，level=6434/1000",
+    "memory_index": 0
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按规则 1 直接采用该 RULE。",
+    "memory_index": 0
+  },
+  "schema401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答：flow=f1/1000=2583/1000=2.583，level=h1/1000=8354/1000=8.354",
+    "memory_index": 0
+  },
+  "tool101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项 tool101-v1 的版本为 1，与本轮文档版本 v4 不一致，按规则 3 声明需要读源，不先作答。",
+    "memory_index": null
+  },
+  "tool201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则 2 直接按内容作答，参数值 = raw * factor = 69 * 1000 = 69000",
+    "memory_index": 0
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与本轮文档版本一致，按规则 1 直接采用该 RULE 并计算 86*100=8600",
+    "memory_index": 0
+  },
+  "tool401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按第 2 条规则直接依据其内容作答。",
+    "memory_index": 0
+  }
+}

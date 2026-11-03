@@ -171,3 +171,26 @@ _tmp_*.py
 !/docs/论文/experiment_results/host-loop-v4-20261103/stages/*.json
 !/docs/论文/experiment_results/host-loop-v4-20261103/seed-evidence/
 !/docs/论文/experiment_results/host-loop-v4-20261103/seed-evidence/*.txt
+
+# Real-host multiround arm 5 (2026-11-03, host-loop-v5): the same v4 ablation replayed with
+# external API models as the host. Protocol, runner, result document, per-round decisions,
+# raw model transcripts and token usage are public; the SQLite homes stay private.
+!/docs/论文/run_host_v5_multiround_study.py
+!/docs/论文/实验协议-真实宿主多轮-v5.md
+!/docs/论文/真实宿主多轮验证结果-v5-20261103.md
+!/docs/论文/experiment_results/host-loop-v5-20261103/
+!/docs/论文/experiment_results/host-loop-v5-20261103/summary.json
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/state.json
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/api-usage.json
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/mcp-trace.jsonl
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/fixtures/
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/fixtures/*.json
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/fixtures/*.txt
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/stages/
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/stages/*.json
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/calls/
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/calls/*.json
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/seed-evidence/
+!/docs/论文/experiment_results/host-loop-v5-20261103/models/*/seed-evidence/*.txt

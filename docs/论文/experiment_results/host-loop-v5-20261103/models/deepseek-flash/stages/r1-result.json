@@ -1,0 +1,295 @@
+{
+  "round": 1,
+  "results": [
+    {
+      "round": 1,
+      "entity": "calibration101",
+      "family": "calibration",
+      "group": "drift",
+      "arm": "gated",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "value": 18.272,
+        "basis": "experience",
+        "from_memory": "calibration101-v1"
+      },
+      "truth": 18.272,
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "calibration201",
+      "family": "calibration",
+      "group": "drift",
+      "arm": "naive",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "value": 4.143,
+        "basis": "experience"
+      },
+      "truth": 4.143,
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "calibration301",
+      "family": "calibration",
+      "group": "stable",
+      "arm": "gated",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "value": 5.644,
+        "basis": "experience",
+        "from_memory": "calibration301-v1"
+      },
+      "truth": 5.644,
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "calibration401",
+      "family": "calibration",
+      "group": "stable",
+      "arm": "naive",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "value": 0.292,
+        "basis": "experience"
+      },
+      "truth": 0.292,
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "schema101",
+      "family": "schema",
+      "group": "drift",
+      "arm": "gated",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "flow": 6.525,
+        "level": 7.946,
+        "basis": "experience",
+        "from_memory": "schema101-v1"
+      },
+      "truth": {
+        "flow": 6.525,
+        "level": 7.946
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "schema201",
+      "family": "schema",
+      "group": "drift",
+      "arm": "naive",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "flow": 5.405,
+        "level": 2.896,
+        "basis": "experience"
+      },
+      "truth": {
+        "flow": 5.405,
+        "level": 2.896
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "schema301",
+      "family": "schema",
+      "group": "stable",
+      "arm": "gated",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "flow": 88.32,
+        "level": 54.41,
+        "basis": "experience",
+        "from_memory": "schema301-v1"
+      },
+      "truth": {
+        "flow": 88.32,
+        "level": 54.41
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "schema401",
+      "family": "schema",
+      "group": "stable",
+      "arm": "naive",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "flow": 0.753,
+        "level": 1.261,
+        "basis": "experience"
+      },
+      "truth": {
+        "flow": 0.753,
+        "level": 1.261
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "tool101",
+      "family": "tool",
+      "group": "drift",
+      "arm": "gated",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "endpoint": "/api/v1/tool101",
+        "parameter": "limit_v1",
+        "value": 57000,
+        "basis": "experience",
+        "from_memory": "tool101-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool101",
+        "kwargs": {
+          "limit_v1": 57000
+        }
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "tool201",
+      "family": "tool",
+      "group": "drift",
+      "arm": "naive",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "endpoint": "/api/v1/tool201",
+        "parameter": "limit_v1",
+        "value": 3000,
+        "basis": "experience"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool201",
+        "kwargs": {
+          "limit_v1": 3000
+        }
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "tool301",
+      "family": "tool",
+      "group": "stable",
+      "arm": "gated",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "endpoint": "/api/v1/tool301",
+        "parameter": "limit_v1",
+        "value": 7300,
+        "basis": "experience",
+        "from_memory": "tool301-v1"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool301",
+        "kwargs": {
+          "limit_v1": 7300
+        }
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    },
+    {
+      "round": 1,
+      "entity": "tool401",
+      "family": "tool",
+      "group": "stable",
+      "arm": "naive",
+      "version": 1,
+      "need_source": false,
+      "basis": "experience",
+      "verdict": "correct",
+      "stale_match": true,
+      "stale_differs_from_truth": false,
+      "answer": {
+        "endpoint": "/api/v1/tool401",
+        "parameter": "limit_v1",
+        "value": 780,
+        "basis": "experience"
+      },
+      "truth": {
+        "endpoint": "/api/v1/tool401",
+        "kwargs": {
+          "limit_v1": 780
+        }
+      },
+      "memory_status": "warm",
+      "memory_version": 1
+    }
+  ]
+}

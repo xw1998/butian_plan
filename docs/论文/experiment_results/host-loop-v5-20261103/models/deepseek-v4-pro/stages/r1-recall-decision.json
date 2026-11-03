@@ -1,0 +1,74 @@
+{
+  "calibration101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "采用版本一致且状态为 warm 的 calibration101-v1 规则计算工程值。",
+    "memory_index": 0
+  },
+  "calibration201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项无版本与状态信息，按 calibration 公式 (raw-offset)/scale 直接计算。",
+    "memory_index": 0
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回经验状态为 warm 且版本与 v1 一致，按 calibration 公式 (raw-offset)/scale 计算。",
+    "memory_index": 0
+  },
+  "calibration401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，依据内容中的 calibration 规则直接换算：(587-3)/2000=0.292。",
+    "memory_index": 0
+  },
+  "schema101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "采用版本一致且状态为 warm 的 schema101-v1 经验，按 divisor 1000 计算 f1 与 h1。",
+    "memory_index": 0
+  },
+  "schema201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "采用召回中无版本与状态信息的 schema201 经验，按 f1/h1 除以 1000 计算。",
+    "memory_index": 0
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "采用版本一致且状态为 warm 的 schema301-v1 规则：flow 取 f1/100，level 取 h1/100。",
+    "memory_index": 0
+  },
+  "schema401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "采用第0条经验（无版本与状态信息，按内容直接作答）：flow=f1/1000，level=h1/1000。",
+    "memory_index": 0
+  },
+  "tool101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回经验状态为warm且版本与当前文档版本v1一致，按tool族公式计算参数值。",
+    "memory_index": 0
+  },
+  "tool201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按内容直接作答，工具族参数值取 raw 乘以 factor。",
+    "memory_index": 0
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "采用下标 0 的 warm 经验，其版本 1 与当前文档版本 v1 一致，按 tool 族 raw * factor 计算参数值。",
+    "memory_index": 0
+  },
+  "tool401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按内容直接作答，tool族参数值=raw*factor。",
+    "memory_index": 0
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "calibration101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项版本为 v1，与当前文档版本 v4 不一致，需读源。",
+    "memory_index": 0
+  },
+  "calibration201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按内容直接采用该条 calibration 规则计算工程值。",
+    "memory_index": 0
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "依据第0条召回经验，状态为warm且版本v1与文档版本一致，按calibration换算规则计算工程值。",
+    "memory_index": 0
+  },
+  "calibration401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项无版本与状态信息，按内容直接采用 calibration 公式计算工程值。",
+    "memory_index": 0
+  },
+  "schema101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回经验版本为 v1，与当前文档版本 v4 不一致，需读源。",
+    "memory_index": null
+  },
+  "schema201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "依据召回第0条无版本状态信息，按内容直接采用 schema 规则计算。",
+    "memory_index": 0
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "采用版本一致且状态为 warm 的 schema301-v1 规则，按除数 100 计算。",
+    "memory_index": 0
+  },
+  "schema401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项无版本与状态信息，按内容直接采用 schema 规则计算 flow 与 level。",
+    "memory_index": 0
+  },
+  "tool101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回经验版本为 1，与当前文档版本 v4 不一致，按规则需要读源。",
+    "memory_index": 0
+  },
+  "tool201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按内容直接作答并计算 raw * factor。",
+    "memory_index": 0
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按 tool 族规则参数值 = raw * factor 计算。",
+    "memory_index": 0
+  },
+  "tool401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按内容直接作答，tool 族参数值取 raw * factor = 46 * 10。",
+    "memory_index": 0
+  }
+}

@@ -1,0 +1,370 @@
+{
+  "calibration101@1": {
+    "family": "calibration",
+    "entity": "calibration101",
+    "version": 1,
+    "scale": 125,
+    "offset": 4
+  },
+  "calibration101@2": {
+    "family": "calibration",
+    "entity": "calibration101",
+    "version": 2,
+    "scale": 250,
+    "offset": 5
+  },
+  "calibration101@3": {
+    "family": "calibration",
+    "entity": "calibration101",
+    "version": 3,
+    "scale": 250,
+    "offset": 19
+  },
+  "calibration101@4": {
+    "family": "calibration",
+    "entity": "calibration101",
+    "version": 4,
+    "scale": 2000,
+    "offset": 26
+  },
+  "calibration201@1": {
+    "family": "calibration",
+    "entity": "calibration201",
+    "version": 1,
+    "scale": 2000,
+    "offset": 23
+  },
+  "calibration201@2": {
+    "family": "calibration",
+    "entity": "calibration201",
+    "version": 2,
+    "scale": 2000,
+    "offset": 3
+  },
+  "calibration201@3": {
+    "family": "calibration",
+    "entity": "calibration201",
+    "version": 3,
+    "scale": 250,
+    "offset": 14
+  },
+  "calibration201@4": {
+    "family": "calibration",
+    "entity": "calibration201",
+    "version": 4,
+    "scale": 250,
+    "offset": 10
+  },
+  "calibration301@1": {
+    "family": "calibration",
+    "entity": "calibration301",
+    "version": 1,
+    "scale": 1000,
+    "offset": 23
+  },
+  "calibration301@2": {
+    "family": "calibration",
+    "entity": "calibration301",
+    "version": 1,
+    "scale": 1000,
+    "offset": 23
+  },
+  "calibration301@3": {
+    "family": "calibration",
+    "entity": "calibration301",
+    "version": 1,
+    "scale": 1000,
+    "offset": 23
+  },
+  "calibration301@4": {
+    "family": "calibration",
+    "entity": "calibration301",
+    "version": 1,
+    "scale": 1000,
+    "offset": 23
+  },
+  "calibration401@1": {
+    "family": "calibration",
+    "entity": "calibration401",
+    "version": 1,
+    "scale": 2000,
+    "offset": 3
+  },
+  "calibration401@2": {
+    "family": "calibration",
+    "entity": "calibration401",
+    "version": 1,
+    "scale": 2000,
+    "offset": 3
+  },
+  "calibration401@3": {
+    "family": "calibration",
+    "entity": "calibration401",
+    "version": 1,
+    "scale": 2000,
+    "offset": 3
+  },
+  "calibration401@4": {
+    "family": "calibration",
+    "entity": "calibration401",
+    "version": 1,
+    "scale": 2000,
+    "offset": 3
+  },
+  "schema101@1": {
+    "family": "schema",
+    "entity": "schema101",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 1000
+  },
+  "schema101@2": {
+    "family": "schema",
+    "entity": "schema101",
+    "version": 2,
+    "flow_field": "f2",
+    "level_field": "h2",
+    "divisor": 100
+  },
+  "schema101@3": {
+    "family": "schema",
+    "entity": "schema101",
+    "version": 3,
+    "flow_field": "f3",
+    "level_field": "h3",
+    "divisor": 10
+  },
+  "schema101@4": {
+    "family": "schema",
+    "entity": "schema101",
+    "version": 4,
+    "flow_field": "f4",
+    "level_field": "h4",
+    "divisor": 10
+  },
+  "schema201@1": {
+    "family": "schema",
+    "entity": "schema201",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 1000
+  },
+  "schema201@2": {
+    "family": "schema",
+    "entity": "schema201",
+    "version": 2,
+    "flow_field": "f2",
+    "level_field": "h2",
+    "divisor": 10
+  },
+  "schema201@3": {
+    "family": "schema",
+    "entity": "schema201",
+    "version": 3,
+    "flow_field": "f3",
+    "level_field": "h3",
+    "divisor": 10
+  },
+  "schema201@4": {
+    "family": "schema",
+    "entity": "schema201",
+    "version": 4,
+    "flow_field": "f4",
+    "level_field": "h4",
+    "divisor": 1000
+  },
+  "schema301@1": {
+    "family": "schema",
+    "entity": "schema301",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 100
+  },
+  "schema301@2": {
+    "family": "schema",
+    "entity": "schema301",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 100
+  },
+  "schema301@3": {
+    "family": "schema",
+    "entity": "schema301",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 100
+  },
+  "schema301@4": {
+    "family": "schema",
+    "entity": "schema301",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 100
+  },
+  "schema401@1": {
+    "family": "schema",
+    "entity": "schema401",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 1000
+  },
+  "schema401@2": {
+    "family": "schema",
+    "entity": "schema401",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 1000
+  },
+  "schema401@3": {
+    "family": "schema",
+    "entity": "schema401",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 1000
+  },
+  "schema401@4": {
+    "family": "schema",
+    "entity": "schema401",
+    "version": 1,
+    "flow_field": "f1",
+    "level_field": "h1",
+    "divisor": 1000
+  },
+  "tool101@1": {
+    "family": "tool",
+    "entity": "tool101",
+    "version": 1,
+    "endpoint": "/api/v1/tool101",
+    "parameter": "limit_v1",
+    "factor": 1000
+  },
+  "tool101@2": {
+    "family": "tool",
+    "entity": "tool101",
+    "version": 2,
+    "endpoint": "/api/v2/tool101",
+    "parameter": "limit_v2",
+    "factor": 1000
+  },
+  "tool101@3": {
+    "family": "tool",
+    "entity": "tool101",
+    "version": 3,
+    "endpoint": "/api/v3/tool101",
+    "parameter": "limit_v3",
+    "factor": 10
+  },
+  "tool101@4": {
+    "family": "tool",
+    "entity": "tool101",
+    "version": 4,
+    "endpoint": "/api/v4/tool101",
+    "parameter": "limit_v4",
+    "factor": 10
+  },
+  "tool201@1": {
+    "family": "tool",
+    "entity": "tool201",
+    "version": 1,
+    "endpoint": "/api/v1/tool201",
+    "parameter": "limit_v1",
+    "factor": 1000
+  },
+  "tool201@2": {
+    "family": "tool",
+    "entity": "tool201",
+    "version": 2,
+    "endpoint": "/api/v2/tool201",
+    "parameter": "limit_v2",
+    "factor": 10
+  },
+  "tool201@3": {
+    "family": "tool",
+    "entity": "tool201",
+    "version": 3,
+    "endpoint": "/api/v3/tool201",
+    "parameter": "limit_v3",
+    "factor": 1000
+  },
+  "tool201@4": {
+    "family": "tool",
+    "entity": "tool201",
+    "version": 4,
+    "endpoint": "/api/v4/tool201",
+    "parameter": "limit_v4",
+    "factor": 10
+  },
+  "tool301@1": {
+    "family": "tool",
+    "entity": "tool301",
+    "version": 1,
+    "endpoint": "/api/v1/tool301",
+    "parameter": "limit_v1",
+    "factor": 100
+  },
+  "tool301@2": {
+    "family": "tool",
+    "entity": "tool301",
+    "version": 1,
+    "endpoint": "/api/v1/tool301",
+    "parameter": "limit_v1",
+    "factor": 100
+  },
+  "tool301@3": {
+    "family": "tool",
+    "entity": "tool301",
+    "version": 1,
+    "endpoint": "/api/v1/tool301",
+    "parameter": "limit_v1",
+    "factor": 100
+  },
+  "tool301@4": {
+    "family": "tool",
+    "entity": "tool301",
+    "version": 1,
+    "endpoint": "/api/v1/tool301",
+    "parameter": "limit_v1",
+    "factor": 100
+  },
+  "tool401@1": {
+    "family": "tool",
+    "entity": "tool401",
+    "version": 1,
+    "endpoint": "/api/v1/tool401",
+    "parameter": "limit_v1",
+    "factor": 10
+  },
+  "tool401@2": {
+    "family": "tool",
+    "entity": "tool401",
+    "version": 1,
+    "endpoint": "/api/v1/tool401",
+    "parameter": "limit_v1",
+    "factor": 10
+  },
+  "tool401@3": {
+    "family": "tool",
+    "entity": "tool401",
+    "version": 1,
+    "endpoint": "/api/v1/tool401",
+    "parameter": "limit_v1",
+    "factor": 10
+  },
+  "tool401@4": {
+    "family": "tool",
+    "entity": "tool401",
+    "version": 1,
+    "endpoint": "/api/v1/tool401",
+    "parameter": "limit_v1",
+    "factor": 10
+  }
+}

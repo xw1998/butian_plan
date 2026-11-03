@@ -1,0 +1,50 @@
+{
+  "calibration101": {
+    "value": 34.976
+  },
+  "calibration201": {
+    "value": 2.5985
+  },
+  "calibration301": {
+    "value": 3.436
+  },
+  "calibration401": {
+    "value": 2.6
+  },
+  "schema101": {
+    "flow": 28.8,
+    "level": 65
+  },
+  "schema201": {
+    "flow": 9.492,
+    "level": 7.852
+  },
+  "schema301": {
+    "flow": 39.35,
+    "level": 55.67
+  },
+  "schema401": {
+    "flow": 1.832,
+    "level": 8.159
+  },
+  "tool101": {
+    "endpoint": "/api/v3/tool101",
+    "parameter": "limit_v3",
+    "value": 390
+  },
+  "tool201": {
+    "endpoint": "/api/v1/tool201",
+    "parameter": "limit_v1",
+    "value": 8000
+  },
+  "tool301": {
+    "endpoint": "/api/v1/tool301",
+    "parameter": "limit_v1",
+    "value": 2400
+  },
+  "tool401": {
+    "endpoint": "/api/v1/tool401",
+    "parameter": "limit_v1",
+    "value": 190
+  }
+}

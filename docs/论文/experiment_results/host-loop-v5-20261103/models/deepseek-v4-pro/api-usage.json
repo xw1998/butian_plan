@@ -1,0 +1,13 @@
+{
+  "requested_model": "deepseek-v4-pro",
+  "served_models": [
+    "deepseek-v4-pro"
+  ],
+  "usage": {
+    "prompt_tokens": 53198,
+    "completion_tokens": 30960,
+    "calls": 57
+  },
+  "parse_errors": 0,
+  "protocol_errors": []
+}

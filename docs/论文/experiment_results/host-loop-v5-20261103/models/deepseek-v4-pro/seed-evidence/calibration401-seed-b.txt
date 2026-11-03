@@ -1,0 +1,2 @@
+entity=calibration401; tag=seed-b; group=stable; arm=naive; source=upstream_extraction
+content=RULE {"entity": "calibration401", "family": "calibration", "offset": 3, "scale": 2000, "version": 1}

@@ -1,0 +1,374 @@
+[
+  {
+    "tag": "r1-calibration101-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 calibration101（calibration 族），当前文档版本 v1。\n原始读数 raw = 2288，请按 calibration 族的换算规则给出工程值（kPa）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"calibration101-v1\",\n    \"status\": \"warm\",\n    \"content\": \"RULE {\\\"entity\\\": \\\"calibration101\\\", \\\"family\\\": \\\"calibration\\\", \\\"offset\\\": 4, \\\"scale\\\": 125, \\\"version\\\": 1}\",\n    \"needs_revalidation\": false,\n    \"environment_match\": null\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"entity\": \"calibration101\",\n    \"family\": \"calibration\",\n    \"offset\": 4,\n    \"scale\": 125,\n    \"version\": 1\n  },\n  \"answer\": {\n    \"value\": 18.272\n  },\n  \"reason\": \"采用版本一致且状态为 warm 的 calibration101-v1 规则计算工程值。\"\n}",
+    "usage": {
+      "prompt_tokens": 650,
+      "completion_tokens": 274,
+      "total_tokens": 924,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 170
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 650
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-calibration201-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 calibration201（calibration 族），当前文档版本 v1。\n原始读数 raw = 8309，请按 calibration 族的换算规则给出工程值（kPa）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"content\": \"RULE {\\\"entity\\\": \\\"calibration201\\\", \\\"family\\\": \\\"calibration\\\", \\\"offset\\\": 23, \\\"scale\\\": 2000}\"\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"entity\": \"calibration201\",\n    \"family\": \"calibration\",\n    \"offset\": 23,\n    \"scale\": 2000\n  },\n  \"answer\": {\n    \"value\": 4.143\n  },\n  \"reason\": \"召回项无版本与状态信息，按 calibration 公式 (raw-offset)/scale 直接计算。\"\n}",
+    "usage": {
+      "prompt_tokens": 608,
+      "completion_tokens": 278,
+      "total_tokens": 886,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 177
+      },
+      "prompt_cache_hit_tokens": 0,
+      "prompt_cache_miss_tokens": 608
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-calibration301-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 calibration301（calibration 族），当前文档版本 v1。\n原始读数 raw = 5667，请按 calibration 族的换算规则给出工程值（kPa）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"calibration301-v1\",\n    \"status\": \"warm\",\n    \"content\": \"RULE {\\\"entity\\\": \\\"calibration301\\\", \\\"family\\\": \\\"calibration\\\", \\\"offset\\\": 23, \\\"scale\\\": 1000, \\\"version\\\": 1}\",\n    \"needs_revalidation\": false,\n    \"environment_match\": null\n  }\n]"
+      }
+    ],
+    "reply": "{\"decision\":\"experience\",\"memory_index\":0,\"rule\":{\"entity\":\"calibration301\",\"family\":\"calibration\",\"offset\":23,\"scale\":1000,\"version\":1},\"answer\":{\"value\":5.644},\"reason\":\"召回经验状态为 warm 且版本与 v1 一致，按 calibration 公式 (raw-offset)/scale 计算。\"}",
+    "usage": {
+      "prompt_tokens": 651,
+      "completion_tokens": 251,
+      "total_tokens": 902,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 174
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 267
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-calibration401-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 calibration401（calibration 族），当前文档版本 v1。\n原始读数 raw = 587，请按 calibration 族的换算规则给出工程值（kPa）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"content\": \"RULE {\\\"entity\\\": \\\"calibration401\\\", \\\"family\\\": \\\"calibration\\\", \\\"offset\\\": 3, \\\"scale\\\": 2000}\"\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"entity\": \"calibration401\",\n    \"family\": \"calibration\",\n    \"offset\": 3,\n    \"scale\": 2000\n  },\n  \"answer\": {\n    \"value\": 0.292\n  },\n  \"reason\": \"召回项不含版本与状态信息，依据内容中的 calibration 规则直接换算：(587-3)/2000=0.292。\"\n}",
+    "usage": {
+      "prompt_tokens": 607,
+      "completion_tokens": 363,
+      "total_tokens": 970,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 256
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 223
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-schema101-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 schema101（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 6525, \"f2\": 5974, \"f3\": 660, \"f4\": 1393, \"h1\": 7946, \"h2\": 2120, \"h3\": 3208, \"h4\": 9632}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"schema101-v1\",\n    \"status\": \"warm\",\n    \"content\": \"RULE {\\\"divisor\\\": 1000, \\\"entity\\\": \\\"schema101\\\", \\\"family\\\": \\\"schema\\\", \\\"flow_field\\\": \\\"f1\\\", \\\"level_field\\\": \\\"h1\\\", \\\"version\\\": 1}\",\n    \"needs_revalidation\": false,\n    \"environment_match\": null\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"divisor\": 1000,\n    \"entity\": \"schema101\",\n    \"family\": \"schema\",\n    \"flow_field\": \"f1\",\n    \"level_field\": \"h1\",\n    \"version\": 1\n  },\n  \"answer\": {\n    \"flow\": 6.525,\n    \"level\": 7.946\n  },\n  \"reason\": \"采用版本一致且状态为 warm 的 schema101-v1 经验，按 divisor 1000 计算 f1 与 h1。\"\n}",
+    "usage": {
+      "prompt_tokens": 725,
+      "completion_tokens": 418,
+      "total_tokens": 1143,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 283
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 341
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-schema201-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 schema201（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 5405, \"f2\": 944, \"f3\": 933, \"f4\": 3535, \"h1\": 2896, \"h2\": 8405, \"h3\": 6989, \"h4\": 863}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"content\": \"RULE {\\\"divisor\\\": 1000, \\\"entity\\\": \\\"schema201\\\", \\\"family\\\": \\\"schema\\\", \\\"flow_field\\\": \\\"f1\\\", \\\"level_field\\\": \\\"h1\\\"}\"\n  }\n]"
+      }
+    ],
+    "reply": "{\"decision\":\"experience\",\"memory_index\":0,\"rule\":{\"divisor\":1000,\"entity\":\"schema201\",\"family\":\"schema\",\"flow_field\":\"f1\",\"level_field\":\"h1\"},\"answer\":{\"flow\":5.405,\"level\":2.896},\"reason\":\"采用召回中无版本与状态信息的 schema201 经验，按 f1/h1 除以 1000 计算。\"}",
+    "usage": {
+      "prompt_tokens": 682,
+      "completion_tokens": 278,
+      "total_tokens": 960,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 193
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 298
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-schema301-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 schema301（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 8832, \"f2\": 9327, \"f3\": 4620, \"f4\": 9091, \"h1\": 5441, \"h2\": 8093, \"h3\": 1952, \"h4\": 4507}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"schema301-v1\",\n    \"status\": \"warm\",\n    \"content\": \"RULE {\\\"divisor\\\": 100, \\\"entity\\\": \\\"schema301\\\", \\\"family\\\": \\\"schema\\\", \\\"flow_field\\\": \\\"f1\\\", \\\"level_field\\\": \\\"h1\\\", \\\"version\\\": 1}\",\n    \"needs_revalidation\": false,\n    \"environment_match\": null\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"divisor\": 100,\n    \"entity\": \"schema301\",\n    \"family\": \"schema\",\n    \"flow_field\": \"f1\",\n    \"level_field\": \"h1\",\n    \"version\": 1\n  },\n  \"answer\": {\n    \"flow\": 88.32,\n    \"level\": 54.41\n  },\n  \"reason\": \"采用版本一致且状态为 warm 的 schema301-v1 规则：flow 取 f1/100，level 取 h1/100。\"\n}",
+    "usage": {
+      "prompt_tokens": 725,
+      "completion_tokens": 316,
+      "total_tokens": 1041,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 180
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 341
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-schema401-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 schema401（schema 族），当前文档版本 v1。\n本版本文档字段载荷 payload = {\"f1\": 753, \"f2\": 7988, \"f3\": 3748, \"f4\": 7043, \"h1\": 1261, \"h2\": 9295, \"h3\": 6629, \"h4\": 3214}，请给出 flow 与 level 两个工程量（除以本版本的分母）。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"content\": \"RULE {\\\"divisor\\\": 1000, \\\"entity\\\": \\\"schema401\\\", \\\"family\\\": \\\"schema\\\", \\\"flow_field\\\": \\\"f1\\\", \\\"level_field\\\": \\\"h1\\\"}\"\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"divisor\": 1000,\n    \"entity\": \"schema401\",\n    \"family\": \"schema\",\n    \"flow_field\": \"f1\",\n    \"level_field\": \"h1\"\n  },\n  \"answer\": {\n    \"flow\": 0.753,\n    \"level\": 1.261\n  },\n  \"reason\": \"采用第0条经验（无版本与状态信息，按内容直接作答）：flow=f1/1000，level=h1/1000。\"\n}",
+    "usage": {
+      "prompt_tokens": 684,
+      "completion_tokens": 502,
+      "total_tokens": 1186,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 373
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 300
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-tool101-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 tool101（tool 族），当前文档版本 v1。\n调用参数 raw = 57，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"tool101-v1\",\n    \"status\": \"warm\",\n    \"content\": \"RULE {\\\"endpoint\\\": \\\"/api/v1/tool101\\\", \\\"entity\\\": \\\"tool101\\\", \\\"factor\\\": 1000, \\\"family\\\": \\\"tool\\\", \\\"parameter\\\": \\\"limit_v1\\\", \\\"version\\\": 1}\",\n    \"needs_revalidation\": false,\n    \"environment_match\": null\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"endpoint\": \"/api/v1/tool101\",\n    \"entity\": \"tool101\",\n    \"factor\": 1000,\n    \"family\": \"tool\",\n    \"parameter\": \"limit_v1\",\n    \"version\": 1\n  },\n  \"answer\": {\n    \"endpoint\": \"/api/v1/tool101\",\n    \"parameter\": \"limit_v1\",\n    \"value\": 57000\n  },\n  \"reason\": \"召回经验状态为warm且版本与当前文档版本v1一致，按tool族公式计算参数值。\"\n}",
+    "usage": {
+      "prompt_tokens": 663,
+      "completion_tokens": 475,
+      "total_tokens": 1138,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 331
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 279
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-tool201-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 tool201（tool 族），当前文档版本 v1。\n调用参数 raw = 3，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"content\": \"RULE {\\\"endpoint\\\": \\\"/api/v1/tool201\\\", \\\"entity\\\": \\\"tool201\\\", \\\"factor\\\": 1000, \\\"family\\\": \\\"tool\\\", \\\"parameter\\\": \\\"limit_v1\\\"}\"\n  }\n]"
+      }
+    ],
+    "reply": "{\"decision\":\"experience\",\"memory_index\":0,\"rule\":{\"endpoint\":\"/api/v1/tool201\",\"entity\":\"tool201\",\"factor\":1000,\"family\":\"tool\",\"parameter\":\"limit_v1\"},\"answer\":{\"endpoint\":\"/api/v1/tool201\",\"parameter\":\"limit_v1\",\"value\":3000},\"reason\":\"召回项不含版本与状态信息，按内容直接作答，工具族参数值取 raw 乘以 factor。\"}",
+    "usage": {
+      "prompt_tokens": 622,
+      "completion_tokens": 372,
+      "total_tokens": 994,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 276
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 238
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-tool301-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 tool301（tool 族），当前文档版本 v1。\n调用参数 raw = 73，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"memory_id\": \"tool301-v1\",\n    \"status\": \"warm\",\n    \"content\": \"RULE {\\\"endpoint\\\": \\\"/api/v1/tool301\\\", \\\"entity\\\": \\\"tool301\\\", \\\"factor\\\": 100, \\\"family\\\": \\\"tool\\\", \\\"parameter\\\": \\\"limit_v1\\\", \\\"version\\\": 1}\",\n    \"needs_revalidation\": false,\n    \"environment_match\": null\n  }\n]"
+      }
+    ],
+    "reply": "{\n  \"decision\": \"experience\",\n  \"memory_index\": 0,\n  \"rule\": {\n    \"endpoint\": \"/api/v1/tool301\",\n    \"entity\": \"tool301\",\n    \"factor\": 100,\n    \"family\": \"tool\",\n    \"parameter\": \"limit_v1\",\n    \"version\": 1\n  },\n  \"answer\": {\n    \"endpoint\": \"/api/v1/tool301\",\n    \"parameter\": \"limit_v1\",\n    \"value\": 7300\n  },\n  \"reason\": \"采用下标 0 的 warm 经验，其版本 1 与当前文档版本 v1 一致，按 tool 族 raw * factor 计算参数值。\"\n}",
+    "usage": {
+      "prompt_tokens": 662,
+      "completion_tokens": 508,
+      "total_tokens": 1170,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 353
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 278
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  },
+  {
+    "tag": "r1-tool401-recall",
+    "requested_model": "deepseek-v4-pro",
+    "served_model": "deepseek-v4-pro",
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是一个工程助手，通过工具使用一个经验库。你会收到一道题和一次经验召回的结果。\n\n三族任务的换算约定（公式本身不随版本变化，参数随实体与版本变化）：\n- calibration: 工程值 = (raw - offset) / scale\n- schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor\n- tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor\n\n你必须严格按以下消费规则决定依据，不得自行放宽或收紧：\n1. 召回给出的经验，若状态为 warm 或 hot，且其版本与本轮任务的文档版本一致 -> 据此作答；\n2. 若召回项不含任何版本与状态信息 -> 按内容直接作答；\n3. 若版本不一致，或状态为 candidate 或 disputed -> 声明需要读源（decision=\"source\"），不要先作答；\n4. 三者都不成立 -> decision=\"unknown\"。\n\n只输出一个 JSON 对象，不要 markdown 代码块，不要额外文字。字段：\n{\n  \"decision\": \"experience\" | \"source\" | \"unknown\",\n  \"memory_index\": 整数或 null,   // 你采用的召回项在列表中的下标，从 0 开始\n  \"rule\": {...} | null,          // 你决定采用的那条 RULE 对象，原样抄出，不要改写字段\n  \"answer\": {...} | null,        // 你自己算出的答案；decision=\"source\" 时填 null\n  \"reason\": \"一句话说明你依据上面哪一条规则\"\n}\n\nanswer 的格式：calibration 族 {\"value\": 数}；schema 族 {\"flow\": 数, \"level\": 数}；\ntool 族 {\"endpoint\": 字符串, \"parameter\": 字符串, \"value\": 数}。\n判分是精确匹配。没有可用依据时必须 decision=\"unknown\"，不得猜。"
+      },
+      {
+        "role": "user",
+        "content": "实体 tool401（tool 族），当前文档版本 v1。\n调用参数 raw = 78，请给出本版本的端点路径与参数名，以及该参数的值。\n判分是精确匹配；若没有可用依据，必须回答 unknown，不得猜。\n\n本次经验召回返回（列表顺序即下标顺序）：\n[\n  {\n    \"content\": \"RULE {\\\"endpoint\\\": \\\"/api/v1/tool401\\\", \\\"entity\\\": \\\"tool401\\\", \\\"factor\\\": 10, \\\"family\\\": \\\"tool\\\", \\\"parameter\\\": \\\"limit_v1\\\"}\"\n  }\n]"
+      }
+    ],
+    "reply": "{\"decision\":\"experience\",\"memory_index\":0,\"rule\":{\"endpoint\":\"/api/v1/tool401\",\"entity\":\"tool401\",\"factor\":10,\"family\":\"tool\",\"parameter\":\"limit_v1\"},\"answer\":{\"endpoint\":\"/api/v1/tool401\",\"parameter\":\"limit_v1\",\"value\":780},\"reason\":\"召回项不含版本与状态信息，按内容直接作答，tool族参数值=raw*factor。\"}",
+    "usage": {
+      "prompt_tokens": 621,
+      "completion_tokens": 692,
+      "total_tokens": 1313,
+      "prompt_tokens_details": {
+        "cached_tokens": 384
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 599
+      },
+      "prompt_cache_hit_tokens": 384,
+      "prompt_cache_miss_tokens": 237
+    },
+    "finish_reason": "stop",
+    "parse": "ok"
+  }
+]

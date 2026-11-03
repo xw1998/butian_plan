@@ -1,0 +1,74 @@
+{
+  "calibration101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项状态为 warm 但版本为 v1，与本轮文档版本 v3 不一致，按规则 3 需先读源，不能直接作答。",
+    "memory_index": null
+  },
+  "calibration201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2直接依其内容作答，工程值=(5220-23)/2000=2.5985",
+    "memory_index": 0
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "该召回项的状态为 warm，且它的版本 1 与本轮文档版本 v1 一致，符合规则 1，因此直接按 calibration 公式 (raw-offset)/scale 计算",
+    "memory_index": 0
+  },
+  "calibration401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则 2 依其内容直接作答，工程值=(5203-3)/2000=2.6",
+    "memory_index": 0
+  },
+  "schema101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项 schema101-v1 的状态为 warm，但版本为 1，与本轮文档版本 v3 不一致，按规则 3 需声明先读源，不能直接作答。",
+    "memory_index": 0
+  },
+  "schema201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按消费规则第 2 条依其内容直接作答",
+    "memory_index": 0
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，按规则1直接采用该 RULE 计算。",
+    "memory_index": 0
+  },
+  "schema401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，采用该 RULE 的分母与字段。",
+    "memory_index": 0
+  },
+  "tool101": {
+    "use_experience": false,
+    "need_source": true,
+    "why": "召回项 tool101-v1 状态为 warm，但版本为 1，与本轮文档版本 v3 不一致，按规则第 3 条需先读源，不能据此作答。",
+    "memory_index": null
+  },
+  "tool201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，参数值 raw*factor = 8*1000",
+    "memory_index": 0
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项状态为 warm 且版本 v1 与当前文档版本一致，符合规则 1，直接采用该 RULE 并按 tool 族公式 raw*factor 计算。",
+    "memory_index": 0
+  },
+  "tool401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "召回项不含版本与状态信息，按规则2依内容直接作答，参数值 = raw * factor = 19 * 10 = 190",
+    "memory_index": 0
+  }
+}
