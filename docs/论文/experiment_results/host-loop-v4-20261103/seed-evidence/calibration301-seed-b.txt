@@ -1,0 +1,2 @@
+entity=calibration301; tag=seed-b; group=stable; arm=gated; source=upstream_extraction
+content=RULE {"entity": "calibration301", "family": "calibration", "offset": 23, "scale": 1000, "version": 1}

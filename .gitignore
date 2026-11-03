@@ -150,3 +150,24 @@ _tmp_*.py
 !/docs/论文/experiment_results/host-loop-v3-20261102/practice-evidence/*.txt
 !/docs/论文/experiment_results/host-loop-v3-20261102/revision-evidence/
 !/docs/论文/experiment_results/host-loop-v3-20261102/revision-evidence/*.txt
+
+# Real-host multiround arm 4 (2026-11-03, host-loop-v4): continuous drift + version-metadata
+# ablation. Protocol, runner, result document, per-round host decisions/answers and the raw
+# recall audit are public evidence; the SQLite production home stays private.
+# The research index is linked from docs/发行说明-0.1.4.md but was swallowed by /docs/**,
+# leaving a broken link in the public repo; ship it together with the arms it indexes.
+!/docs/论文/README.md
+!/docs/论文/run_host_v4_multiround_study.py
+!/docs/论文/实验协议-真实宿主多轮-v4.md
+!/docs/论文/真实宿主多轮验证结果-v4-20261103.md
+!/docs/论文/experiment_results/host-loop-v4-20261103/
+!/docs/论文/experiment_results/host-loop-v4-20261103/summary.json
+!/docs/论文/experiment_results/host-loop-v4-20261103/state.json
+!/docs/论文/experiment_results/host-loop-v4-20261103/mcp-trace.jsonl
+!/docs/论文/experiment_results/host-loop-v4-20261103/fixtures/
+!/docs/论文/experiment_results/host-loop-v4-20261103/fixtures/*.json
+!/docs/论文/experiment_results/host-loop-v4-20261103/fixtures/*.txt
+!/docs/论文/experiment_results/host-loop-v4-20261103/stages/
+!/docs/论文/experiment_results/host-loop-v4-20261103/stages/*.json
+!/docs/论文/experiment_results/host-loop-v4-20261103/seed-evidence/
+!/docs/论文/experiment_results/host-loop-v4-20261103/seed-evidence/*.txt

@@ -1,0 +1,42 @@
+# 契约手册（归档快照，单位 kPa，内部使用）
+# 每条 RULE 行是一个实体在一个文档版本下的参数；版本号必须与本轮任务一致。
+# 换算约定（对全部实体与版本一致，公式本身不随版本变化）：
+#   calibration: 工程值 = (raw - offset) / scale
+#   schema:      flow = payload[flow_field] / divisor, level = payload[level_field] / divisor
+#   tool:        端点 = endpoint, 参数名 = parameter, 参数值 = raw * factor
+RULE {"entity": "calibration101", "family": "calibration", "offset": 4, "scale": 125, "version": 1}
+RULE {"entity": "calibration101", "family": "calibration", "offset": 5, "scale": 250, "version": 2}
+RULE {"entity": "calibration101", "family": "calibration", "offset": 19, "scale": 250, "version": 3}
+RULE {"entity": "calibration101", "family": "calibration", "offset": 26, "scale": 2000, "version": 4}
+RULE {"entity": "calibration201", "family": "calibration", "offset": 23, "scale": 2000, "version": 1}
+RULE {"entity": "calibration201", "family": "calibration", "offset": 3, "scale": 2000, "version": 2}
+RULE {"entity": "calibration201", "family": "calibration", "offset": 14, "scale": 250, "version": 3}
+RULE {"entity": "calibration201", "family": "calibration", "offset": 10, "scale": 250, "version": 4}
+RULE {"entity": "calibration301", "family": "calibration", "offset": 23, "scale": 1000, "version": 1}
+RULE {"entity": "calibration401", "family": "calibration", "offset": 3, "scale": 2000, "version": 1}
+RULE {"divisor": 1000, "entity": "schema101", "family": "schema", "flow_field": "f1", "level_field": "h1", "version": 1}
+RULE {"divisor": 100, "entity": "schema101", "family": "schema", "flow_field": "f2", "level_field": "h2", "version": 2}
+RULE {"divisor": 10, "entity": "schema101", "family": "schema", "flow_field": "f3", "level_field": "h3", "version": 3}
+RULE {"divisor": 10, "entity": "schema101", "family": "schema", "flow_field": "f4", "level_field": "h4", "version": 4}
+RULE {"divisor": 1000, "entity": "schema201", "family": "schema", "flow_field": "f1", "level_field": "h1", "version": 1}
+RULE {"divisor": 10, "entity": "schema201", "family": "schema", "flow_field": "f2", "level_field": "h2", "version": 2}
+RULE {"divisor": 10, "entity": "schema201", "family": "schema", "flow_field": "f3", "level_field": "h3", "version": 3}
+RULE {"divisor": 1000, "entity": "schema201", "family": "schema", "flow_field": "f4", "level_field": "h4", "version": 4}
+RULE {"divisor": 100, "entity": "schema301", "family": "schema", "flow_field": "f1", "level_field": "h1", "version": 1}
+RULE {"divisor": 1000, "entity": "schema401", "family": "schema", "flow_field": "f1", "level_field": "h1", "version": 1}
+RULE {"endpoint": "/api/v1/tool101", "entity": "tool101", "factor": 1000, "family": "tool", "parameter": "limit_v1", "version": 1}
+RULE {"endpoint": "/api/v2/tool101", "entity": "tool101", "factor": 1000, "family": "tool", "parameter": "limit_v2", "version": 2}
+RULE {"endpoint": "/api/v3/tool101", "entity": "tool101", "factor": 10, "family": "tool", "parameter": "limit_v3", "version": 3}
+RULE {"endpoint": "/api/v4/tool101", "entity": "tool101", "factor": 10, "family": "tool", "parameter": "limit_v4", "version": 4}
+RULE {"endpoint": "/api/v1/tool201", "entity": "tool201", "factor": 1000, "family": "tool", "parameter": "limit_v1", "version": 1}
+RULE {"endpoint": "/api/v2/tool201", "entity": "tool201", "factor": 10, "family": "tool", "parameter": "limit_v2", "version": 2}
+RULE {"endpoint": "/api/v3/tool201", "entity": "tool201", "factor": 1000, "family": "tool", "parameter": "limit_v3", "version": 3}
+RULE {"endpoint": "/api/v4/tool201", "entity": "tool201", "factor": 10, "family": "tool", "parameter": "limit_v4", "version": 4}
+RULE {"endpoint": "/api/v1/tool301", "entity": "tool301", "factor": 100, "family": "tool", "parameter": "limit_v1", "version": 1}
+RULE {"endpoint": "/api/v1/tool401", "entity": "tool401", "factor": 10, "family": "tool", "parameter": "limit_v1", "version": 1}
+RULE {"entity": "retired000", "family": "calibration", "offset": 20, "scale": 500, "version": 1}
+RULE {"entity": "retired001", "family": "calibration", "offset": 18, "scale": 250, "version": 1}
+RULE {"entity": "retired002", "family": "calibration", "offset": 23, "scale": 1000, "version": 1}
+RULE {"entity": "retired003", "family": "calibration", "offset": 10, "scale": 500, "version": 1}
+RULE {"entity": "retired004", "family": "calibration", "offset": 17, "scale": 250, "version": 1}
+RULE {"entity": "retired005", "family": "calibration", "offset": 7, "scale": 500, "version": 1}

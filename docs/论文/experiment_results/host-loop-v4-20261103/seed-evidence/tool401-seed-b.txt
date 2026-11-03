@@ -1,0 +1,2 @@
+entity=tool401; tag=seed-b; group=stable; arm=naive; source=upstream_extraction
+content=RULE {"endpoint": "/api/v1/tool401", "entity": "tool401", "factor": 10, "family": "tool", "parameter": "limit_v1", "version": 1}

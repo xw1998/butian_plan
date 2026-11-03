@@ -1,0 +1,149 @@
+{
+  "round": 3,
+  "items": [
+    {
+      "entity": "calibration101",
+      "arm": "gated",
+      "group": "drift",
+      "raw": [
+        {
+          "memory_id": "calibration101-v1",
+          "status": "warm",
+          "content": "RULE {\"entity\": \"calibration101\", \"family\": \"calibration\", \"offset\": 4, \"scale\": 125, \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "calibration201",
+      "arm": "naive",
+      "group": "drift",
+      "raw": [
+        {
+          "memory_id": "calibration201-v1",
+          "status": "warm",
+          "content": "RULE {\"entity\": \"calibration201\", \"family\": \"calibration\", \"offset\": 23, \"scale\": 2000, \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "calibration301",
+      "arm": "gated",
+      "group": "stable",
+      "raw": [
+        {
+          "memory_id": "calibration301-v1",
+          "status": "warm",
+          "content": "RULE {\"entity\": \"calibration301\", \"family\": \"calibration\", \"offset\": 23, \"scale\": 1000, \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "calibration401",
+      "arm": "naive",
+      "group": "stable",
+      "raw": [
+        {
+          "memory_id": "calibration401-v1",
+          "status": "warm",
+          "content": "RULE {\"entity\": \"calibration401\", \"family\": \"calibration\", \"offset\": 3, \"scale\": 2000, \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "schema101",
+      "arm": "gated",
+      "group": "drift",
+      "raw": [
+        {
+          "memory_id": "schema101-v1",
+          "status": "warm",
+          "content": "RULE {\"divisor\": 1000, \"entity\": \"schema101\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "schema201",
+      "arm": "naive",
+      "group": "drift",
+      "raw": [
+        {
+          "memory_id": "schema201-v1",
+          "status": "warm",
+          "content": "RULE {\"divisor\": 1000, \"entity\": \"schema201\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "schema301",
+      "arm": "gated",
+      "group": "stable",
+      "raw": [
+        {
+          "memory_id": "schema301-v1",
+          "status": "warm",
+          "content": "RULE {\"divisor\": 100, \"entity\": \"schema301\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "schema401",
+      "arm": "naive",
+      "group": "stable",
+      "raw": [
+        {
+          "memory_id": "schema401-v1",
+          "status": "warm",
+          "content": "RULE {\"divisor\": 1000, \"entity\": \"schema401\", \"family\": \"schema\", \"flow_field\": \"f1\", \"level_field\": \"h1\", \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "tool101",
+      "arm": "gated",
+      "group": "drift",
+      "raw": [
+        {
+          "memory_id": "tool101-v1",
+          "status": "warm",
+          "content": "RULE {\"endpoint\": \"/api/v1/tool101\", \"entity\": \"tool101\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "tool201",
+      "arm": "naive",
+      "group": "drift",
+      "raw": [
+        {
+          "memory_id": "tool201-v1",
+          "status": "warm",
+          "content": "RULE {\"endpoint\": \"/api/v1/tool201\", \"entity\": \"tool201\", \"factor\": 1000, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "tool301",
+      "arm": "gated",
+      "group": "stable",
+      "raw": [
+        {
+          "memory_id": "tool301-v1",
+          "status": "warm",
+          "content": "RULE {\"endpoint\": \"/api/v1/tool301\", \"entity\": \"tool301\", \"factor\": 100, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+        }
+      ]
+    },
+    {
+      "entity": "tool401",
+      "arm": "naive",
+      "group": "stable",
+      "raw": [
+        {
+          "memory_id": "tool401-v1",
+          "status": "warm",
+          "content": "RULE {\"endpoint\": \"/api/v1/tool401\", \"entity\": \"tool401\", \"factor\": 10, \"family\": \"tool\", \"parameter\": \"limit_v1\", \"version\": 1}"
+        }
+      ]
+    }
+  ]
+}

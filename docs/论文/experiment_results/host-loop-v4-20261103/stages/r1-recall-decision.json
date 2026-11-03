@@ -1,0 +1,160 @@
+{
+  "calibration101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "entity": "calibration101",
+      "family": "calibration",
+      "offset": 4,
+      "scale": 125,
+      "version": 1
+    },
+    "from_memory": "calibration101-v1"
+  },
+  "calibration201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "entity": "calibration201",
+      "family": "calibration",
+      "offset": 23,
+      "scale": 2000
+    },
+    "from_memory": null
+  },
+  "calibration301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "entity": "calibration301",
+      "family": "calibration",
+      "offset": 23,
+      "scale": 1000,
+      "version": 1
+    },
+    "from_memory": "calibration301-v1"
+  },
+  "calibration401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "entity": "calibration401",
+      "family": "calibration",
+      "offset": 3,
+      "scale": 2000
+    },
+    "from_memory": null
+  },
+  "schema101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "divisor": 1000,
+      "entity": "schema101",
+      "family": "schema",
+      "flow_field": "f1",
+      "level_field": "h1",
+      "version": 1
+    },
+    "from_memory": "schema101-v1"
+  },
+  "schema201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "divisor": 1000,
+      "entity": "schema201",
+      "family": "schema",
+      "flow_field": "f1",
+      "level_field": "h1"
+    },
+    "from_memory": null
+  },
+  "schema301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "divisor": 100,
+      "entity": "schema301",
+      "family": "schema",
+      "flow_field": "f1",
+      "level_field": "h1",
+      "version": 1
+    },
+    "from_memory": "schema301-v1"
+  },
+  "schema401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "divisor": 1000,
+      "entity": "schema401",
+      "family": "schema",
+      "flow_field": "f1",
+      "level_field": "h1"
+    },
+    "from_memory": null
+  },
+  "tool101": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "endpoint": "/api/v1/tool101",
+      "entity": "tool101",
+      "factor": 1000,
+      "family": "tool",
+      "parameter": "limit_v1",
+      "version": 1
+    },
+    "from_memory": "tool101-v1"
+  },
+  "tool201": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "endpoint": "/api/v1/tool201",
+      "entity": "tool201",
+      "factor": 1000,
+      "family": "tool",
+      "parameter": "limit_v1"
+    },
+    "from_memory": null
+  },
+  "tool301": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "endpoint": "/api/v1/tool301",
+      "entity": "tool301",
+      "factor": 100,
+      "family": "tool",
+      "parameter": "limit_v1",
+      "version": 1
+    },
+    "from_memory": "tool301-v1"
+  },
+  "tool401": {
+    "use_experience": true,
+    "need_source": false,
+    "why": "admissible recall content",
+    "rule": {
+      "endpoint": "/api/v1/tool401",
+      "entity": "tool401",
+      "factor": 10,
+      "family": "tool",
+      "parameter": "limit_v1"
+    },
+    "from_memory": null
+  }
+}

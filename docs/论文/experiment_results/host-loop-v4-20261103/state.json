@@ -1,0 +1,22 @@
+{
+  "protocol": "host-loop-v4",
+  "source_id": "src_7903941181884c42911897cd9b440abb",
+  "source_sha256": "1de28fe8b95c9ae657e35d1c845da690b814e4d328bb272c5e6ca54a88088968",
+  "archive": "D:\\工作\\git_project\\butian_plan\\docs\\论文\\experiment_results\\host-loop-v4-20261103\\fixtures\\contract-manual-v1-v4.txt",
+  "created_at": 1793688883.4097278,
+  "round": 0,
+  "seeded_status": {
+    "calibration101": "warm",
+    "calibration201": "warm",
+    "calibration301": "warm",
+    "calibration401": "warm",
+    "schema101": "warm",
+    "schema201": "warm",
+    "schema301": "warm",
+    "schema401": "warm",
+    "tool101": "warm",
+    "tool201": "warm",
+    "tool301": "warm",
+    "tool401": "warm"
+  }
+}
