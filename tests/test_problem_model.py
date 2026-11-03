@@ -62,12 +62,13 @@ def test_correction_invalidates_execution_revision_and_is_atomic(tmp_path):
         service.close()
 
 
-def test_standard_stdio_goal_without_provider(tmp_path):
+def test_standard_stdio_goal_without_provider(tmp_path, monkeypatch):
     import json
     import os
     import subprocess
     import sys
     from pathlib import Path
+    monkeypatch.setenv('BUTIAN_MCP_TOOLSET', 'full')
     service = ButianService(tmp_path)
     service.add_member('wire', '标准宿主')
     service.store.set_member_token('wire', 'wire-test-token')

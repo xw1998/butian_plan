@@ -172,3 +172,64 @@ def test_mcp_server_recovers_after_malformed_first_line(tmp_path, monkeypatch, c
     responses = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
     assert responses[0]["error"]["code"] == -32700
     assert responses[1]["id"] == 2 and "result" in responses[1]
+
+
+def test_stdio_host_negotiates_version_answers_ping_and_calls_hidden_tools(tmp_path):
+    import json
+    import os
+    from pathlib import Path
+    from butian.runtime.service import ButianService
+    home = tmp_path / "compact-home"
+    service = ButianService(home)
+    service.add_member("member", "Member")
+    service.store.set_member_token("member", "compact-token")
+    service.close()
+    env = dict(os.environ, BUTIAN_HOME=str(home))
+    env.pop("BUTIAN_PROVIDERS_FILE", None)
+    requests = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "compact-host", "version": "1"}}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "butian_connect", "arguments": {"member_id": "member", "token": "compact-token"}}},
+        {"jsonrpc": "2.0", "id": 3, "method": "ping"},
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {}},
+        {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "butian_tool_call", "arguments": {"name": "butian_memory_search", "arguments": {"query": "nothing"}}}},
+    ]
+    proc = subprocess.run([sys.executable, "-m", "butian.cli", "mcp"], cwd=Path(__file__).resolve().parents[1], env=env,
+                          input="\n".join(json.dumps(item) for item in requests) + "\n", text=True, encoding="utf-8",
+                          capture_output=True, timeout=20)
+    assert proc.returncode == 0, proc.stderr
+    replies = {item["id"]: item for item in map(json.loads, proc.stdout.splitlines())}
+    assert replies[1]["result"]["protocolVersion"] == "2025-06-18"
+    assert replies[2]["result"]["isError"] is False
+    assert replies[3]["result"] == {}
+    names = {tool["name"] for tool in replies[4]["result"]["tools"]}
+    assert "butian_tool_call" in names and "butian_dream_run" not in names
+    hidden = replies[5]["result"]
+    assert hidden["isError"] is False, hidden
+    assert "memories" in json.loads(hidden["content"][0]["text"])
+
+
+def test_stdio_transport_survives_unavailable_home(tmp_path):
+    import json
+    import os
+    from pathlib import Path
+    blocked = tmp_path / "home-is-a-file"
+    blocked.write_text("not a directory", encoding="utf-8")
+    env = dict(os.environ, BUTIAN_HOME=str(blocked))
+    env.pop("BUTIAN_PROVIDERS_FILE", None)
+    requests = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "broken-home", "version": "1"}}},
+        {"jsonrpc": "2.0", "id": 2, "method": "ping"},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}},
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "butian_status", "arguments": {}}},
+    ]
+    proc = subprocess.run([sys.executable, "-m", "butian.cli", "mcp"], cwd=Path(__file__).resolve().parents[1], env=env,
+                          input="\n".join(json.dumps(item) for item in requests) + "\n", text=True, encoding="utf-8",
+                          capture_output=True, timeout=20)
+    assert proc.returncode == 0, proc.stderr
+    replies = {item["id"]: item for item in map(json.loads, proc.stdout.splitlines())}
+    assert replies[2]["result"] == {}
+    assert replies[3]["result"]["tools"]
+    failure = replies[4]["result"]
+    assert failure["isError"] is True
+    assert "service_unavailable" in failure["content"][0]["text"]

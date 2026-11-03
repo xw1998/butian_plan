@@ -16,7 +16,7 @@ execFileSync(python,['-c',`import sys; from butian.runtime.service import Butian
 const auth={actor_member_id:'sdk-worker',token};
 async function connect(){
  const client=new Client({name:'official-sdk-business-acceptance',version:'1.0.0'});
- const transport=new StdioClientTransport({command:python,args:['-m','butian.cli','mcp'],cwd:root,env:{...process.env,BUTIAN_HOME:home},stderr:'pipe'});
+ const transport=new StdioClientTransport({command:python,args:['-m','butian.cli','mcp'],cwd:root,env:{...process.env,BUTIAN_HOME:home,BUTIAN_MCP_TOOLSET:'full'},stderr:'pipe'});
  await client.connect(transport);
  return client;
 }

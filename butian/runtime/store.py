@@ -1,5 +1,6 @@
 from __future__ import annotations
 import hashlib
+import os
 import hmac
 import json
 import sqlite3
@@ -151,19 +152,113 @@ def serialized_write(fn):
     return wrapped
 
 
+class StoreUnavailable(RuntimeError):
+    """本地库打不开，且自动恢复也没能救回来。
+
+    带上当前状态、缺什么、下一步合法动作，避免宿主只拿到一句 disk I/O error。
+    """
+
+    def __init__(self, path, reason, moved=None):
+        self.path = str(path)
+        self.reason = str(reason)
+        self.moved = str(moved) if moved else None
+        self.details = {
+            "code": "store_unavailable",
+            "path": self.path,
+            "reason": self.reason,
+            "recovered_sidecar": self.moved,
+            "next_actions": [
+                {"action": "close_other_butian_processes",
+                 "note": "先关掉仍占用该库的 butian 进程（MCP、HTTP 后台、CLI），再重试。"},
+                {"action": "check_home_writable",
+                 "note": "确认 BUTIAN_HOME 所在目录可写、磁盘未满、未被同步盘锁定。"},
+                {"action": "restore_sidecar",
+                 "note": "若自动挪走的 -shm 需要还原，它就在 recovered_sidecar 指向的路径；-wal 从未被改动。"},
+            ],
+        }
+        super().__init__(f"store_unavailable: {self.reason} (path={self.path})")
+
+
+def _sidecar_in_use(shm: Path) -> bool:
+    """判断 -shm 是否仍被别的进程持有。
+
+    Windows 上被占用的文件无法改名，交给调用处的 os.replace 抛错即可；
+    POSIX 上改名不受打开状态影响，必须显式探一次写锁，否则会动到活库的索引。
+    """
+    if os.name != "posix":
+        return False
+    import fcntl
+    try:
+        with open(shm, "r+b") as handle:
+            try:
+                fcntl.lockf(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                return True
+            fcntl.lockf(handle, fcntl.LOCK_UN)
+    except OSError:
+        return True
+    return False
+
+
+def _quarantine_stale_shm(path: Path):
+    """把崩溃残留的 -shm 改名挪开，让 SQLite 从 -wal 重建共享内存索引。
+
+    -shm 是派生索引，不含权威数据；-wal 才可能含已提交但未落盘的事务，所以这里
+    只动 -shm、绝不动 -wal，而且是改名保留而非删除。实测残留 -shm 会让
+    `PRAGMA journal_mode=WAL` 直接抛 disk I/O error，进程在 MCP 握手前就退出。
+    """
+    shm = Path(str(path) + "-shm")
+    if not shm.exists() or _sidecar_in_use(shm):
+        return None
+    target = shm.with_name(shm.name + ".stale-" + time.strftime("%Y%m%d-%H%M%S"))
+    try:
+        os.replace(shm, target)
+    except OSError:
+        # 改名失败通常意味着别的进程正开着它：那是活库，不能动。
+        return None
+    return target
+
+
 class Store:
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
-        self._connection.row_factory = sqlite3.Row
         self._write_lock = threading.RLock()
         self._db_lock = threading.RLock()
-        self.db = _LockedConnection(self._connection, self._db_lock)
-        self.db.executescript(SCHEMA)
+        self.recovered_sidecar = None
+        self._open()
         self._migrate_columns()
         from .planning_execution import initialize
         initialize(self)
+
+    def _open(self) -> None:
+        try:
+            self._connect_and_initialize()
+            return
+        except sqlite3.OperationalError as exc:
+            original = exc
+        # 只对“打不开/IO 错误”这一类做残留索引恢复；语法错、表冲突等不该被掩盖。
+        text = str(original).lower()
+        if "disk i/o error" not in text and "unable to open database file" not in text:
+            raise StoreUnavailable(self.path, original) from original
+        moved = _quarantine_stale_shm(self.path)
+        if moved is None:
+            raise StoreUnavailable(self.path, original) from original
+        try:
+            self._connect_and_initialize()
+        except sqlite3.OperationalError as exc:
+            raise StoreUnavailable(self.path, exc, moved) from exc
+        integrity = self.db.execute("PRAGMA quick_check").fetchone()[0]
+        if integrity != "ok":
+            raise StoreUnavailable(self.path, f"quick_check={integrity}", moved)
+        self.recovered_sidecar = moved
+
+    def _connect_and_initialize(self) -> None:
+        connection = sqlite3.connect(self.path, isolation_level=None, check_same_thread=False)
+        connection.row_factory = sqlite3.Row
+        self._connection = connection
+        self.db = _LockedConnection(connection, self._db_lock)
+        self.db.executescript(SCHEMA)
 
     def _migrate_columns(self) -> None:
         member_columns = {row[1] for row in self.db.execute("PRAGMA table_info(members)")}

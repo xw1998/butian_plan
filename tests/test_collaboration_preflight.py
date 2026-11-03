@@ -1,6 +1,6 @@
 import json
 import pytest
-from butian.mcp_server import call_tool, list_tools_page, TOOLS
+from butian.mcp_server import CORE_TOOL_NAMES, call_tool, list_tools_page, TOOLS
 from butian.runtime.service import ButianService
 
 @pytest.fixture
@@ -38,22 +38,28 @@ def test_preflight_missing_provider_and_status(runtime):
     assert 'provider_unavailable' in result['blockers']
     assert call_tool(service, 'butian_status', {})['collaboration_ready'] == 'unchecked'
 
-def test_tools_list_defaults_to_every_callable_tool():
-    """默认不再只给 8 个首屏工具：宿主只读第一页时，推进/收口工具会整片看不见。"""
+def test_tools_list_defaults_to_core_and_full_is_opt_in(monkeypatch):
+    """默认只给闭环必需的工具，避免宿主把 125 份 schema 塞进每次模型请求。"""
     page = list_tools_page()
     names = [t['name'] for t in page['tools']]
     assert 'nextCursor' not in page
-    assert len(names) == len(set(names)) == len(TOOLS)
-    assert set(names) == {t['name'] for t in TOOLS}
-    # 入口在前，但推进与收口必须都在同一份清单里。
+    assert len(names) == len(set(names)) == len(CORE_TOOL_NAMES)
+    assert set(names) <= {t['name'] for t in TOOLS}
+    # 入口在前，推进与收口都在默认清单里。
     assert names[:4] == ['butian_status', 'butian_connect', 'butian_context', 'butian_mode']
     assert {'butian_task_claim', 'butian_task_transition', 'butian_task_review',
             'butian_execution_submit', 'butian_context_compose', 'butian_evidence_record',
             'butian_task_handoff'} <= set(names)
+    # 高级工具不在清单里，但可以经 butian_tool_call 调到。
+    assert 'butian_tool_call' in names
+    assert 'butian_dream_run' not in names
     with pytest.raises(ValueError):
         list_tools_page('tools:1')
+    monkeypatch.setenv('BUTIAN_MCP_TOOLSET', 'full')
+    assert len(list_tools_page()['tools']) == len(TOOLS)
 
-def test_tools_pagination_still_available_when_limit_is_requested():
+def test_tools_pagination_still_available_when_limit_is_requested(monkeypatch):
+    monkeypatch.setenv('BUTIAN_MCP_TOOLSET', 'full')
     names, cursor = [], None
     while True:
         result = list_tools_page(cursor, 8)

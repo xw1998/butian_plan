@@ -2,7 +2,7 @@
 
 **简体中文** | [English](README.en.md)
 
-`MCP Server` · Model Context Protocol · 本地 stdio · Python 3.11+ · 零第三方依赖 · 125 个工具
+`MCP Server` · Model Context Protocol · 本地 stdio · Python 3.11+ · 零第三方依赖 · 126 个工具（默认暴露 21 个核心工具）
 
 > **实践是检验真理的唯一标准**
 
@@ -30,11 +30,11 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
    }
    ```
 
-   装好后验证一次：`butian mcp` 直接起 stdio 服务（没有参数会一直等 JSON-RPC 输入）；工具清单不用记，客户端连上后 `tools/list` 一次返回全部 125 个。
+   装好后验证一次：`butian mcp` 直接起 stdio 服务（没有参数会一直等 JSON-RPC 输入）；工具清单不用记，客户端连上后 `tools/list` 默认返回 21 个核心工具，其余工具用 `butian_tools_catalog` 发现、`butian_tool_call` 调用（需要一次拿全量清单时设 `BUTIAN_MCP_TOOLSET=full`）。
 3. 连一次：在 MCP 里调 `butian_connect`（本机回环免口令；成员多于一个时必须显式给 `member_id`），紧接着调 `butian_context` 拿到当前成员、模式、可见任务与下一步动作。
 3. 交一次活：`butian_goal_submit` 写目标与验收条件 → 照抄 `butian_context` 返回的 `next_actions` 一步步执行 → `butian_evidence_record` 登记真实证据 → `butian_task_handoff`（或 `butian_execution_submit`）交付。
 
-要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数 125 个，但不必先背表——`tools/list` 默认一次返回全部工具（含 `task_claim`、`task_transition`、`task_review`、`execution_submit`、`context_compose`、`evidence_record`、`task_handoff` 这些推进与收口的入口），`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数；找不到工具时用 `butian_tools_catalog`（`query` 子串过滤）加 `butian_tool_schema` 查单个参数。
+要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数 126 个，但不必先背表——`tools/list` 默认只返回闭环必需的 21 个核心工具（含 `task_claim`、`task_transition`、`task_review`、`execution_submit`、`context_compose`、`evidence_record`、`task_handoff` 这些推进与收口的入口），避免宿主把上百份 schema 塞进每次模型请求；其余工具用 `butian_tools_catalog`（`query` 子串过滤）发现、`butian_tool_schema` 查单个参数、`butian_tool_call` 调用。`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数。
 
 仓库根目录的 `server.json` 是按 MCP 官方 registry schema（2025-09-29）写的服务清单，目录站与注册表直接读它；`tools/list` 里的每个工具都带 `inputSchema`，可以先用 `butian_tool_schema` 查单个工具的参数再调用。
 
@@ -53,7 +53,8 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
 - **同一字段两处写法不再报错**：`acceptance_criteria` 既写在顶层又写在 `problem` 里时，列表取并集、标量以顶层为准，并在返回的 `problem_fields_merged` 里回显，不再抛 `problem_field_conflict`。
 - **同名目标幂等**：同一执行者在同一模式下重复提交未结束的同一目标时，返回已有任务（`created: false`、`reused_existing: true`）并附 `next_actions`，不会再多出一条互相看不见的 `todo`。去重按模式分开算：团队目标的根任务挂在派活者名下，单人提交同名目标仍然单独建单，不会被吸进团队任务。
 - **提交即给出入口**：`butian_goal_submit` 返回的 `next_actions` 直接给出推进动作（以及团队模式里每个无 Provider 子任务的宿主执行动作），不必自己猜 revision 与 operation_key。
-- **拼错的参数直接报错**：125 个工具的入参 schema 都是闭合对象（`additionalProperties: false`），未声明的顶层参数不再被静默忽略，而是返回 `unknown_argument`，并附 `accepted`（全部合法字段名）、`unexpected`（你传错的）与 `did_you_mean`（最近似的正确写法）。以前把 `acceptance_criteria` 写成 `acceptance_criterai` 既不报错也不生效，看起来像系统坏了。
+- **拼错的参数直接报错**：全部工具的入参 schema 都是闭合对象（`additionalProperties: false`），未声明的顶层参数不再被静默忽略，而是返回 `unknown_argument`，并附 `accepted`（全部合法字段名）、`unexpected`（你传错的）与 `did_you_mean`（最近似的正确写法）。以前把 `acceptance_criteria` 写成 `acceptance_criterai` 既不报错也不生效，看起来像系统坏了。
+- **本地库残留索引不再让对话中断**：上一次进程崩溃留下的 `team.db-shm` 会让 `PRAGMA journal_mode=WAL` 抛 `disk I/O error`，以前 MCP 进程在握手前就退出，宿主只看到管道 EOF，整轮对话随之失败。现在启动时自动把残留的 `-shm` 改名挪开（`team.db-shm.stale-<时间戳>`，保留不删）让 SQLite 从 WAL 重建索引，并跑一次 `quick_check` 确认数据完好；`-wal` 一个字节都不动，因为它才可能含已提交未落盘的事务。判断到别的进程仍占用索引时不动它，直接返回带`next_actions` 的 `store_unavailable`。服务本身也改成延迟到第一次 `tools/call` 才建，库暂时打不开只让那一次调用失败，`initialize`/`tools/list`/`ping` 与后续对话都还在。
 - **批量写先预览再落盘**：`butian_dream_distill` 与 `butian_dream_abstract` 支持 `preview_only: true`，只读返回 `preview_token`、受影响记忆（`source_states`）、将写几行（`writes`）与是否已有等价记录（`existing`）；把令牌和同样内容传回同一工具才真正写库。预览之后源记忆正文或状态变了，令牌失效并返回 `preview_stale`（带当前令牌与重新预览的动作），不会把基于过期快照的结论写进记忆。设置 `BUTIAN_REQUIRE_DREAM_PREVIEW=1` 可强制两段式（默认关闭，关闭时行为与以前一致）。
 
 ### 没有 Provider 也能走完团队模式
@@ -542,7 +543,7 @@ python -m butian.assets.export /absolute/new/runtime
 
 预检只读检查成员边界、记忆可读性、Provider 配置以及已有任务的认领/审核条件。跨成员未授权时立即返回 `member_memory_access_denied`，不检查或泄露目标成员的记忆、Provider 配置。配置检查通过不等于模型可实际调用：`execution_verified=false` 明确表示尚未执行。证据登记、哈希核验和独立审核未经实际执行时保持 `unchecked`，不会把健康检查当作协作验收。
 
-`butian_status` 区分服务存活与协作就绪，并给出预检入口。标准 MCP `tools/list` 每页返回最多 8 个完整 schema，首屏优先展示状态、目录、schema、预检与目标接口；宿主应按 `nextCursor` 继续翻页。若宿主自动聚合所有页，仍可能展示全部工具；需要简短查询时使用 `butian_tools_catalog`。补天自带 MCP Provider 已支持分页消费。
+`butian_status` 区分服务存活与协作就绪，并给出预检入口。标准 MCP `tools/list` 默认只返回 21 个核心工具（入口排在最前），以免 126 份 schema（约 80KB）把宿主每次模型请求的上下文顶爆；高级工具通过 `butian_tools_catalog` + `butian_tool_schema` + `butian_tool_call` 按需发现与调用。需要一次返回全部工具的宿主可设 `BUTIAN_MCP_TOOLSET=full`；显式传 `limit` 仍可按 `nextCursor` 分页。
 
 当前认证模型要求成员操作的 actor 与 member 相同，没有跨成员委派授权接口。真实数字人执行需要其自身已认证连接与可用 Provider。任务审核还受会话调度员/执行者身份限制；第三位成员并不自动获得审核权。以上预检不会新增授权、自动换身份或伪造独立审核。
 

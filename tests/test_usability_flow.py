@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from butian.mcp_server import TOOLS, call_tool, list_tools_page
+from butian.mcp_server import CORE_TOOL_NAMES, TOOLS, call_tool, list_tools_page
 from butian.runtime.service import ButianService
 
 
@@ -105,14 +105,8 @@ def test_status_reports_identity_and_mode(runtime):
 
 
 def test_first_page_is_a_starter_kit_without_duplicates():
-    names = []
-    cursor = None
-    while True:
-        page = list_tools_page(cursor)
-        names.extend(tool["name"] for tool in page["tools"])
-        cursor = page.get("nextCursor")
-        if cursor is None:
-            break
-    assert len(names) == len(set(names)) == len(TOOLS)
+    names = [tool["name"] for tool in list_tools_page()["tools"]]
+    assert len(names) == len(set(names)) == len(CORE_TOOL_NAMES)
     assert names[:4] == ["butian_status", "butian_connect", "butian_context", "butian_mode"]
     assert "butian_goal_submit" in names[:8]
+    assert len(names) < len(TOOLS)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from butian.version import VERSION
 import json
+import os
 import sys
 from .runtime.service import ButianService
 
@@ -131,9 +132,15 @@ for _name, _description, _fields, _required in [
     _fields.update({field: {"type": "string"} for field in ("member_id", "actor_member_id", "token")})
     TOOLS.append({"name": _name, "description": _description, "inputSchema": {"type": "object", "properties": _fields, "required": ["member_id", "actor_member_id", "token", *_required]}})
 
+SUPPORTED_PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
+
+
 def run(home=None):
     from .runtime.stdio_encoding import InputEncodingError, read_request_line, repair_surrogates, write_frame
-    service = ButianService(home, local_executor=True)
+    # 服务延迟到第一次 tools/call 再建：initialize / tools/list 不依赖数据库。
+    # 以前启动即建服务，本地库打不开（例如残留的 team.db-shm 触发 disk I/O error）会让进程
+    # 在握手前退出，宿主只看到管道 EOF，整轮对话随之中断。
+    service = None
     state = {"actor": None, "token": None}
     try:
         while True:
@@ -159,7 +166,15 @@ def run(home=None):
                 if not isinstance(params, dict):
                     raise ValueError("invalid_jsonrpc_params")
                 if method == "initialize":
-                    result = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": VERSION}}
+                    # 按客户端请求回一个双方都支持的版本；固定回 2024-11-05 会让只认新版本的宿主直接断开。
+                    requested = params.get("protocolVersion")
+                    negotiated = requested if requested in SUPPORTED_PROTOCOL_VERSIONS else SUPPORTED_PROTOCOL_VERSIONS[-1]
+                    result = {"protocolVersion": negotiated, "capabilities": {"tools": {}}, "serverInfo": {"name": "butian", "version": VERSION},
+                              "instructions": ("Call butian_connect once, then butian_context for the next legal action. "
+                                               "Only core tools are listed; discover the rest with butian_tools_catalog and invoke them through butian_tool_call.")}
+                elif method == "ping":
+                    # 宿主用它做存活检查；回 method_not_found 会被当成连接已死而反复重连。
+                    result = {}
                 elif method.startswith("notifications/"):
                     continue
                 elif method == "tools/list":
@@ -167,11 +182,27 @@ def run(home=None):
                 elif method == "tools/call":
                     from .runtime.mcp_guidance import ToolError
                     try:
+                        if service is None:
+                            service = ButianService(home, local_executor=True)
                         payload = call_tool(service, params.get("name"), params.get("arguments", {}), state)
                         result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": False}
                     except ToolError as exc:
                         # Tool failures belong in MCP content: some hosts discard JSON-RPC error.data.
                         payload = {"ok": False, "error": str(exc), "details": exc.details}
+                        result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": True}
+                    except Exception as exc:
+                        if service is not None:
+                            raise
+                        # 库暂时打不开也只让这一次工具调用失败，连接和后续对话继续保留。
+                        # 存储层已经给出结构化原因与下一步动作时原样透出，不要被通用文案盖掉。
+                        specific = getattr(exc, "details", None)
+                        payload = {"ok": False, "error": "service_unavailable",
+                                   "details": {"code": "service_unavailable", "reason": str(exc),
+                                               "store": specific,
+                                               "next_actions": [
+                                                   {"action": "check_butian_home",
+                                                    "note": "确认 BUTIAN_HOME 可写；若存在残留的 team.db-shm，先关闭占用它的进程再重试。"},
+                                                   {"action": "retry", "note": "修复后重发同一次工具调用即可，无需重建连接。"}]}}
                         result = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}], "isError": True}
                 else:
                     if "id" in req:
@@ -186,7 +217,8 @@ def run(home=None):
                 request_id = req.get("id") if isinstance(req, dict) else None
                 write_frame({"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": str(exc), "data": getattr(exc, "details", {"code": str(exc)})}})
     finally:
-        service.close()
+        if service is not None:
+            service.close()
 
 _PROBLEM_FIELD_DOC = ('constraints / known_facts / unknowns / acceptance_criteria / next_actions / '
                        'undesired_outcomes / inputs / outputs / resources / assumptions / disputes / '
@@ -390,6 +422,26 @@ def call_tool(service, name, args, state=None):
     if name in {"butian_member_preflight", "butian_member_import", "butian_migration_runs"}:
         # 历史身份迁移被整体排除：这是明确的功能结论，不是“工具不存在”。
         raise ValueError("historical_identity_migration_out_of_scope")
+    if name == "butian_tool_call":
+        validate_arguments(name, args, TOOLS)
+        target = args.get("name")
+        if target == name:
+            raise ValueError("tool_call_recursion_not_allowed")
+        if target not in {tool["name"] for tool in TOOLS}:
+            raise ToolError("unknown_tool", {
+                "code": "unknown_tool", "tool": target,
+                "next_actions": [{"tool": "butian_tools_catalog"},
+                                 {"tool": "butian_tool_schema", "arguments": {"name": "butian_tools_catalog"}}],
+            })
+        raw_args = args.get("arguments") or {}
+        if not isinstance(raw_args, dict):
+            raise ValueError("invalid_tool_arguments")
+        target_args = dict(raw_args)
+        # 连接信封上的身份同样适用于被调工具；没连接时目标工具仍按自己的 schema 报错。
+        for field in ("actor_member_id", "token"):
+            if args.get(field) and not target_args.get(field):
+                target_args[field] = args[field]
+        return call_tool(service, target, target_args, state)
     if name == "butian_tool_schema":
         validate_arguments(name, args, TOOLS)
         return describe_tool(args["name"], TOOLS)
@@ -946,19 +998,31 @@ TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-onl
 
 TOOLS_PAGE_SIZE = 8
 
-def list_tools_page(cursor=None, limit=None):
-    """MCP tools/list：默认一次返回全部工具。
+# 宿主会把 tools/list 的全部 schema 放进每一次模型请求。125 个工具约 80KB（≈2–3 万 token），
+# 叠加宿主自己的系统提示与历史后，上下文小的模型会返回空结果，表现为“对话失败中断、聊天框很卡”。
+# 默认只暴露闭环必需的入口与推进工具；其余工具用 butian_tools_catalog 发现、butian_tool_call 调用。
+# 需要一次拿全量清单的老宿主可设 BUTIAN_MCP_TOOLSET=full。
+CORE_TOOL_NAMES = (
+    "butian_status", "butian_connect", "butian_context", "butian_mode",
+    "butian_goal_submit", "butian_task_list", "butian_task_tree", "butian_task_create",
+    "butian_task_claim", "butian_task_transition", "butian_task_review", "butian_task_handoff",
+    "butian_context_compose", "butian_evidence_record", "butian_execution_submit",
+    "butian_memory_recall", "butian_memory_practice", "butian_collaboration_preflight",
+    "butian_tools_catalog", "butian_tool_schema", "butian_tool_call",
+)
 
-    以前首页只放 8 个“入口”工具、其余靠 nextCursor 翻页；但宿主（以及很多 MCP
-    客户端）只读第一页，于是 task_claim / task_transition / task_review /
-    execution_submit / context_compose / evidence_record / task_handoff 这些
-    推进与收口的工具根本看不到：任务能建、却无法推进。现在默认全量返回，
-    分页能力保留给显式传 limit 的客户端。
+
+def list_tools_page(cursor=None, limit=None):
+    """MCP tools/list：默认只返回核心工具，BUTIAN_MCP_TOOLSET=full 时返回全部。
+
+    分页能力保留给显式传 limit 的客户端；默认清单本身已经小到不需要翻页。
     """
     first = ("butian_status", "butian_connect", "butian_context", "butian_mode",
              "butian_goal_submit", "butian_task_list", "butian_tools_catalog",
-             "butian_tool_schema")
-    ordered = sorted(TOOLS, key=lambda tool: first.index(tool['name']) if tool['name'] in first else len(first))
+             "butian_tool_schema", "butian_tool_call")
+    profile = os.environ.get("BUTIAN_MCP_TOOLSET", "core").strip().lower()
+    visible = TOOLS if profile in {"full", "all"} else [tool for tool in TOOLS if tool["name"] in CORE_TOOL_NAMES]
+    ordered = sorted(visible, key=lambda tool: first.index(tool['name']) if tool['name'] in first else len(first))
     if cursor is None and limit is None:
         return {"tools": ordered}
     size = TOOLS_PAGE_SIZE if limit is None else limit
@@ -969,10 +1033,10 @@ def list_tools_page(cursor=None, limit=None):
         if not isinstance(cursor, str) or not cursor.startswith("tools:") or not cursor[6:].isdigit():
             raise ValueError("invalid_tools_cursor")
         offset = int(cursor[6:])
-        if offset >= len(TOOLS) or offset % size:
+        if offset >= len(ordered) or offset % size:
             raise ValueError("invalid_tools_cursor")
     result = {"tools": ordered[offset:offset + size]}
-    if offset + size < len(TOOLS):
+    if offset + size < len(ordered):
         result["nextCursor"] = "tools:" + str(offset + size)
     return result
 
@@ -981,6 +1045,15 @@ TOOLS.append({"name": "butian_collaboration_start", "description": "Preflight th
 TOOLS.append({"name": "butian_connect", "description": "Bind this connection to one member once; later calls inherit actor and, on local trust, need no token. Never guesses among multiple members", "inputSchema": {"type": "object", "properties": {"member_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
 TOOLS.append({"name": "butian_context", "description": "One call returns current member, mode, visible tasks with revisions and the next legal action", "inputSchema": {"type": "object", "properties": {"actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
 TOOLS.append({"name": "butian_mode", "description": "Read or switch solo/team for upcoming goals without a session_id; running tasks are preserved", "inputSchema": {"type": "object", "properties": {"action": {"type": "string", "enum": ["get", "set"]}, "mode": {"type": "string", "enum": ["solo", "team"]}, "session_id": {"type": "string"}, "actor_member_id": {"type": "string"}, "token": {"type": "string"}}}})
+
+TOOLS.append({"name": "butian_tool_call",
+              "description": ("Invoke any butian tool by name, including tools hidden from tools/list to keep the host context small; "
+                              "discover names with butian_tools_catalog and parameters with butian_tool_schema"),
+              "inputSchema": {"type": "object", "required": ["name"], "properties": {
+                  "name": {"type": "string", "description": "target butian tool name"},
+                  "arguments": {"type": "object", "description": "arguments passed to the target tool"},
+                  "actor_member_id": {"type": "string", "description": "inherited from butian_connect when omitted"},
+                  "token": {"type": "string", "description": "inherited from butian_connect when omitted"}}}})
 
 # 对外契约收紧：未在 properties 里声明的顶层参数一律拒收。
 # 以前 schema 是开放对象，宿主机把 memberId 写成 member_id 之外的拼法时既不报错也不生效，

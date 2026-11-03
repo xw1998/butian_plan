@@ -13,7 +13,7 @@ const setup=JSON.parse(execFileSync(python,['-c',`import sys,json; from butian.r
 const c=new Client({name:'official-dream-dispatch-acceptance',version:'1.0.0'});
 async function call(name,args={}){const r=await c.callTool({name,arguments:{actor_member_id:'reader',member_id:'reader',token,...args}});assert.equal(r.isError,false);return JSON.parse(r.content.find(x=>x.type==='text').text);}
 try{
- await c.connect(new StdioClientTransport({command:python,args:['-m','butian.cli','mcp'],cwd:root,env:{...process.env,BUTIAN_HOME:home,BUTIAN_MAINTENANCE_ENABLED:'0'},stderr:'pipe'}));
+ await c.connect(new StdioClientTransport({command:python,args:['-m','butian.cli','mcp'],cwd:root,env:{...process.env,BUTIAN_HOME:home,BUTIAN_MAINTENANCE_ENABLED:'0',BUTIAN_MCP_TOOLSET:'full'},stderr:'pipe'}));
  const pkg=await call('butian_execution_export',{task_id:setup.task_id});
  const directory=new Set((await c.listTools()).tools.map(t=>t.name));
  for(const name of pkg.context.match(/butian_[a-z_]+/g)||[])assert(directory.has(name),`Unknown instruction tool: ${name}`);

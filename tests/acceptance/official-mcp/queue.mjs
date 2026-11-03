@@ -10,7 +10,7 @@ const root=fileURLToPath(new URL('../../../',import.meta.url));
 const python=process.env.BUTIAN_TEST_PYTHON;assert(python);
 const home=mkdtempSync(join(root,'.agent_tmp','official-queue-'));
 const token=randomUUID();
-const env={...process.env,BUTIAN_HOME:home,BUTIAN_MAINTENANCE_ENABLED:'0'};
+const env={...process.env,BUTIAN_HOME:home,BUTIAN_MAINTENANCE_ENABLED:'0',BUTIAN_MCP_TOOLSET:'full'};
 execFileSync(python,['-c',"import sys; from butian.runtime.service import ButianService; s=ButianService(sys.argv[1]); [(s.add_member(m,m),s.store.set_member_token(m,sys.argv[2]+m)) for m in ('reader','other')]; s.close()",home,token],{cwd:root,env});
 async function connect(){const c=new Client({name:'official-queue-acceptance',version:'1.0.0'});await c.connect(new StdioClientTransport({command:python,args:['-m','butian.cli','mcp'],cwd:root,env,stderr:'pipe'}));return c;}
 async function call(c,name,args={}){const r=await c.callTool({name,arguments:{actor_member_id:'reader',member_id:'reader',token:token+'reader',...args}});assert.equal(r.isError,false);return JSON.parse(r.content.find(x=>x.type==='text').text);}
