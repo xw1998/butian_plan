@@ -142,11 +142,13 @@ def test_unconfirmed_execution_is_marked_untrustworthy_with_retry_step():
     assert [action['tool'] for action in orphan['next_actions']] == ['butian_context']
     assert orphan['diagnosis']['reason'] == 'provider_status_unknown'
 
-def test_default_tool_list_puts_task_loop_first_but_keeps_everything():
+def test_default_tool_list_keeps_experience_loop_and_points_at_catalog():
+    """首屏只放闭环必经节点；任务树、预检这些推进期工具改走 catalog 按需发现。"""
     names = [tool["name"] for tool in list_tools_page()["tools"]]
-    assert "butian_task_list" in names[:8]
-    # 执行预检不再被藏到第二页：只读第一页的宿主要能看到全部能力。
-    assert "butian_collaboration_preflight" in names
+    assert "butian_task_transition" in names
+    assert "butian_tools_catalog" in names and "butian_tool_call" in names
+    # 首屏不背全量，但藏在 catalog 里的工具仍可被 tool_call 调到。
+    assert "butian_task_list" not in names
 
 def test_team_mode_without_provider_is_not_a_dead_end(runtime):
     """没有 Provider 的团队模式：子任务要能由宿主以成员身份执行完，不能空转。

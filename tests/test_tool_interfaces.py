@@ -157,7 +157,8 @@ def test_http_member_creation_requires_auth(tmp_path):
         server.shutdown(); server.server_close(); thread.join(timeout=3); service.close()
 
 def test_mcp_escalation_schemas_only_require_action_fields():
-    schemas = {item["name"]: item["inputSchema"] for item in mcp_server.TOOLS}
+    # 升级类工具收进长尾归档，仍可调用；schema 契约按全量注册表核对。
+    schemas = {item["name"]: item["inputSchema"] for item in mcp_server.ALL_TOOLS}
     assert "now" not in schemas["butian_tool_issue_escalations"]["properties"]
     assert "now" not in schemas["butian_tool_issue_escalation_claim"]["properties"]
     assert "now" not in schemas["butian_tool_issue_escalation_resolve"]["properties"]

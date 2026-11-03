@@ -107,6 +107,9 @@ def test_status_reports_identity_and_mode(runtime):
 def test_first_page_is_a_starter_kit_without_duplicates():
     names = [tool["name"] for tool in list_tools_page()["tools"]]
     assert len(names) == len(set(names)) == len(CORE_TOOL_NAMES)
-    assert names[:4] == ["butian_status", "butian_connect", "butian_context", "butian_mode"]
-    assert "butian_goal_submit" in names[:8]
+    assert names[:3] == ["butian_connect", "butian_context", "butian_goal_submit"]
+    # 首屏只放“接到活 → 写完经验”这条链路必经的节点，其余按需从 catalog 发现。
+    assert {"butian_memory_recall", "butian_memory_practice", "butian_memory_revise",
+            "butian_evidence_record", "butian_knowledge_source_add", "butian_knowledge_source_read",
+            "butian_tools_catalog", "butian_tool_call"} <= set(names)
     assert len(names) < len(TOOLS)

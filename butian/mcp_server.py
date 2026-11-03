@@ -437,9 +437,9 @@ def call_tool(service, name, args, state=None):
         target = args.get("name")
         if target == name:
             raise ValueError("tool_call_recursion_not_allowed")
-        if target not in {tool["name"] for tool in TOOLS}:
+        if target not in {tool["name"] for tool in ALL_TOOLS}:
             from .runtime.mcp_guidance import unknown_tool_details
-            raise ToolError("unknown_tool", unknown_tool_details(target, TOOLS))
+            raise ToolError("unknown_tool", unknown_tool_details(target, ALL_TOOLS))
         raw_args = args.get("arguments") or {}
         if not isinstance(raw_args, dict):
             raise ValueError("invalid_tool_arguments")
@@ -450,13 +450,24 @@ def call_tool(service, name, args, state=None):
                 target_args[field] = args[field]
         return call_tool(service, target, target_args, state)
     if name == "butian_tool_schema":
-        validate_arguments(name, args, TOOLS)
-        return describe_tool(args["name"], TOOLS)
+        validate_arguments(name, args, ALL_TOOLS)
+        return describe_tool(args["name"], ALL_TOOLS)
     if name == "butian_tools_catalog":
-        validate_arguments(name, args, TOOLS)
+        validate_arguments(name, args, ALL_TOOLS)
         offset, limit = args.get("offset", 0), args.get("limit", 20)
         query = str(args.get("query") or "").strip().lower()
-        tools = [tool for tool in TOOLS if args.get("prefix", "") in tool["name"]]
+        category = str(args.get("category") or "").strip().lower()
+        # 默认只看“激活工具”；归档的 37 个长尾要显式 include_archived 才出现，避免首屏又被塞满。
+        pool = ALL_TOOLS if args.get("include_archived") else list(TOOLS)
+        tools = [tool for tool in pool if (args.get("prefix") or "") in tool["name"]]
+        if category:
+            tools = [tool for tool in tools if category_of(tool["name"]) == category]
+            if not tools:
+                raise ToolError('catalog_category_no_match', {
+                    'code': 'catalog_category_no_match', 'category': args.get("category"),
+                    'valid_categories': {key: text for key, text in CATEGORIES.items()},
+                    'next_actions': [{'tool': 'butian_tools_catalog'},
+                                     {'tool': 'butian_tools_catalog', 'arguments': {'include_archived': True}}]})
         if query:
             tools = [tool for tool in tools
                      if query in tool["name"].lower() or query in str(tool.get("description", "")).lower()]
@@ -465,15 +476,18 @@ def call_tool(service, name, args, state=None):
                     'code': 'catalog_query_no_match', 'query': args.get("query"),
                     'next_actions': [{'tool': 'butian_tools_catalog'},
                                      {'tool': 'butian_tools_catalog', 'arguments': {'prefix': 'butian_task_'}}]})
-        return {"tools": [{"name": tool["name"], "description": tool["description"]} for tool in tools[offset:offset+limit]],
-                "total": len(tools), "next_offset": offset+limit if offset+limit < len(tools) else None}
+        return {"tools": [{"name": tool["name"], "category": category_of(tool["name"]),
+                           "archived": tool["name"] in ARCHIVED_TOOL_NAMES,
+                           "description": tool["description"]} for tool in tools[offset:offset+limit]],
+                "total": len(tools), "next_offset": offset+limit if offset+limit < len(tools) else None,
+                "categories": describe_surface(tool["name"] for tool in TOOLS)}
     # Validate at the public boundary before dictionary indexing; never echo values.
     _extra_accepted = ()
     if name == 'butian_goal_submit':
         # 问题模型字段允许写在顶层（AI 最自然的写法），不算未知参数。
         from .runtime.problem import FIELDS as _PROBLEM_FIELDS
         _extra_accepted = tuple(_PROBLEM_FIELDS)
-    validate_arguments(name, args, TOOLS, extra_accepted=_extra_accepted)
+    validate_arguments(name, args, ALL_TOOLS, extra_accepted=_extra_accepted)
     try:
         return _call_tool(service, name, args, state)
     except OSError as exc:
@@ -997,7 +1011,7 @@ def _call_tool(service, name, args, state=None):
 
 TOOLS.extend([
     {"name": "butian_tool_schema", "description": "Read one tool schema and its authorization restrictions without executing it", "inputSchema": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}}},
-    {"name": "butian_tools_catalog", "description": "Read a compact paginated tool catalog; filter with query or prefix; use butian_tool_schema for parameters", "inputSchema": {"type": "object", "properties": {"offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 30}, "prefix": {"type": "string"}, "query": {"type": "string", "description": "case-insensitive substring match on tool name or description"}}}},
+    {"name": "butian_tools_catalog", "description": "Read the paginated tool catalog grouped by purpose (experience / orchestration / governance / research / host / meta); filter with category, prefix or query; archived long-tail tools appear only with include_archived; use butian_tool_schema for parameters", "inputSchema": {"type": "object", "properties": {"offset": {"type": "integer", "minimum": 0}, "limit": {"type": "integer", "minimum": 1, "maximum": 50}, "prefix": {"type": "string"}, "category": {"type": "string", "enum": ["experience", "orchestration", "governance", "research", "host", "meta"], "description": "只列这一类：experience=攒经验、orchestration=任务编排、governance=工具治理、research=假设实验策略、host=宿主执行、meta=元入口"}, "include_archived": {"type": "boolean", "description": "true 才包含收进长尾的归档工具（它们仍可用 butian_tool_call 调用）"}, "query": {"type": "string", "description": "case-insensitive substring match on tool name or description"}}}},
 ])
 
 TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-only member permission, Provider configuration and task/reviewer readiness checks; never claims execution success. Passing goal adds a local (evidence-ineligible) manual plan when no Provider is available", "inputSchema": {"type": "object", "properties": {**{key: {"type": "string"} for key in ("actor_member_id", "token", "member_id", "task_id", "goal")}, "acceptance_criteria": {"type": "array", "items": {"type": "string"}}}}})
@@ -1005,17 +1019,15 @@ TOOLS.append({"name": "butian_collaboration_preflight", "description": "Read-onl
 
 TOOLS_PAGE_SIZE = 8
 
-# 宿主会把 tools/list 的全部 schema 放进每一次模型请求。125 个工具约 80KB（≈2–3 万 token），
-# 叠加宿主自己的系统提示与历史后，上下文小的模型会返回空结果，表现为“对话失败中断、聊天框很卡”。
-# 默认只暴露闭环必需的入口与推进工具；其余工具用 butian_tools_catalog 发现、butian_tool_call 调用。
-# 需要一次拿全量清单的老宿主可设 BUTIAN_MCP_TOOLSET=full。
-CORE_TOOL_NAMES = (
-    "butian_status", "butian_connect", "butian_context", "butian_mode",
-    "butian_goal_submit", "butian_task_list", "butian_task_tree", "butian_task_create",
-    "butian_task_claim", "butian_task_transition", "butian_task_review", "butian_task_handoff",
-    "butian_context_compose", "butian_evidence_record", "butian_execution_submit",
-    "butian_memory_recall", "butian_memory_practice", "butian_collaboration_preflight",
-    "butian_tools_catalog", "butian_tool_schema", "butian_tool_call",
+# 宿主会把 tools/list 的全部 schema 放进每一次模型请求。工具越多，上下文小的模型越容易返回空结果，
+# 表现为“对话失败中断、聊天框很卡”。所以默认只暴露闭环必经的入口，其余用 catalog 发现、tool_call 调用。
+# 分类与归档名单是代码级事实，见 butian/runtime/tool_surface.py：
+#   - 六类分工（经验闭环/任务编排/工具治理/研究推理/宿主执行/元入口）
+#   - CORE_TOOL_NAMES：默认暴露的 13 个
+#   - ARCHIVED_TOOL_NAMES：收进长尾的 37 个，仍可 tool_call，catalog(include_archived=true) 可查
+# 需要一次拿全量可调工具的宿主可设 BUTIAN_MCP_TOOLSET=full（返回激活工具，不含归档）。
+from .runtime.tool_surface import (  # noqa: E402
+    ARCHIVED_TOOL_NAMES, CATEGORIES, CORE_TOOL_NAMES, category_of, describe_surface, surface_order,
 )
 
 
@@ -1024,12 +1036,9 @@ def list_tools_page(cursor=None, limit=None):
 
     分页能力保留给显式传 limit 的客户端；默认清单本身已经小到不需要翻页。
     """
-    first = ("butian_status", "butian_connect", "butian_context", "butian_mode",
-             "butian_goal_submit", "butian_task_list", "butian_tools_catalog",
-             "butian_tool_schema", "butian_tool_call")
     profile = os.environ.get("BUTIAN_MCP_TOOLSET", "core").strip().lower()
     visible = TOOLS if profile in {"full", "all"} else [tool for tool in TOOLS if tool["name"] in CORE_TOOL_NAMES]
-    ordered = sorted(visible, key=lambda tool: first.index(tool['name']) if tool['name'] in first else len(first))
+    ordered = sorted(visible, key=lambda tool: surface_order(tool["name"]))
     if cursor is None and limit is None:
         return {"tools": ordered}
     size = TOOLS_PAGE_SIZE if limit is None else limit
@@ -1087,3 +1096,14 @@ TOOLS.append({"name": "butian_tool_call",
 # 于是“我设了”变成“状态没变”，看起来像系统坏了。
 for _tool in TOOLS:
     _tool['inputSchema'].setdefault('additionalProperties', False)
+
+# 工具面定稿：ALL_TOOLS 是“所有可调工具”（含归档），TOOLS 是“默认可见工具”。
+# 之所以原地切片而不是重新绑定，是为了让 from .mcp_server import TOOLS 的调用方一起生效。
+# 归档只影响可见性：tool_call / tool_schema / 参数校验仍走 ALL_TOOLS，旧调用不会因为这次收敛而失败。
+ALL_TOOLS = list(TOOLS)
+# 归档名单写错名字会静默“少归档”，宁可启动即炸：目录表必须与注册表逐一对得上。
+_unknown_archived = sorted(ARCHIVED_TOOL_NAMES - {tool["name"] for tool in ALL_TOOLS})
+assert not _unknown_archived, f"ARCHIVED_TOOL_NAMES has unknown tools: {_unknown_archived}"
+_missing_core = sorted(set(CORE_TOOL_NAMES) - {tool["name"] for tool in TOOLS})
+assert not _missing_core, f"CORE_TOOL_NAMES points at archived/unknown tools: {_missing_core}"
+TOOLS[:] = [tool for tool in TOOLS if tool["name"] not in ARCHIVED_TOOL_NAMES]

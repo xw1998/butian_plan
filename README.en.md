@@ -2,7 +2,7 @@
 
 [简体中文](README.md) | **English**
 
-`MCP server` · Model Context Protocol · local stdio · Python 3.11+ · zero dependencies · 126 tools (21 core tools exposed by default)
+`MCP server` · Model Context Protocol · local stdio · Python 3.11+ · zero dependencies · 126 tools (89 callable + 37 archived long tail, 13 exposed by default)
 
 > **Practice is the sole criterion for testing truth.**
 
@@ -30,11 +30,11 @@ The sections after this one explain mechanisms; you do not need to read them bef
    }
    ```
 
-   Sanity check right after install: `butian mcp` starts the stdio server directly (with no arguments it waits for JSON-RPC input); you do not need the tool list by heart — once a client connects, `tools/list` returns 21 core tools by default, the rest are discovered with `butian_tools_catalog` and invoked with `butian_tool_call` (set `BUTIAN_MCP_TOOLSET=full` to expose every tool in one page).
+   Sanity check right after install: `butian mcp` starts the stdio server directly (with no arguments it waits for JSON-RPC input); you do not need the tool list by heart — once a client connects, `tools/list` returns the 13 tools on the experience loop by default, the rest are found with `butian_tools_catalog` (grouped by purpose) and invoked with `butian_tool_call` (set `BUTIAN_MCP_TOOLSET=full` to expose every callable tool in one page).
 3. Connect once: call `butian_connect` over MCP (loopback has no token; with more than one member you must pass `member_id` explicitly), then `butian_context` for the current member, mode, visible tasks and next legal action.
 3. Deliver once: `butian_goal_submit` records the goal and acceptance criteria → copy the `next_actions` returned by `butian_context` → `butian_evidence_record` registers real evidence → `butian_task_handoff` (or `butian_execution_submit`) delivers.
 
-Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are 126 tools, but you do not need the list up front: `tools/list` returns only the 21 core tools needed for the loop — including the ones that move a task forward and close it out (`task_claim`, `task_transition`, `task_review`, `execution_submit`, `context_compose`, `evidence_record`, `task_handoff`) — so hosts do not stuff a hundred-plus schemas into every model request. `butian_context` returns ready-to-copy arguments for the current state; `butian_tools_catalog` (`query` substring filter), `butian_tool_schema` and `butian_tool_call` answer “which tool, which parameters, and how to run it”.
+Only three words matter: **connect → mode → context** (`butian_connect`, `butian_mode`, `butian_context`). There are 126 registered tools, but you do not need the list up front: `tools/list` returns only the 13 nodes on the path from “take a task” to “write the lesson” (`connect`, `context`, `goal_submit`, `task_transition`, `memory_recall`, `memory_practice`, `memory_revise`, `evidence_record`, `knowledge_source_add`, `knowledge_source_read`, `tools_catalog`, `tool_schema`, `tool_call`), so hosts do not stuff a hundred-plus schemas into every model request. Everything else is filed under six categories — `experience`, `orchestration`, `governance`, `research`, `host`, `meta` — discoverable with `butian_tools_catalog` (accepts `category`/`prefix`/`query`), inspectable with `butian_tool_schema`, callable with `butian_tool_call`; 37 long-tail tools sit in the archive (`include_archived: true` lists them) yet stay callable. `butian_context` returns ready-to-copy arguments for the current state.
 
 `server.json` in the repository root is a service manifest written against the official MCP registry schema (2025-09-29), so directories and registries can read it directly; every tool in `tools/list` carries an `inputSchema`, and `butian_tool_schema` returns one tool's parameters before you call it.
 
@@ -487,6 +487,16 @@ The dashboard also reports a content-free `stalled` count for the authenticated 
 
 Dreams belong to the member who triggered them: one member running a dream only changes that member's counters and records. The scheduled maintenance loop (`BUTIAN_MAINTENANCE_ENABLED`, on by default) performs memory maintenance, queue dispatch and due checks, and by default does **not** run dreams for any member, so one member's dream no longer raises everyone else's count. Set `BUTIAN_AUTO_DREAM=1` to restore automatic dreaming; such runs carry `source="auto"`, manual runs carry `source="manual"`, and legacy rows show an unrecorded source. Dashboards report `dream_auto` separately.
 
+## v0.1.14 update
+
+- The tool surface is now classified by purpose and compressed: the 126 registered tools stay registered, but the default list drops from 21 to **13**, and 37 long-tail tools move into an archive. The taxonomy and the archived names live in code (`butian/runtime/tool_surface.py`), not in prose.
+  - Six categories: `experience` 32 (memory, knowledge sources, skill evolution, dreaming, evidence), `orchestration` 28 (tasks, goals, problems, sessions, context, collaboration), `governance` 37 (proposals, versions, review, execution, issue lifecycle), `research` 19 (hypotheses, experiments, strategies, peer questions), `host` 7, `meta` 3. `butian_tools_catalog` gains a `category` filter, returns `category` and `archived` per entry, and a per-category summary at the top level.
+  - The default 13 only cover the path from taking a task to writing the lesson; task tree, claim, review, handoff and execution export are fetched from the catalog when needed. The first `tools/list` page drops from 15.0KB to about 10.8KB.
+  - Archiving changes visibility only: argument validation, `butian_tool_schema` and `butian_tool_call` all resolve against the full registry, so existing calls keep working. A typo in either name list fails at import time instead of silently archiving the wrong set.
+- Shared project and MCP version is **0.1.14**.
+
+[v0.1.14 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.14)
+
 ## v0.1.13 update
 
 - The MCP server was exercised as an agent would use it — a separate `BUTIAN_HOME` plus real stdio JSON-RPC, judging real responses rather than reading code — and seven frictions that could strand a caller were fixed. The bar was practical: would it interrupt the caller, make it retry the same failing call, or read as "the system is broken"?
@@ -557,7 +567,7 @@ Dreams belong to the member who triggered them: one member running a dream only 
 
 Call `butian_collaboration_preflight` with an authenticated `actor_member_id`, optionally a target `member_id` and visible `task_id`. Direct MCP requires that actor's token; a trusted local bridge may inject it. This read-only check reports member boundaries, memory readability, Provider configuration and existing task/reviewer eligibility. Unauthorized cross-member requests are rejected before inspecting target bindings or memory.
 
-Configuration availability is not execution success: `execution_verified=false` stays explicit. Evidence registration/hash verification and independent review remain unverified until actually performed. `butian_status` now distinguishes liveness from collaboration readiness. Standard MCP tool discovery returns 21 core tools by default (common discovery/goal tools first) so that 126 schemas (~80KB) do not overflow the host's per-request context; advanced tools are discovered with `butian_tools_catalog`, inspected with `butian_tool_schema` and invoked with `butian_tool_call`. Set `BUTIAN_MCP_TOOLSET=full` to expose every tool; explicit `limit` still paginates via `nextCursor`.
+Configuration availability is not execution success: `execution_verified=false` stays explicit. Evidence registration/hash verification and independent review remain unverified until actually performed. `butian_status` now distinguishes liveness from collaboration readiness. Standard MCP tool discovery returns the 13 loop tools by default (entry points first, ~10.8KB) so that 126 schemas (~82KB) do not overflow the host's per-request context; everything else is discovered with `butian_tools_catalog` (six purpose categories with per-category counts), inspected with `butian_tool_schema` and invoked with `butian_tool_call`. Set `BUTIAN_MCP_TOOLSET=full` to expose all 89 callable tools (archive excluded); explicit `limit` still paginates via `nextCursor`.
 
 The current authorization model has no cross-member delegation grant. Real member execution requires its authenticated connection and an available Provider. Task review is restricted to its session dispatcher or assignee; an arbitrary third reviewer is not automatically authorized. Preflight does not grant access, switch identities or certify independent execution.
 

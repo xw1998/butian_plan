@@ -58,10 +58,10 @@ def test_gbk_host_console_still_speaks_utf8_and_finishes_a_chinese_task(tmp_path
                                "clientInfo": {"name": "gbk-host", "version": "1"}})
         tools = request("tools/list")["result"]["tools"]
         names = {tool["name"] for tool in tools}
-        # 只读第一页也要能看到推进与收口的工具。
-        assert {"butian_task_claim", "butian_task_transition", "butian_task_review",
-                "butian_execution_submit", "butian_context_compose", "butian_evidence_record",
-                "butian_task_handoff"} <= names
+        # 首屏是闭环必经节点；任务认领/评审/交接改走 catalog，输入中文的主机也不该被塞满 schema。
+        assert {"butian_connect", "butian_context", "butian_goal_submit", "butian_task_transition",
+                "butian_evidence_record", "butian_memory_practice", "butian_tools_catalog",
+                "butian_tool_call"} <= names
 
         call("butian_connect")
         goal = call("butian_goal_submit", goal="把中文实验记录整理成可复核结论",

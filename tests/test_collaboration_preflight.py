@@ -39,17 +39,18 @@ def test_preflight_missing_provider_and_status(runtime):
     assert call_tool(service, 'butian_status', {})['collaboration_ready'] == 'unchecked'
 
 def test_tools_list_defaults_to_core_and_full_is_opt_in(monkeypatch):
-    """默认只给闭环必需的工具，避免宿主把 125 份 schema 塞进每次模型请求。"""
+    """默认只给闭环必经的工具，避免宿主把上百份 schema 塞进每次模型请求。"""
     page = list_tools_page()
     names = [t['name'] for t in page['tools']]
     assert 'nextCursor' not in page
     assert len(names) == len(set(names)) == len(CORE_TOOL_NAMES)
     assert set(names) <= {t['name'] for t in TOOLS}
-    # 入口在前，推进与收口都在默认清单里。
-    assert names[:4] == ['butian_status', 'butian_connect', 'butian_context', 'butian_mode']
-    assert {'butian_task_claim', 'butian_task_transition', 'butian_task_review',
-            'butian_execution_submit', 'butian_context_compose', 'butian_evidence_record',
-            'butian_task_handoff'} <= set(names)
+    # 入口在前；首屏只保留“接到活 → 写完经验”的必经节点，任务认领/评审/交接改走 catalog。
+    assert names[:3] == ['butian_connect', 'butian_context', 'butian_goal_submit']
+    assert {'butian_task_transition', 'butian_evidence_record',
+            'butian_memory_recall', 'butian_memory_practice', 'butian_memory_revise',
+            'butian_knowledge_source_add', 'butian_knowledge_source_read'} <= set(names)
+    assert {'butian_task_claim', 'butian_task_review', 'butian_task_handoff'} & set(names) == set()
     # 高级工具不在清单里，但可以经 butian_tool_call 调到。
     assert 'butian_tool_call' in names
     assert 'butian_dream_run' not in names

@@ -2,7 +2,7 @@
 
 **简体中文** | [English](README.en.md)
 
-`MCP Server` · Model Context Protocol · 本地 stdio · Python 3.11+ · 零第三方依赖 · 126 个工具（默认暴露 21 个核心工具）
+`MCP Server` · Model Context Protocol · 本地 stdio · Python 3.11+ · 零第三方依赖 · 126 个工具（89 个可调 + 37 个长尾归档，默认暴露 13 个）
 
 > **实践是检验真理的唯一标准**
 
@@ -30,11 +30,11 @@ AI 已经能回答很多问题，但长期合作还需要更多：记住你的�
    }
    ```
 
-   装好后验证一次：`butian mcp` 直接起 stdio 服务（没有参数会一直等 JSON-RPC 输入）；工具清单不用记，客户端连上后 `tools/list` 默认返回 21 个核心工具，其余工具用 `butian_tools_catalog` 发现、`butian_tool_call` 调用（需要一次拿全量清单时设 `BUTIAN_MCP_TOOLSET=full`）。
+   装好后验证一次：`butian mcp` 直接起 stdio 服务（没有参数会一直等 JSON-RPC 输入）；工具清单不用记，客户端连上后 `tools/list` 默认返回 13 个闭环必经工具，其余工具用 `butian_tools_catalog` 按用途分类查找、`butian_tool_call` 调用（需要一次拿全部可调工具时设 `BUTIAN_MCP_TOOLSET=full`）。
 3. 连一次：在 MCP 里调 `butian_connect`（本机回环免口令；成员多于一个时必须显式给 `member_id`），紧接着调 `butian_context` 拿到当前成员、模式、可见任务与下一步动作。
 3. 交一次活：`butian_goal_submit` 写目标与验收条件 → 照抄 `butian_context` 返回的 `next_actions` 一步步执行 → `butian_evidence_record` 登记真实证据 → `butian_task_handoff`（或 `butian_execution_submit`）交付。
 
-要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。工具总数 126 个，但不必先背表——`tools/list` 默认只返回闭环必需的 21 个核心工具（含 `task_claim`、`task_transition`、`task_review`、`execution_submit`、`context_compose`、`evidence_record`、`task_handoff` 这些推进与收口的入口），避免宿主把上百份 schema 塞进每次模型请求；其余工具用 `butian_tools_catalog`（`query` 子串过滤）发现、`butian_tool_schema` 查单个参数、`butian_tool_call` 调用。`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数。
+要记住的只有 **连接 → 模式 → 上下文** 三个词：`butian_connect`、`butian_mode`、`butian_context`。注册的工具共 126 个，但不必先背表——`tools/list` 默认只返回 13 个“接到活 → 写完经验”的必经节点（`connect`、`context`、`goal_submit`、`task_transition`、`memory_recall`、`memory_practice`、`memory_revise`、`evidence_record`、`knowledge_source_add`、`knowledge_source_read`、`tools_catalog`、`tool_schema`、`tool_call`），避免宿主把上百份 schema 塞进每次模型请求。其余工具按六类分区存放：`experience` 攒经验、`orchestration` 任务编排、`governance` 工具治理、`research` 假设实验、`host` 宿主执行、`meta` 元入口——用 `butian_tools_catalog`（可传 `category`/`prefix`/`query`）发现、`butian_tool_schema` 查单个参数、`butian_tool_call` 调用；37 个长尾收在归档里，加 `include_archived: true` 才列出，但一直可以调。`butian_context` 的 `next_actions` 按当前状态给可直接复制的调用参数。
 
 仓库根目录的 `server.json` 是按 MCP 官方 registry schema（2025-09-29）写的服务清单，目录站与注册表直接读它；`tools/list` 里的每个工具都带 `inputSchema`，可以先用 `butian_tool_schema` 查单个工具的参数再调用。
 
@@ -487,6 +487,17 @@ python -m butian.assets.export /absolute/new/runtime
 
 自动扫查里“没新材料 / 时间没到”这类没有实际动作的结果不写库：一名成员每小时一条、十人一年约 8.8 万条，会把真正的 `completed` 从看板和“最近 20 条”里挤出去，也让 `dream_skipped` 凭空线性增长。手动触发的跳过仍然照常记录，返回里 `recorded` 字段标明这次结果是否入账。
 
+## v0.1.14 更新
+
+- 工具面按用途分成六类，并做了一次压缩：注册总数 126 不变，但默认清单从 21 个收到 **13 个**，另把 37 个长尾收进归档。分法与名单是代码级事实（`butian/runtime/tool_surface.py`），不靠文档维护。
+  - 六类：`experience` 攒经验 32 个（记忆、知识来源、技能演化、自省蒸馏、证据）、`orchestration` 任务编排 28 个（任务、目标、问题、会话、上下文、协作）、`governance` 工具治理 37 个（提案、版本、审核、执行、问题单）、`research` 假设实验策略与同伴 19 个、`host` 宿主执行与授权 7 个、`meta` 元入口 3 个。`butian_tools_catalog` 新增 `category` 过滤，每条结果回 `category` 与 `archived`，顶层回各类计数。
+  - 默认 13 个只覆盖“接到活 → 写完经验”的必经节点；任务树、认领、评审、交接、执行导出这些推进期工具改为从 catalog 按需取。`tools/list` 首屏从 15.0KB 降到约 10.8KB。
+  - 归档只影响可见性，不影响可调用性：参数校验、`butian_tool_schema`、`butian_tool_call` 一律以全量注册表为准，旧调用不会因为这次收敛而失败。归档名单或核心名单写错名字会在加载时直接断言失败，不会静默少归档。
+  - 收进长尾的主要几族：问题单生命周期（14 个收到 4 个，保留 `report`/`issues`/`repair`/`repair_confirm`）、工作流编排与打包分享（10 个）、工具执行观测长尾（2 个）、策略编排五件套（留 `recommend`，其余 4 个）、同伴互问（留 `ask`/`answer`）、假设动作（留 `grant`/`start`）、会话与租约（3 个）、跨机授权（3 个）。
+- 项目及 MCP 共享版本更新为 **0.1.14**。源码安装后重启 HTTP 后台、重新连接 MCP，分别加载新代码；两者为独立进程。
+
+[v0.1.14 源码](https://gitee.com/xw19981010/butian_plan/tree/v0.1.14)
+
 ## v0.1.13 更新
 
 - 以 Agent 使用者的身份把 MCP 真跑了一遍（独立 `BUTIAN_HOME` + stdio 真实 JSON-RPC，不看代码看实际返回），修掉 7 处会让人卡住的摩擦（判断标准：会不会让调用方中断、反复重试同一个错误，或把错误看成"系统坏了"）。
@@ -559,7 +570,7 @@ python -m butian.assets.export /absolute/new/runtime
 
 预检只读检查成员边界、记忆可读性、Provider 配置以及已有任务的认领/审核条件。跨成员未授权时立即返回 `member_memory_access_denied`，不检查或泄露目标成员的记忆、Provider 配置。配置检查通过不等于模型可实际调用：`execution_verified=false` 明确表示尚未执行。证据登记、哈希核验和独立审核未经实际执行时保持 `unchecked`，不会把健康检查当作协作验收。
 
-`butian_status` 区分服务存活与协作就绪，并给出预检入口。标准 MCP `tools/list` 默认只返回 21 个核心工具（入口排在最前），以免 126 份 schema（约 80KB）把宿主每次模型请求的上下文顶爆；高级工具通过 `butian_tools_catalog` + `butian_tool_schema` + `butian_tool_call` 按需发现与调用。需要一次返回全部工具的宿主可设 `BUTIAN_MCP_TOOLSET=full`；显式传 `limit` 仍可按 `nextCursor` 分页。
+`butian_status` 区分服务存活与协作就绪，并给出预检入口。标准 MCP `tools/list` 默认只返回 13 个闭环必经工具（入口排在最前，约 10.8KB），以免 126 份 schema（约 82KB）把宿主每次模型请求的上下文顶爆；其余工具通过 `butian_tools_catalog` + `butian_tool_schema` + `butian_tool_call` 按需发现与调用，catalog 按六类分区并给出每类数量。需要一次返回全部可调工具的宿主可设 `BUTIAN_MCP_TOOLSET=full`（89 个，不含归档）；显式传 `limit` 仍可按 `nextCursor` 分页。
 
 当前认证模型要求成员操作的 actor 与 member 相同，没有跨成员委派授权接口。真实数字人执行需要其自身已认证连接与可用 Provider。任务审核还受会话调度员/执行者身份限制；第三位成员并不自动获得审核权。以上预检不会新增授权、自动换身份或伪造独立审核。
 
