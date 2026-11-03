@@ -487,6 +487,22 @@ python -m butian.assets.export /absolute/new/runtime
 
 自动扫查里“没新材料 / 时间没到”这类没有实际动作的结果不写库：一名成员每小时一条、十人一年约 8.8 万条，会把真正的 `completed` 从看板和“最近 20 条”里挤出去，也让 `dream_skipped` 凭空线性增长。手动触发的跳过仍然照常记录，返回里 `recorded` 字段标明这次结果是否入账。
 
+## v0.1.13 更新
+
+- 以 Agent 使用者的身份把 MCP 真跑了一遍（独立 `BUTIAN_HOME` + stdio 真实 JSON-RPC，不看代码看实际返回），修掉 7 处会让人卡住的摩擦（判断标准：会不会让调用方中断、反复重试同一个错误，或把错误看成"系统坏了"）。
+  - `arguments: null` 不再被当成参数类型错：JSON-RPC 里 arguments 是可选的，宿主对无参工具发 null 很常见，`butian_status` 一类工具现在照常执行。
+  - 漏传 `params.name` 从 `unknown_tool`（还带 `tool: null`）改成 `tool_name_required`，明确说是缺必填项。
+  - `tools/list` 游标容忍裸数字（宿主或代理把 opaque 游标改写成 `"8"` 时不再整个列表失败）；越过末尾回空页；真正无法解析时错误里带 `expected`/`example`/`next_actions`，客户端能自己纠回来。
+  - 成员 id 拼错回显 `members` 列表与 `did_you_mean`，`next_actions` 直接给可照抄的 `butian_connect`，不再让 Agent 在同一条错字上循环。
+  - 工具名拼错给最多三个近似名（`did_you_mean`），每个下一步动作都带 `why`。
+  - 缺引用型必填字段时，按字段名给出「去哪个工具拿这个 id」：`session_id`→`butian_context`、`task_id`→`butian_task_list`、`memory_id`→`butian_memory_search`、`evidence_ref`→`butian_evidence_record`、`source_id`→`butian_knowledge_source_queue` 等。
+  - `outcome=success` 缺证据时直接指到 `butian_evidence_record`，并写明 `evidence_ref` 必须是已登记的 `evidence_id`（不是文件路径），没有证据就记 `unknown`，不要伪造。
+- 把两处最容易踩的语义写进 schema 本身：`butian_memory_practice.evidence_ref`、`butian_knowledge_source_add.content_hash`（原文 sha256 十六进制摘要）。
+- 以上只改错误引导与容错，没有放宽任何成员边界、任务可见性或审核独立性；新增 6 个回归用例。
+- 项目及 MCP 共享版本更新为 **0.1.13**。源码安装后重启 HTTP 后台、重新连接 MCP，分别加载新代码；两者为独立进程。
+
+[v0.1.13 源码](https://gitee.com/xw19981010/butian_plan/tree/v0.1.13)
+
 ## v0.1.12 更新
 
 - 并行回归不再抖：三处假失败全部按“真实证据”收口，而不是放宽断言。① 执行收尾的租约续期在回环传输上会被已释放作业拒回 400，`urllib` 抛出的是 `OSError` 子类而代码只捕获 `ValueError`，于是一个已经成功结束的执行被记成 `unknown`——续期现在按“建议性调用”处理，连不上、被拒都不构成失败证据，终态一律从持久账本读回。② 本地进程取消用例改成轮询标记文件的内容而非存在性，创建到落盘之间的空窗不再被当成“子进程没起来”。③ 记忆写入的敏感内容扫描加了 token 边界与 GB 11643 校验位：十六进制摘要、流水号里偶然出现的 18 位数字段不再被误判成身份证号（这是并行回归里偶发 `sensitive_memory_content_rejected:national_id` 的来源），真号码必然通过校验，漏检没有变宽。

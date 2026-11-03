@@ -233,3 +233,37 @@ def test_stdio_transport_survives_unavailable_home(tmp_path):
     failure = replies[4]["result"]
     assert failure["isError"] is True
     assert "service_unavailable" in failure["content"][0]["text"]
+
+
+def test_tools_list_tolerates_numeric_cursor_and_explains_bad_one(tmp_path):
+    import json
+    import os
+    from pathlib import Path
+    home = tmp_path / "cursor-home"
+    env = dict(os.environ, BUTIAN_HOME=str(home))
+    env.pop("BUTIAN_PROVIDERS_FILE", None)
+    requests = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "cursor-host", "version": "1"}}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {"limit": 8}},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {"cursor": "8", "limit": 8}},
+        {"jsonrpc": "2.0", "id": 4, "method": "tools/list", "params": {"cursor": "tools:800", "limit": 8}},
+        {"jsonrpc": "2.0", "id": 5, "method": "tools/list", "params": {"cursor": "not-a-cursor"}},
+        {"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "butian_status", "arguments": None}},
+    ]
+    proc = subprocess.run([sys.executable, "-m", "butian.cli", "mcp"], cwd=Path(__file__).resolve().parents[1], env=env,
+                          input="\n".join(json.dumps(item) for item in requests) + "\n", text=True, encoding="utf-8",
+                          capture_output=True, timeout=20)
+    assert proc.returncode == 0, proc.stderr
+    replies = {item["id"]: item for item in map(json.loads, proc.stdout.splitlines())}
+    first = [tool["name"] for tool in replies[2]["result"]["tools"]]
+    second = [tool["name"] for tool in replies[3]["result"]["tools"]]
+    assert first and second and first != second
+    # 已过末尾：回空页而不是报错，避免最后一页之后把连接打断。
+    assert replies[4]["result"]["tools"] == []
+    # 真正无法解析的游标仍报错，但带上格式与下一步动作。
+    assert replies[5]["error"]["data"]["code"] == "invalid_tools_cursor"
+    assert replies[5]["error"]["data"]["next_actions"]
+    # arguments: null 与 {} 同义（宿主常用写法）。
+    status = json.loads(replies[6]["result"]["content"][0]["text"])
+    assert status["ok"] is True and status["service"] == "butian"

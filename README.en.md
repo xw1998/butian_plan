@@ -487,6 +487,22 @@ The dashboard also reports a content-free `stalled` count for the authenticated 
 
 Dreams belong to the member who triggered them: one member running a dream only changes that member's counters and records. The scheduled maintenance loop (`BUTIAN_MAINTENANCE_ENABLED`, on by default) performs memory maintenance, queue dispatch and due checks, and by default does **not** run dreams for any member, so one member's dream no longer raises everyone else's count. Set `BUTIAN_AUTO_DREAM=1` to restore automatic dreaming; such runs carry `source="auto"`, manual runs carry `source="manual"`, and legacy rows show an unrecorded source. Dashboards report `dream_auto` separately.
 
+## v0.1.13 update
+
+- The MCP server was exercised as an agent would use it — a separate `BUTIAN_HOME` plus real stdio JSON-RPC, judging real responses rather than reading code — and seven frictions that could strand a caller were fixed. The bar was practical: would it interrupt the caller, make it retry the same failing call, or read as "the system is broken"?
+  - `arguments: null` is no longer read as a type error: `arguments` is optional in JSON-RPC and hosts routinely send null for parameterless tools, so `butian_status` and friends now just run.
+  - A missing `params.name` reports `tool_name_required` instead of `unknown_tool` with `tool: null`.
+  - `tools/list` accepts a bare numeric cursor (hosts and proxies rewrite opaque cursors to `"8"`), returns an empty page past the end instead of failing the whole listing, and explains genuinely unparseable cursors with `expected`/`example`/`next_actions` so the client can recover.
+  - A mistyped member id now echoes the `members` list and `did_you_mean`, with a copy-pasteable `butian_connect` in `next_actions`, instead of leaving the caller to loop on the same typo.
+  - A mistyped tool name returns up to three nearest names and a `why` on every follow-up action.
+  - Missing reference fields now name the tool that holds the id: `session_id`→`butian_context`, `task_id`→`butian_task_list`, `memory_id`→`butian_memory_search`, `evidence_ref`→`butian_evidence_record`, `source_id`→`butian_knowledge_source_queue`, and so on.
+  - `outcome=success` without evidence points straight at `butian_evidence_record` and states that `evidence_ref` must be a registered `evidence_id` (not a file path); when there is no evidence, record `unknown` rather than fabricate one.
+- Two semantics that were easiest to get wrong are now in the schemas themselves: `butian_memory_practice.evidence_ref` and `butian_knowledge_source_add.content_hash` (hex SHA-256 of the original content).
+- Only error guidance and tolerance changed; no member boundary, task visibility or review independence was relaxed. Six regression cases were added.
+- Package and shared MCP version: **0.1.13**. Restart the HTTP backend and reconnect MCP after updating a source installation; these are separate processes.
+
+[v0.1.13 source](https://gitee.com/xw19981010/butian_plan/tree/v0.1.13)
+
 ## v0.1.12 update
 
 - The parallel regression no longer flakes: three false failures were closed with real evidence rather than looser assertions. (1) Lease renewal at execution teardown hits a 400 from an already-released job on the loopback transport; `urllib` raises an `OSError` subclass while the code only caught `ValueError`, so a finished success was recorded as `unknown`. Renewal is now an advisory call — an unreachable or refused renewal is not evidence of failure, and the terminal state always comes from the durable ledger. (2) The local-process cancellation test now polls the marker file's *content* instead of its existence, so the window between creation and flush is no longer read as "the child never started". (3) The sensitive-content scan on memory writes gained token boundaries plus the GB 11643 check digit: an 18-digit run that happens to appear inside a hex digest or a serial number is no longer mistaken for a national ID (that was the source of the intermittent `sensitive_memory_content_rejected:national_id` in the parallel regression). Real numbers always pass the checksum, so nothing that used to be caught is now missed.

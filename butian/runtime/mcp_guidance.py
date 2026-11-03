@@ -14,10 +14,29 @@ class ToolError(ValueError):
         self.details = details
 
 
+def unknown_tool_details(name, tools):
+    """工具名不存在时的可行动返回：给近似名，而不是只让调用方去翻目录。"""
+    names = [tool['name'] for tool in tools]
+    matches = difflib.get_close_matches(name, names, n=3, cutoff=0.6) if isinstance(name, str) else []
+    details = {
+        'code': 'unknown_tool', 'tool': name,
+        'reason': '工具名必须来自 catalog；tools/list 只列核心入口，其余工具用 butian_tool_call 调用。',
+        'next_actions': [
+            {'tool': 'butian_tools_catalog',
+             'why': '按关键字查全部工具名（默认清单只含核心入口，查不到不等于不存在）。'},
+            {'tool': 'butian_tool_schema', 'arguments': {'name': matches[0] if matches else '<catalog 返回的工具名>'},
+             'why': '确认参数与授权后再用 butian_tool_call 执行。'},
+        ],
+    }
+    if matches:
+        # 只给名字，不猜调用意图：拼错一个字符时直接照抄 did_you_mean 就能继续。
+        details['did_you_mean'] = matches
+    return details
+
 def describe_tool(name, tools):
     tool = next((tool for tool in tools if tool['name'] == name), None)
     if tool is None:
-        raise ToolError('unknown_tool', {'code': 'unknown_tool', 'next_actions': [{'tool': 'butian_tools_catalog'}]})
+        raise ToolError('unknown_tool', unknown_tool_details(name, tools))
     result = copy.deepcopy(tool)
     if name.startswith('butian_experiment_'):
         result['authorization'] = {'available_to_member': False, 'reason': 'admin_authorization_required',
@@ -27,12 +46,31 @@ def describe_tool(name, tools):
     return result
 
 
+# 引用型必填字段 → 能列出这些 id 的工具。缺少 id 时最常见的问题不是“参数拼错”，
+# 而是 Agent 不知道该去哪个工具里拿，于是反复重试同一个错误。
+_MISSING_FIELD_LOOKUPS = {
+    'session_id': ('butian_context', '当前会话 id 在 context 返回的 sessions 里；也可由 butian_goal_submit 带回。'),
+    'task_id': ('butian_task_list', '先列出当前成员可见的任务，再拿 task_id 与 revision。'),
+    'member_id': ('butian_context', '成员 id 见 context 的 members 列表。'),
+    'memory_id': ('butian_memory_search', '先搜出相关记忆的 memory_id（记忆按成员隔离）。'),
+    'evidence_ref': ('butian_evidence_record', 'evidence_ref 必须是已登记的 evidence_id，不能是文件路径或自造串。'),
+    'evidence_ids': ('butian_evidence_record', '先登记证据拿到 evidence_id 再引用。'),
+    'source_id': ('butian_knowledge_source_queue', '先看已登记或已排队的源，拿 source_id。'),
+    'tool_id': ('butian_tool_list', '先列出自己的工具与版本，拿 tool_id 与 version。'),
+    'claim_id': ('butian_knowledge_source_read', 'claim_id 来自某个源的读取结果。'),
+    'experiment_id': ('butian_experiment_list', '先列出已有实验，拿 experiment_id。'),
+}
+
 def validate_arguments(name, args, tools, *, extra_accepted=()):
     tool = next((tool for tool in tools if tool['name'] == name), None)
     if tool is None:
         describe_tool(name, tools)
     if not isinstance(args, dict):
-        raise ToolError('invalid_tool_arguments', {'code': 'invalid_tool_arguments', 'expected': 'object'})
+        raise ToolError('invalid_tool_arguments', {
+            'code': 'invalid_tool_arguments', 'tool': name, 'expected': 'object',
+            'reason': 'arguments 必须是 JSON 对象；无参工具传 {} 或不传。',
+            'next_actions': [{'tool': 'butian_tool_schema', 'arguments': {'name': name},
+                              'why': '确认这个工具的参数形态后重传。'}]})
     schema = tool['inputSchema']
     # 拼错的参数名以前会被静默丢掉：宿主以为设置生效了，实际什么都没改。
     # 这里在类型检查之前先拒收，并给出最近似的合法字段名。
@@ -73,7 +111,14 @@ def validate_arguments(name, args, tools, *, extra_accepted=()):
     if issues:
         missing = [issue['field'] for issue in issues if issue.get('reason') == 'required']
         identity_fields = ('member_id', 'actor_member_id', 'token')
-        next_actions = [{'tool': 'butian_tool_schema', 'arguments': {'name': name}}]
+        next_actions = [{'tool': 'butian_tool_schema', 'arguments': {'name': name},
+                         'why': '按 details.issues 补齐字段；漏传或拼错不会被静默忽略。'}]
+        # 缺的是“引用型字段”时，只让调用方看 schema 等于让它自己猜 id 从哪来：
+        # 这里直接给出能列出该 id 的那一个工具。
+        for field in missing:
+            lookup = _MISSING_FIELD_LOOKUPS.get(field)
+            if lookup and all(action.get('tool') != lookup[0] for action in next_actions):
+                next_actions.append({'tool': lookup[0], 'why': lookup[1]})
         if any(field in identity_fields for field in missing):
             next_actions.insert(0, {'tool': 'butian_connect', 'arguments': {'member_id': '<成员 id>'},
                                     'why': '身份由连接建立后自动注入，连一次就不必每次重传 member_id/actor_member_id/token。'})
@@ -135,6 +180,15 @@ _EXISTENCE_HINTS = {
          'why': '预览之后源记忆或提交内容变了：重新预览拿新令牌，旧令牌不能用来写库。'}]),
     'unknown_argument': ('accepted_argument_names', [
         {'tool': 'butian_tool_schema', 'why': '按 details.accepted 里的名字重传；拼错的参数不会被静默忽略。'}]),
+    'practice_success_evidence_required': ('registered_evidence_for_success_outcome', [
+        {'tool': 'butian_evidence_record', 'arguments': {'path': '<本地证据文件路径>'},
+         'why': 'outcome=success 必须带已登记证据：evidence_record 返回的 evidence_id 才是 evidence_ref 的合法取值。'},
+        {'tool': 'butian_memory_practice',
+         'why': '暂时没有可核验证据时把 outcome 记成 unknown，不要伪造 evidence_ref 去过闸门。'}]),
+    'practice_evidence_not_valid': ('valid_registered_evidence', [
+        {'tool': 'butian_evidence_record', 'arguments': {'path': '<本地证据文件路径>'},
+         'why': 'evidence_ref 只能是本成员已登记的 evidence_id；来源文件改动过就重新登记拿新 id。'},
+        {'tool': 'butian_memory_practice', 'why': '先确认这条记忆属于当前成员，再重试同一次实践记录。'}]),
     'problem_field_conflict': ('one_source_per_problem_field', [
         {'tool': 'butian_problem_get', 'why': '先看已保存的问题定义，再决定改哪一处。'}]),
     'unknown_problem_field': ('known_problem_fields', [
@@ -181,6 +235,28 @@ def recovery_details(service, name, args, code):
                                        {'action': 'ask_member_to_run', 'note': '跨成员执行应由该成员自己的连接完成，结果不能算到当前成员名下。'}]
         else:
             details['next_actions'] = [{'tool': 'butian_context', 'why': '先确认当前连接的身份与可见范围。'}]
+        return details
+    if code.startswith('member_not_found'):
+        # 成员 id 拼错是最常见的摩擦：直接回显可选成员与近似名，别让 Agent 再花一次调用去猜。
+        requested = code.split(':', 1)[1] if ':' in code else args.get('member_id')
+        known = []
+        try:
+            known = [row['member_id'] for row in service.store.db.execute('SELECT member_id FROM members ORDER BY member_id').fetchall()]
+        except Exception:
+            known = []
+        details.update(missing_conditions=['existing_member'])
+        if requested:
+            details['requested_member_id'] = requested
+            match = difflib.get_close_matches(str(requested), known, n=1, cutoff=0.6)
+            if match:
+                details['did_you_mean'] = {'member_id': match[0]}
+        if known:
+            details['members'] = known
+        suggestion = (details.get('did_you_mean') or {}).get('member_id') or (known[0] if len(known) == 1 else '<members 里的成员 id>')
+        details['next_actions'] = [
+            {'tool': 'butian_connect', 'arguments': {'member_id': suggestion},
+             'why': '成员 id 必须来自 members 列表；这里只回显名字与近似项，不会替你猜一个身份。'},
+            {'tool': 'butian_context', 'why': '看成员列表与角色，确认该由哪个成员来做这件事。'}]
         return details
     if code in {'task_access_denied', 'task_not_found', 'task_visibility_denied'}:
         # 看不到这个任务时不回显任何任务状态（安全契约）。

@@ -76,6 +76,10 @@ description: 正确使用补天 Butian MCP 完成任务执行、经验召回、�
 - `handoff_task_not_owned_or_active`：核对身份、assignee、running/review 状态及 revision；跨成员无权限就停止，不冒用身份。团队子任务处于 todo 时应走上面的外部执行闭环，不是 handoff。
 - `awaiting_external_execution` 不是完成、也不是卡死：按返回的 `next_actions` 走 connect → export → 执行 → evidence → submit，不要手工改状态或重复提交目标。
 - `evidence_not_found`：引用已登记 evidence_id，不传文件路径作 evidence_ref。
+- `unknown_tool` / `unknown_argument`：看 `details.did_you_mean` 与 `accepted`，照抄最近似的名字重试，不要翻遍目录试名字。
+- `member_not_found`：`details.members` 是可选成员，`did_you_mean` 给近似 id；身份不猜、不跨成员借用。
+- `invalid_tool_arguments`：缺引用型字段时 `next_actions` 已指出该去哪个工具拿这个 id（session_id/task_id/memory_id/evidence_ref/source_id 等），先去拿再重试。
+- `practice_success_evidence_required`：`outcome=success` 必须带已登记 `evidence_id`；没有证据就把 `outcome` 记成 `unknown`，不要伪造。
 - revision 冲突先读最新状态，不盲重试带副作用的旧请求；幂等键只能用于同一操作内容。
 
 ## 经验与做梦

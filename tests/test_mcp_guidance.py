@@ -96,3 +96,50 @@ def test_stdio_error_contains_machine_readable_data(tmp_path, monkeypatch):
     error = json.loads(result['content'][0]['text'])
     assert error['details']['code'] == 'invalid_tool_arguments'
     assert any(issue['field'] == 'path' for issue in error['details']['issues'])
+
+
+def test_unknown_tool_offers_nearest_names(runtime):
+    service, _ = runtime
+    with pytest.raises(ToolError) as error:
+        call_tool(service, 'butian_tool_call', {'name': 'butian_memory_recallz', 'arguments': {}})
+    details = error.value.details
+    assert details['code'] == 'unknown_tool'
+    assert details['did_you_mean'][0] == 'butian_memory_recall'
+    assert all(action.get('why') for action in details['next_actions'])
+
+
+def test_member_not_found_lists_members_and_suggests(runtime):
+    service, _ = runtime
+    with pytest.raises(ToolError) as error:
+        call_tool(service, 'butian_connect', {'member_id': 'owner1'}, state={})
+    details = error.value.details
+    assert details['missing_conditions'] == ['existing_member']
+    assert {'owner', 'other'} <= set(details['members'])
+    assert details['did_you_mean']['member_id'] in {'owner', 'other'}
+    assert details['next_actions'][0]['arguments']['member_id'] == details['did_you_mean']['member_id']
+
+
+def test_practice_success_without_evidence_points_at_evidence_record(runtime):
+    service, auth = runtime
+    args = {**auth, 'memory_id': 'mem_x', 'kind': 'lesson', 'content': 'c',
+            'outcome': 'success', 'independent_key': 'k1'}
+    with pytest.raises(ToolError) as error:
+        call_tool(service, 'butian_memory_practice', args)
+    details = error.value.details
+    assert details['code'] == 'practice_success_evidence_required'
+    assert details['next_actions'][0]['tool'] == 'butian_evidence_record'
+    assert details['missing_conditions'] == ['registered_evidence_for_success_outcome']
+
+
+def test_missing_tool_name_is_named_not_unknown(runtime):
+    service, _ = runtime
+    with pytest.raises(ToolError) as error:
+        call_tool(service, None, {})
+    assert error.value.details['code'] == 'tool_name_required'
+    assert error.value.details['missing_conditions'] == ['tool_name']
+
+
+def test_null_arguments_equal_empty_object(runtime):
+    service, _ = runtime
+    result = call_tool(service, 'butian_status', None)
+    assert result['service'] == 'butian'
