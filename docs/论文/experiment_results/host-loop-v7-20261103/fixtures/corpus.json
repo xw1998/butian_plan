@@ -1,0 +1,8 @@
+{
+  "protocol": "host-loop-v7",
+  "seed": 20261103,
+  "entities": 120,
+  "tasks": 72,
+  "rounds": 3,
+  "archive_chars": 37873
+}

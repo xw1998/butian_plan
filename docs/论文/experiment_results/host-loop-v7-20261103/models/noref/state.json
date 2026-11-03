@@ -1,0 +1,17 @@
+{
+  "protocol": "host-loop-v7",
+  "arm": "noref",
+  "source_id": "src_174231558b3944d39c778b8b6a9b7e99",
+  "source_sha256": "1379e3219ed8ba52c962496ac6cf168bdcc9e4096ed030095649f4fe1f7da9d6",
+  "archive": "D:\\工作\\git_project\\butian_plan\\docs\\论文\\experiment_results\\host-loop-v7-20261103\\fixtures\\contract-manual-120.txt",
+  "archive_chars": 37873,
+  "archive_bytes": 38063,
+  "verified": {
+    "source_id": "src_174231558b3944d39c778b8b6a9b7e99",
+    "status": "verified",
+    "expected_hash": "1379e3219ed8ba52c962496ac6cf168bdcc9e4096ed030095649f4fe1f7da9d6",
+    "actual_hash": "1379e3219ed8ba52c962496ac6cf168bdcc9e4096ed030095649f4fe1f7da9d6",
+    "snapshot_saved": true
+  },
+  "created_at": 1793698944.194878
+}

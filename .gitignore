@@ -219,3 +219,32 @@ _tmp_*.py
 !/docs/论文/experiment_results/host-loop-v6-20261103/models/*/calls/
 !/docs/论文/experiment_results/host-loop-v6-20261103/models/*/calls/*/
 !/docs/论文/experiment_results/host-loop-v6-20261103/models/*/calls/*/*.json
+
+# Real-host multiround arm 7 (2026-11-03, host-loop-v7): formation-side effectiveness.
+# Library starts empty; the host fills it while working, then we ask whether its own notes are
+# reusable (reads saved), whether the reuse is real, and whether bad notes contaminate answers.
+# Protocol, runner, result document, stage records, raw model transcripts stay public; SQLite
+# homes (production/) and the evidence artifacts stay private.
+!/docs/论文/实验协议-真实宿主多轮-v7.md
+!/docs/论文/run_host_v7_formation_study.py
+!/docs/论文/真实宿主多轮验证结果-v7-20261103.md
+!/docs/论文/experiment_results/host-loop-v7-20261103/
+!/docs/论文/experiment_results/host-loop-v7-20261103/summary.json
+!/docs/论文/experiment_results/host-loop-v7-20261103/fixtures/
+!/docs/论文/experiment_results/host-loop-v7-20261103/fixtures/*.json
+!/docs/论文/experiment_results/host-loop-v7-20261103/fixtures/*.txt
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/state.json
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/form-state.json
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/mcp-trace.jsonl
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/fixtures/
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/fixtures/*.json
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/fixtures/*.txt
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/stages/
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/stages/*.json
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/calls/
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/calls/*/
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/calls/*/*.json
+!/docs/论文/experiment_results/host-loop-v7-20261103/models/*/calls/*/*.jsonl
+!/docs/论文/实验进度-v7-断点续跑.md

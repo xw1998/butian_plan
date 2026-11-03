@@ -1,0 +1,8 @@
+{
+  "calibration001": {
+    "content": "RULE {\"entity\": \"calibration001\", \"family\": \"calibration\", \"offset\": 4, \"scale\": 125, \"version\": 1}",
+    "version": 1,
+    "status": "candidate",
+    "writes": 1
+  }
+}
